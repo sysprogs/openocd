@@ -19,6 +19,8 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl COMMAND sh ARG
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc COMMAND sh ARGS -c "${CMAKE_CURRENT_SOURCE_DIR}/helper/bin2char.sh < ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl > ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc" MAIN_DEPENDENCY ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl)
 
+string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d")
+
 add_executable(openocd openocd.c main.c hello.c ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc)
 target_link_libraries(openocd 
 	xsvf
@@ -41,7 +43,7 @@ target_link_libraries(openocd
 	target
 	ws2_32 hidapi setupapi usb usb-1.0 ftd2xx helper)
 	
-SET_TARGET_PROPERTIES(openocd PROPERTIES COMPILE_FLAGS "-DPKGBLDDATE=\\\"\\\" -DRELSTR=\\\"\\\" -DGITVERSION=\\\"\\\"")
+SET_TARGET_PROPERTIES(openocd PROPERTIES COMPILE_FLAGS "-DPKGBLDDATE=\\\"${BUILD_TIMESTAMP}\\\" -DRELSTR=\\\"\\\" -DGITVERSION=\\\"\\\"")
 
 install(TARGETS openocd DESTINATION bin)
 INSTALL(FILES jtag/drivers/OpenULINK/ulink_firmware.hex DESTINATION share/openocd/OpenULINK)

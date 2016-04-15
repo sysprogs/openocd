@@ -35,6 +35,7 @@ add_library(ocdflashnor
 	sim3x.c
 	spi.c
 	stellaris.c
+	msp432p4.c
 	stm32f1x.c
 	stm32f2x.c
 	stm32l4x.c

@@ -48,7 +48,7 @@
 #endif
 
 #define OPENOCD_VERSION	\
-	"Open On-Chip Debugger " VERSION RELSTR " (" PKGBLDDATE ")"
+	"Open On-Chip Debugger " VERSION RELSTR " (" PKGBLDDATE ") [https://github.com/sysprogs/openocd]"
 
 static const char openocd_startup_tcl[] = {
 #include "startup_tcl.inc"
