@@ -1,0 +1,80 @@
+add_library(openrisc openrisc/or1k.c openrisc/or1k_du_adv.c openrisc/or1k_tap_mohor.c openrisc/or1k_tap_vjtag.c openrisc/or1k_tap_xilinx_bscan.c openrisc/jsp_server.c)
+
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xscale_debug.inc COMMAND sh ARGS -c "${CMAKE_CURRENT_SOURCE_DIR}/../helper/bin2char.sh < ${CMAKE_CURRENT_SOURCE_DIR}/xscale/debug_handler.bin > ${CMAKE_CURRENT_BINARY_DIR}/xscale_debug.inc" MAIN_DEPENDENCY xscale/debug_handler.bin)
+
+add_library(target
+	adi_v5_jtag.c
+	adi_v5_swd.c
+	algorithm.c
+	arm11.c
+	arm11_dbgtap.c
+	arm720t.c
+	arm7tdmi.c
+	arm7_9_common.c
+	arm920t.c
+	arm926ejs.c
+	arm946e.c
+	arm966e.c
+	arm9tdmi.c
+	armv4_5.c
+	armv4_5_cache.c
+	armv4_5_mmu.c
+	armv7a.c
+	armv7a_cache.c
+	armv7a_cache_l2x.c
+	armv7m.c
+	armv7m_trace.c
+	arm_adi_v5.c
+	arm_disassembler.c
+	arm_dpm.c
+	arm_jtag.c
+	arm_semihosting.c
+	arm_simulator.c
+	avr32_ap7k.c
+	avr32_jtag.c
+	avr32_mem.c
+	avr32_regs.c
+	avrt.c
+	breakpoints.c
+	cortex_a.c
+	cortex_m.c
+	dsp563xx.c
+	dsp563xx_once.c
+	dsp5680xx.c
+	embeddedice.c
+	etb.c
+	etm.c
+	etm_dummy.c
+	fa526.c
+	feroceon.c
+	hla_target.c
+	image.c
+	lakemont.c
+	mips32.c
+	mips32_dmaacc.c
+	mips32_pracc.c
+	mips_ejtag.c
+	mips_m4k.c
+	nds32.c
+	nds32_aice.c
+	nds32_cmd.c
+	nds32_disassembler.c
+	nds32_reg.c
+	nds32_tlb.c
+	nds32_v2.c
+	nds32_v3.c
+	nds32_v3m.c
+	nds32_v3_common.c
+	quark_d20xx.c
+	quark_x10xx.c
+	register.c
+	smp.c
+	target.c
+	target_request.c
+	testee.c
+	trace.c
+	x86_32_common.c
+	xscale.c
+	${CMAKE_CURRENT_BINARY_DIR}/xscale_debug.inc)
+	
+SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})
