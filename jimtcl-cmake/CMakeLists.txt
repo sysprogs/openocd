@@ -10,6 +10,20 @@ endforeach(jim_src)
 
 INCLUDE (CheckIncludeFiles)
 SET(JIM_VERSION 76)
+
+if (WIN32)
+    set(TCL_PLATFORM_OS "mingw")
+    set(TCL_PLATFORM_PATH_SEPARATOR ";")
+    set(TCL_PLATFORM_PLATFORM "windows")
+endif (WIN32)
+
+if (UNIX)
+    set(TCL_PLATFORM_OS "linux")
+    set(TCL_PLATFORM_PATH_SEPARATOR ":")
+    set(TCL_PLATFORM_PLATFORM "unix")
+endif (UNIX)
+
+
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/jim-config.h.in ${CMAKE_CURRENT_BINARY_DIR}/jim-config.h)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/jimautoconf.h.in ${CMAKE_CURRENT_BINARY_DIR}/jimautoconf.h)
 
