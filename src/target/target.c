@@ -1150,6 +1150,9 @@ int target_get_gdb_reg_list(struct target *target,
 int target_step(struct target *target,
 		int current, uint32_t address, int handle_breakpoints)
 {
+    if (target->rtos && target->rtos->type->step_hook && target->rtos->type->step_hook(target, current, address, handle_breakpoints) == ERROR_OK)
+        return ERROR_OK;
+    
 	return target->type->step(target, current, address, handle_breakpoints);
 }
 

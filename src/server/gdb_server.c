@@ -1091,7 +1091,7 @@ static inline int gdb_reg_pos(struct target *target, int pos, int len)
  * The format of reg->value is little endian
  *
  */
-static void gdb_str_to_target(struct target *target,
+void gdb_str_to_target(struct target *target,
 		char *tstr, struct reg *reg)
 {
 	int i;
@@ -1537,6 +1537,22 @@ static int gdb_step_continue_packet(struct connection *connection,
 		address = strtoul(packet + 1, NULL, 16);
 	else
 		current = 1;
+    
+    if (target->frozen && target->smp && target->head)
+    {
+        for (struct target_list *pLst = target->head; pLst; pLst = pLst->next)
+        {
+            struct target *pThisTarget = pLst->target;
+            if (!pThisTarget)
+                continue;
+            if (!pThisTarget->frozen)
+            {
+                target = pThisTarget;
+                break;
+            }
+        }
+
+    }
 
 	gdb_running_type = packet[0];
 	if (packet[0] == 'c') {
