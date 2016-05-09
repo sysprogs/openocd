@@ -52,9 +52,11 @@ struct plugin_flash_bank
     
     uint32_t FLASHPlugin_ProgramSync;
     uint32_t FLASHPlugin_ProgramAsync;
+    uint32_t FLASHPlugin_NotImplemented;
     
     struct WorkAreaInfo WorkArea;
     unsigned int stack_size;
+    unsigned int write_block_size;
 };
 
 static int call_plugin_func(struct target *target, int timeout, uint32_t function, uint32_t sp, uint32_t *result, int argc, ...);
@@ -87,6 +89,11 @@ int save_region(struct target *target, struct memory_backup *region, Elf32_Addr 
     region->original_section = sectionNumber;
         
     return target_read_memory(target, region->base_address, 4, (region->size + 3) / 4, (uint8_t *)region->original_contents);
+}
+
+static uint32_t plugin_make_return_addr(uint32_t addr)
+{
+    return addr | 1;    //ARM-specific: Force THUMB mode
 }
 
 static int loaded_plugin_load(struct target *target, struct advanced_elf_image *image, struct loaded_plugin *plugin, uint32_t init_done_address, unsigned stackSize)
@@ -162,6 +169,8 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
 
         retval = target_run_algorithm(target, 0, NULL, sizeof(reg_params) / sizeof(reg_params[0]), reg_params, plugin->entry, init_done_address, FLASH_WRITE_TIMEOUT, &armv7m_info);
         breakpoint_remove(target, init_done_address);
+        if (retval != ERROR_OK)
+            LOG_ERROR("FLASH plugin did not call FLASHPlugin_InitDone(). Ensure it is declared as non-inline.");
     }
     
     return retval;
@@ -296,121 +305,22 @@ FLASH_BANK_COMMAND_HANDLER(plugin_flash_bank_command)
     retval = locate_symbol(&info->image, URL, &info->FLASHPlugin_Unload, "FLASHPlugin_Unload");
     if (retval != ERROR_OK)
         return retval;
-  
+    
     info->FLASHPlugin_ProgramSync = advanced_elf_image_find_symbol(&info->image, "FLASHPlugin_ProgramSync");
     info->FLASHPlugin_ProgramAsync = advanced_elf_image_find_symbol(&info->image, "FLASHPlugin_ProgramAsync");
+    info->FLASHPlugin_NotImplemented = advanced_elf_image_find_symbol(&info->image, "FLASHPlugin_NotImplemented");
     
     if (!info->FLASHPlugin_ProgramAsync && !info->FLASHPlugin_ProgramSync)
     {
         LOG_ERROR("%s: invalid FLASH plugin. Neither 'FLASHPlugin_ProgramSync' nor 'FLASHPlugin_ProgramAsync' is defined.", URL);
         return ERROR_IMAGE_FORMAT_ERROR;
     }
-    
+  
     info->stack_size = stackSize;
     bank->driver_priv = info;
     info->probed = 0;
 
     return ERROR_OK;
-}
-
-static int plugin_write_block(struct flash_bank *bank,
-    const uint8_t *buffer,
-    uint32_t offset,
-    uint32_t count)
-{
-#if 0
-    struct target *target = bank->target;
-    uint32_t buffer_size = 16384;
-    struct working_area *write_algorithm;
-    struct working_area *source;
-    uint32_t address = bank->base + offset;
-    struct reg_param reg_params[5];
-    struct armv7m_algorithm armv7m_info;
-    int retval = ERROR_OK;
-    
-    if (target_alloc_working_area(target,
-        sizeof(plugin_flash_write_code),
-        &write_algorithm) != ERROR_OK) {
-        LOG_WARNING("no working area available, can't do block memory writes");
-        return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
-    }
-
-    retval = target_write_buffer(target,
-        write_algorithm->address,
-        sizeof(plugin_flash_write_code),
-        plugin_flash_write_code);
-    if (retval != ERROR_OK)
-        return retval;
-
-        	/* memory buffer */
-    while (target_alloc_working_area_try(target, buffer_size, &source) != ERROR_OK) {
-        buffer_size /= 2;
-        if (buffer_size <= 256) {
-        	/* we already allocated the writing code, but failed to get a
-        	 * buffer, free the algorithm */
-            target_free_working_area(target, write_algorithm);
-
-            LOG_WARNING("no large enough working area available, can't do block memory writes");
-            return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
-        }
-    }
-
-    armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
-    armv7m_info.core_mode = ARM_MODE_THREAD;
-
-    init_reg_param(&reg_params[0], "r0", 32, PARAM_IN_OUT);		/* buffer start, status (out) */
-    init_reg_param(&reg_params[1], "r1", 32, PARAM_OUT);		/* buffer end */
-    init_reg_param(&reg_params[2], "r2", 32, PARAM_OUT);		/* target address */
-    init_reg_param(&reg_params[3], "r3", 32, PARAM_OUT);		/* count (halfword-16bit) */
-    init_reg_param(&reg_params[4], "r4", 32, PARAM_OUT);		/* flash base */
-
-    buf_set_u32(reg_params[0].value, 0, 32, source->address);
-    buf_set_u32(reg_params[1].value, 0, 32, source->address + source->size);
-    buf_set_u32(reg_params[2].value, 0, 32, address);
-    buf_set_u32(reg_params[3].value, 0, 32, count);
-    buf_set_u32(reg_params[4].value, 0, 32, STM32_FLASH_BASE);
-
-    retval = target_run_flash_async_algorithm(target,
-        buffer,
-        count,
-        2,
-        0,
-        NULL,
-        5,
-        reg_params,
-        source->address,
-        source->size,
-        write_algorithm->address,
-        0,
-        &armv7m_info);
-
-    if (retval == ERROR_FLASH_OPERATION_FAILED) {
-        LOG_ERROR("error executing plugin flash write algorithm");
-
-        uint32_t error = buf_get_u32(reg_params[0].value, 0, 32) & FLASH_ERROR;
-
-        if (error & FLASH_WRPERR)
-            LOG_ERROR("flash memory write protected");
-
-        if (error != 0) {
-            LOG_ERROR("flash write failed = %08" PRIx32, error);
-            /* Clear but report errors */
-            target_write_u32(target, STM32_FLASH_SR, error);
-            retval = ERROR_FAIL;
-        }
-    }
-
-    target_free_working_area(target, source);
-    target_free_working_area(target, write_algorithm);
-
-    destroy_reg_param(&reg_params[0]);
-    destroy_reg_param(&reg_params[1]);
-    destroy_reg_param(&reg_params[2]);
-    destroy_reg_param(&reg_params[3]);
-    destroy_reg_param(&reg_params[4]);
-    return retval;
-#endif
-    return 0;
 }
 
 int plugin_write_sync(struct target *target,
@@ -442,6 +352,81 @@ int plugin_write_sync(struct target *target,
     return result;
 }
 
+int plugin_write_async(struct target *target,
+    struct plugin_flash_bank *plugin_info,
+    struct loaded_plugin *loaded_plugin,
+    uint32_t offset,
+    const uint8_t *buffer,
+    uint32_t size)
+{
+    const int fifo_header_size = 8;
+    unsigned workAreaSize = MIN(MAX(size, plugin_info->write_block_size) + plugin_info->write_block_size + fifo_header_size, plugin_info->WorkArea.Size);
+    workAreaSize -= fifo_header_size;
+    workAreaSize = (workAreaSize / plugin_info->write_block_size) * plugin_info->write_block_size;
+    workAreaSize += fifo_header_size;
+    if (workAreaSize > plugin_info->WorkArea.Size)
+    {
+        LOG_ERROR("Computed worka area size (0x%x) is smaller then the available size (0x%x)", workAreaSize, plugin_info->WorkArea.Size);
+        return ERROR_FLASH_BANK_INVALID;
+    }
+    
+    int retval = loaded_plugin_backup_workarea(loaded_plugin, plugin_info->WorkArea.Address, workAreaSize);
+    if (retval != ERROR_OK)
+        return retval;
+    
+    struct armv7m_algorithm armv7m_info;
+    struct reg_param reg_params[6];
+    unsigned sp = (loaded_plugin->sp - 4) & ~3;
+    unsigned return_addr = sp;
+    armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
+    armv7m_info.core_mode = ARM_MODE_THREAD;
+
+    init_reg_param(&reg_params[0], "r0", 32, PARAM_IN_OUT);
+    init_reg_param(&reg_params[1], "r1", 32, PARAM_OUT);
+    init_reg_param(&reg_params[2], "r2", 32, PARAM_OUT);
+    init_reg_param(&reg_params[3], "r3", 32, PARAM_OUT);
+    init_reg_param(&reg_params[4], "sp", 32, PARAM_OUT);
+    init_reg_param(&reg_params[5], "lr", 32, PARAM_OUT);
+
+    buf_set_u32(reg_params[0].value, 0, 32, offset);
+    buf_set_u32(reg_params[1].value, 0, 32, plugin_info->WorkArea.Address);
+    buf_set_u32(reg_params[2].value, 0, 32, plugin_info->WorkArea.Address + workAreaSize);
+    buf_set_u32(reg_params[3].value, 0, 32, size);
+    buf_set_u32(reg_params[4].value, 0, 32, sp);
+    buf_set_u32(reg_params[5].value, 0, 32, plugin_make_return_addr(return_addr));
+    
+    int bp = breakpoint_add(target, return_addr, 2, BKPT_SOFT);
+    
+    retval = target_run_flash_async_algorithm(target,
+        buffer,
+        (size + plugin_info->write_block_size - 1) / plugin_info->write_block_size,
+        plugin_info->write_block_size,
+        0,
+        NULL,
+        sizeof(reg_params)/sizeof(reg_params[0]),
+        reg_params,
+        plugin_info->WorkArea.Address,
+        workAreaSize,
+        plugin_info->FLASHPlugin_ProgramAsync,
+        return_addr,
+        &armv7m_info);
+    
+    breakpoint_remove(target, return_addr);
+    unsigned result = 0;
+    
+    if (retval == ERROR_OK)
+    {
+        result = buf_get_u32(reg_params[0].value, 0, 32);
+
+        if (result < size)
+        {
+            LOG_ERROR("FLASHPlugin_ProgramAsync returned %d\n", result);
+            retval = ERROR_FLASH_BANK_INVALID;
+        }
+    }
+    
+    return retval;
+}
 
 static int plugin_write(struct flash_bank *bank,
     const uint8_t *buffer,
@@ -455,16 +440,26 @@ static int plugin_write(struct flash_bank *bank,
     int retval = loaded_plugin_load(target, &plugin_info->image, &loaded_plugin, plugin_info->FLASHPlugin_InitDone, plugin_info->stack_size);
     if (retval == ERROR_OK)
     {
-        uint32_t done = 0;
-        while (done < count)
+        if (plugin_info->FLASHPlugin_ProgramAsync && plugin_info->FLASHPlugin_ProgramAsync != plugin_info->FLASHPlugin_NotImplemented)
+            retval = plugin_write_async(target, plugin_info, &loaded_plugin, offset, buffer, count);
+        else if (plugin_info->FLASHPlugin_ProgramSync && plugin_info->FLASHPlugin_ProgramSync != plugin_info->FLASHPlugin_NotImplemented)
         {
-            int doneNow = plugin_write_sync(target, plugin_info, &loaded_plugin, offset + done, buffer + done, count - done);
-            if (doneNow < 0)
+            uint32_t done = 0;
+            while (done < count)
             {
-                retval = ERROR_FLASH_BANK_INVALID;   
-                break;
+                int doneNow = plugin_write_sync(target, plugin_info, &loaded_plugin, offset + done, buffer + done, count - done);
+                if (doneNow < 0)
+                {
+                    retval = ERROR_FLASH_BANK_INVALID;   
+                    break;
+                }
+                done += doneNow;
             }
-            done += doneNow;
+        }
+        else
+        {
+            LOG_ERROR("Neither FLASHPlugin_ProgramAsync() or FLASHPlugin_ProgramSync() are properly defined in the FLASH plugin. Cannot program FLASH memory.");
+            retval = ERROR_FLASH_BANK_INVALID;
         }
     }
     
@@ -483,7 +478,7 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
     init_reg_param(&reg_params[0], "sp", 32, PARAM_IN_OUT);
     init_reg_param(&reg_params[1], "lr", 32, PARAM_IN_OUT); //ARM-specific!
     init_reg_param(&reg_params[r0ParamIndex], arg_reg_names[0], 32, PARAM_IN_OUT); //ARM-specific!
-    buf_set_u32(reg_params[1].value, 0, 32, sp | 1);    //Forced thumb mode!
+    buf_set_u32(reg_params[1].value, 0, 32, plugin_make_return_addr(sp));    //Forced thumb mode!
     int reg_param_count = r0ParamIndex;
     
     sp -= 4;
@@ -538,6 +533,7 @@ struct FLASHBankInfo
     unsigned BaseAddress;
     unsigned BlockCount;
     unsigned BlockSize;
+    unsigned WriteBlockSize;
 };
 
 
@@ -583,6 +579,13 @@ static int plugin_probe(struct flash_bank *bank)
         bank->num_sectors = bankInfo.BlockCount;
         bank->sectors = malloc(sizeof(struct flash_sector) * bank->num_sectors);
         memset(bank->sectors, 0, sizeof(struct flash_sector) * bank->num_sectors);
+        plugin_info->write_block_size = bankInfo.WriteBlockSize;
+        if (!plugin_info->write_block_size)
+        {
+            LOG_ERROR("FLASH plugin returned invalid WriteBlockSize. Writing external FLASH will not be possible.");
+            retval = ERROR_FLASH_BANK_INVALID;
+        }
+        
         for (int i = 0; i < bank->num_sectors; i++)
         {
             bank->sectors[i].offset = i * bankInfo.BlockSize;
