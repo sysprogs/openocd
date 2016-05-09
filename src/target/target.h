@@ -189,6 +189,7 @@ struct target {
 	struct backoff_timer backoff;
 	int smp;							/* add some target attributes for smp support */
     int frozen;                         /* frozen targets won't be auto-resumed when receiving a 'step' or 'continue' command from gdb*/
+    int report_flash_progress;          /* If set to 1, FLASH writing operations will generate detailed progress messages */
 	struct target_list *head;
 	/* the gdb service is there in case of smp, we have only one gdb server
 	 * for all smp target

@@ -891,6 +891,7 @@ int target_run_flash_async_algorithm(struct target *target,
 	int timeout = 0;
 
 	const uint8_t *buffer_orig = buffer;
+    uint32_t count_orig = count;
 
 	/* Set up working area. First word is write pointer, second word is read pointer,
 	 * rest is fifo data area. */
@@ -934,7 +935,7 @@ int target_run_flash_async_algorithm(struct target *target,
 
 		LOG_DEBUG("offs 0x%zx count 0x%" PRIx32 " wp 0x%" PRIx32 " rp 0x%" PRIx32,
 			(size_t) (buffer - buffer_orig), count, wp, rp);
-
+    	
 		if (rp == 0) {
 			LOG_ERROR("flash write algorithm aborted by target");
 			retval = ERROR_FLASH_OPERATION_FAILED;
@@ -996,6 +997,9 @@ int target_run_flash_async_algorithm(struct target *target,
 		retval = target_write_u32(target, wp_addr, wp);
 		if (retval != ERROR_OK)
 			break;
+    	
+    	if (target->report_flash_progress)
+    	    LOG_INFO("FLASH: Programmed %d/%d bytes...", buffer - buffer_orig, block_size * count_orig);
 	}
 
 	if (retval != ERROR_OK) {
@@ -5757,6 +5761,20 @@ static void binprint(struct command_context *cmd_ctx, const char *text, const ui
 		command_print_sameline(cmd_ctx, " %02x", buf[i]);
 	command_print(cmd_ctx, " ");
 }
+    
+COMMAND_HANDLER(handle_report_flash_progress)
+{
+    struct target *target = get_current_target(CMD_CTX);
+    if (CMD_ARGC == 1)
+    {
+        int new_val = 0;
+        COMMAND_PARSE_ON_OFF(CMD_ARGV[0], new_val);
+        target->report_flash_progress = new_val;
+    }
+    command_print(CMD_CTX, "FLASH progress reporting is now %s\n", target->report_flash_progress ? "on" : "off");
+    return ERROR_OK;
+}
+    
 
 COMMAND_HANDLER(handle_test_mem_access_command)
 {
@@ -6167,6 +6185,13 @@ static const struct command_registration target_exec_command_handlers[] = {
 		.help = "Test the target's memory access functions",
 		.usage = "size",
 	},
+    {
+        .name = "report_flash_progress",
+        .handler = handle_report_flash_progress,
+        .mode = COMMAND_EXEC,
+        .help = "Enables/disables reporting FLASH programming progress",
+        .usage = "[on/off]",
+    },
 
 	COMMAND_REGISTRATION_DONE
 };
