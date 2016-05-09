@@ -33,6 +33,7 @@
 #define FLASH_ERASE_TIMEOUT 60000
 #define FLASH_WRITE_TIMEOUT 1000
 #define FLASH_INIT_TIMEOUT 1000
+#define FLASH_PROTECT_TIMEOUT 1000
 
 struct WorkAreaInfo
 {
@@ -54,9 +55,14 @@ struct plugin_flash_bank
     uint32_t FLASHPlugin_ProgramAsync;
     uint32_t FLASHPlugin_NotImplemented;
     
+    //Optional entries
+    uint32_t FLASHPlugin_ProtectSectors;
+    uint32_t FLASHPlugin_CheckSectorProtection;
+    
     struct WorkAreaInfo WorkArea;
     unsigned int stack_size;
     unsigned int write_block_size;
+    char *plugin_file;
 };
 
 static int call_plugin_func(struct target *target, int timeout, uint32_t function, uint32_t sp, uint32_t *result, int argc, ...);
@@ -315,10 +321,15 @@ FLASH_BANK_COMMAND_HANDLER(plugin_flash_bank_command)
         LOG_ERROR("%s: invalid FLASH plugin. Neither 'FLASHPlugin_ProgramSync' nor 'FLASHPlugin_ProgramAsync' is defined.", URL);
         return ERROR_IMAGE_FORMAT_ERROR;
     }
+    
+    info->FLASHPlugin_CheckSectorProtection = advanced_elf_image_find_symbol(&info->image, "FLASHPlugin_CheckSectorProtection");
+    info->FLASHPlugin_ProtectSectors = advanced_elf_image_find_symbol(&info->image, "FLASHPlugin_ProtectSectors");
+    
   
     info->stack_size = stackSize;
     bank->driver_priv = info;
     info->probed = 0;
+    info->plugin_file = strdup(URL);
 
     return ERROR_OK;
 }
@@ -610,7 +621,9 @@ static int plugin_auto_probe(struct flash_bank *bank)
 
 static int get_plugin_info(struct flash_bank *bank, char *buf, int buf_size)
 {
-    //TODO: show info
+    struct plugin_flash_bank *plugin_info = bank->driver_priv;
+    
+    snprintf(buf, buf_size, "Plugin-managed FLASH\r\nPlugin file: %s", plugin_info->plugin_file);
     return ERROR_OK;
 }
 
@@ -643,6 +656,89 @@ static int plugin_erase(struct flash_bank *bank, int first, int last)
     loaded_plugin_unload(&loaded_plugin, plugin_info->FLASHPlugin_Unload);
     return retval;
 }
+
+static int plugin_protect(struct flash_bank *bank, int set, int first, int last)
+{
+    struct target *target = bank->target;
+    struct plugin_flash_bank *plugin_info = bank->driver_priv;
+    struct loaded_plugin loaded_plugin;
+    
+    if (!plugin_info->FLASHPlugin_ProtectSectors || plugin_info->FLASHPlugin_ProtectSectors == plugin_info->FLASHPlugin_NotImplemented)
+        return ERROR_OK;    //Nothing to do
+    
+    int retval = loaded_plugin_load(target, &plugin_info->image, &loaded_plugin, plugin_info->FLASHPlugin_InitDone, plugin_info->stack_size);
+    if (retval == ERROR_OK)
+    {
+        while (first <= last)
+        {
+            int32_t result;
+            retval = call_plugin_func(target, FLASH_PROTECT_TIMEOUT, plugin_info->FLASHPlugin_ProtectSectors, loaded_plugin.sp, &result, 3, set, first, last - first + 1);
+            if (retval != ERROR_OK)
+                break;
+            if (result < 0)
+            {
+                LOG_ERROR("FLASHPlugin_ProtectSectors() returned %d", result);
+                retval = ERROR_FLASH_BANK_INVALID;
+            }
+            
+            first += result;
+        }
+    }
+    
+    loaded_plugin_unload(&loaded_plugin, plugin_info->FLASHPlugin_Unload);
+    return retval;
+}
+
+static int plugin_protect_check(struct flash_bank *bank)
+{
+    struct target *target = bank->target;
+    struct plugin_flash_bank *plugin_info = bank->driver_priv;
+    struct loaded_plugin loaded_plugin;
+    
+    if (!plugin_info->FLASHPlugin_CheckSectorProtection || plugin_info->FLASHPlugin_CheckSectorProtection == plugin_info->FLASHPlugin_NotImplemented)
+        return ERROR_OK;    //Nothing to do
+    
+    unsigned workAreaSize = MIN((bank->num_sectors + 7) / 8, plugin_info->WorkArea.Size);
+    uint8_t *pBuf = malloc(workAreaSize);
+    
+    int retval = loaded_plugin_load(target, &plugin_info->image, &loaded_plugin, plugin_info->FLASHPlugin_InitDone, plugin_info->stack_size);
+    if (retval == ERROR_OK)
+    {
+        int retval = loaded_plugin_backup_workarea(&loaded_plugin, plugin_info->WorkArea.Address, workAreaSize);
+        if (retval == ERROR_OK)
+        {
+            for (int sector =  0; sector < bank->num_sectors;)
+            {
+                int sectors_to_check = MIN(workAreaSize * 8, bank->num_sectors - sector);
+                int32_t result;
+                retval = call_plugin_func(target, FLASH_PROTECT_TIMEOUT, plugin_info->FLASHPlugin_CheckSectorProtection, loaded_plugin.sp, &result, 3, sector, sectors_to_check, plugin_info->WorkArea.Address);
+                if (retval != ERROR_OK)
+                    break;
+                if (result < 0 || result > sectors_to_check)
+                {
+                    LOG_ERROR("FLASHPlugin_ProtectSectors() returned %d", result);
+                    retval = ERROR_FLASH_BANK_INVALID;
+                    break;
+                }
+                
+                retval = target_read_buffer(target, plugin_info->WorkArea.Address,(sectors_to_check + 7) / 8, pBuf);
+                if (retval != ERROR_OK)
+                    break;
+            
+                for (int i = 0; i < result; i++)
+                {
+                    bank->sectors[sector + i].is_protected = pBuf[i / 8] & (1 << (i % 8));
+                }
+                
+                sector += result;
+            }
+        }
+    }
+    
+    free(pBuf);
+    loaded_plugin_unload(&loaded_plugin, plugin_info->FLASHPlugin_Unload);
+    return retval;
+}
  
 struct flash_driver plugin_flash = {
     .name = "plugin",
@@ -654,4 +750,6 @@ struct flash_driver plugin_flash = {
     .auto_probe = plugin_auto_probe,
     .erase_check = default_flash_blank_check,
     .info = get_plugin_info,
+    .protect_check = plugin_protect_check,
+    .protect = plugin_protect
 };
