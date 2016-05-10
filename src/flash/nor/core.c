@@ -777,3 +777,19 @@ int flash_write(struct target *target, struct image *image,
 {
 	return flash_write_unlock(target, image, written, erase, false);
 }
+
+bool is_address_inside_flash(struct target *target, uint32_t addr)
+{
+    for (struct flash_bank *c = flash_banks; c; c = c->next) 
+    {
+        if (c->target != target)
+            continue;
+
+        if ((addr >= c->base) && (addr <= c->base + (c->size - 1))) 
+        {
+            return true;
+        }
+    }
+    return false;
+}
+

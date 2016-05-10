@@ -41,6 +41,8 @@
 #include "arm_opcodes.h"
 #include "arm_semihosting.h"
 #include <helper/time_support.h>
+#include <flash/nor/core.h>
+#include <flash/nor/imp.h>
 
 /* NOTE:  most of this should work fine for the Cortex-M1 and
  * Cortex-M0 cores too, although they're ARMv6-M not ARMv7-M.
@@ -56,12 +58,19 @@
 /**
  * Returns the type of a break point required by address location
  */
-#define BKPT_TYPE_BY_ADDR(addr) ((addr) < 0x20000000 ? BKPT_HARD : BKPT_SOFT)
 
 /* forward declarations */
 static int cortex_m_store_core_reg_u32(struct target *target,
 		uint32_t num, uint32_t value);
 static void cortex_m_dwt_free(struct target *target);
+
+static enum breakpoint_type cortex_m_breakpoint_type_by_addr(struct target *target, uint32_t addr)
+{
+    if (is_address_inside_flash(target, addr))
+        return BKPT_HARD;
+    else
+        return BKPT_SOFT;
+}
 
 static int cortexm_dap_read_coreregister_u32(struct target *target,
 	uint32_t *value, int regnum)
@@ -875,7 +884,7 @@ static int cortex_m_step(struct target *target, int current,
 				if (breakpoint)
 					retval = cortex_m_set_breakpoint(target, breakpoint);
 				else
-					retval = breakpoint_add(target, pc_value, 2, BKPT_TYPE_BY_ADDR(pc_value));
+        			retval = breakpoint_add(target, pc_value, 2, cortex_m_breakpoint_type_by_addr(target, pc_value));
 				bool tmp_bp_set = (retval == ERROR_OK);
 
 				/* No more breakpoints left, just do a step */
@@ -1131,17 +1140,20 @@ int cortex_m_set_breakpoint(struct target *target, struct breakpoint *breakpoint
 		return ERROR_OK;
 	}
 
-	if (cortex_m->auto_bp_type)
-		breakpoint->type = BKPT_TYPE_BY_ADDR(breakpoint->address);
+    if (cortex_m->auto_bp_type && cortex_m->fp_code_available)
+		breakpoint->type = cortex_m_breakpoint_type_by_addr(target, breakpoint->address);
 
-	if (breakpoint->type == BKPT_HARD) {
-		uint32_t fpcr_value;
-		while (comparator_list[fp_num].used && (fp_num < cortex_m->fp_num_code))
-			fp_num++;
-		if (fp_num >= cortex_m->fp_num_code) {
-			LOG_ERROR("Can not find free FPB Comparator!");
-			return ERROR_FAIL;
-		}
+    if (breakpoint->type == BKPT_HARD) {
+        while (comparator_list[fp_num].used && (fp_num < cortex_m->fp_num_code))
+            fp_num++;
+        if (fp_num >= cortex_m->fp_num_code) {
+            LOG_WARNING("Can not find free FPB Comparator. Trying to use a soft breakpoint instead of a hard one.");
+            breakpoint->type = BKPT_SOFT;
+        }
+    }
+    
+    if (breakpoint->type == BKPT_HARD) {
+        uint32_t fpcr_value;
 		breakpoint->set = fp_num + 1;
 		fpcr_value = breakpoint->address | 1;
 		if (cortex_m->fp_rev == 0) {
@@ -1171,22 +1183,33 @@ int cortex_m_set_breakpoint(struct target *target, struct breakpoint *breakpoint
 		}
 	} else if (breakpoint->type == BKPT_SOFT) {
 		uint8_t code[4];
+        buf_set_u32(code, 0, 32, ARMV5_T_BKPT(0x11));
 
 		/* NOTE: on ARMv6-M and ARMv7-M, BKPT(0xab) is used for
 		 * semihosting; don't use that.  Otherwise the BKPT
 		 * parameter is arbitrary.
 		 */
-		buf_set_u32(code, 0, 32, ARMV5_T_BKPT(0x11));
-		retval = target_read_memory(target,
-				breakpoint->address & 0xFFFFFFFE,
-				breakpoint->length, 1,
-				breakpoint->orig_instr);
-		if (retval != ERROR_OK)
-			return retval;
-		retval = target_write_memory(target,
-				breakpoint->address & 0xFFFFFFFE,
-				breakpoint->length, 1,
-				code);
+    	if (is_address_inside_flash(target, breakpoint->address))
+    	{
+        	retval = target_request_flash_breakpoint(target, breakpoint->address, breakpoint->length, true, code, breakpoint->orig_instr);
+    	}
+    	else
+    	{
+        	retval = target_read_memory(target,
+            	breakpoint->address & 0xFFFFFFFE,
+            	breakpoint->length,
+            	1,
+            	breakpoint->orig_instr);
+        	if (retval != ERROR_OK)
+            	return retval;
+        	
+        	retval = target_write_memory(target,
+            	breakpoint->address & 0xFFFFFFFE,
+            	breakpoint->length,
+            	1,
+            	code);
+    	}
+    	
 		if (retval != ERROR_OK)
 			return retval;
 		breakpoint->set = true;
@@ -1232,17 +1255,32 @@ int cortex_m_unset_breakpoint(struct target *target, struct breakpoint *breakpoi
 			comparator_list[fp_num].fpcr_value);
 	} else {
 		/* restore original instruction (kept in target endianness) */
-		if (breakpoint->length == 4) {
-			retval = target_write_memory(target, breakpoint->address & 0xFFFFFFFE, 4, 1,
-					breakpoint->orig_instr);
-			if (retval != ERROR_OK)
-				return retval;
-		} else {
-			retval = target_write_memory(target, breakpoint->address & 0xFFFFFFFE, 2, 1,
-					breakpoint->orig_instr);
-			if (retval != ERROR_OK)
-				return retval;
-		}
+    	
+    	if (is_address_inside_flash(target, breakpoint->address))
+    	{
+        	retval = target_request_flash_breakpoint(target, breakpoint->address, breakpoint->length, false, NULL, NULL);
+    	}
+    	else
+    	{
+        	if (breakpoint->length == 4) {
+            	retval = target_write_memory(target,
+                	breakpoint->address & 0xFFFFFFFE,
+                	4,
+                	1,
+                	breakpoint->orig_instr);
+            	if (retval != ERROR_OK)
+                	return retval;
+        	}
+        	else {
+            	retval = target_write_memory(target,
+                	breakpoint->address & 0xFFFFFFFE,
+                	2,
+                	1,
+                	breakpoint->orig_instr);
+            	if (retval != ERROR_OK)
+                	return retval;
+        	}
+    	}
 	}
 	breakpoint->set = false;
 
@@ -1254,9 +1292,9 @@ int cortex_m_add_breakpoint(struct target *target, struct breakpoint *breakpoint
 	struct cortex_m_common *cortex_m = target_to_cm(target);
 
 	if (cortex_m->auto_bp_type)
-		breakpoint->type = BKPT_TYPE_BY_ADDR(breakpoint->address);
+		breakpoint->type = cortex_m_breakpoint_type_by_addr(target, breakpoint->address);
 
-	if (breakpoint->type != BKPT_TYPE_BY_ADDR(breakpoint->address)) {
+    if (breakpoint->type != cortex_m_breakpoint_type_by_addr(target, breakpoint->address)) {
 		if (breakpoint->type == BKPT_HARD) {
 			LOG_INFO("flash patch comparator requested outside code memory region");
 			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
@@ -1269,8 +1307,8 @@ int cortex_m_add_breakpoint(struct target *target, struct breakpoint *breakpoint
 	}
 
 	if ((breakpoint->type == BKPT_HARD) && (cortex_m->fp_code_available < 1)) {
-		LOG_INFO("no flash patch comparator unit available for hardware breakpoint");
-		return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
+    	breakpoint->type = BKPT_SOFT;
+		LOG_INFO("Inserting a FLASH soft-breakpoint at 0x%08x...", breakpoint->address);
 	}
 
 	if (breakpoint->length == 3) {
@@ -1298,9 +1336,6 @@ int cortex_m_remove_breakpoint(struct target *target, struct breakpoint *breakpo
 		LOG_WARNING("target not halted");
 		return ERROR_TARGET_NOT_HALTED;
 	}
-
-	if (cortex_m->auto_bp_type)
-		breakpoint->type = BKPT_TYPE_BY_ADDR(breakpoint->address);
 
 	if (breakpoint->set)
 		cortex_m_unset_breakpoint(target, breakpoint);
@@ -1882,6 +1917,154 @@ static void cortex_m_dwt_free(struct target *target)
 #define MVFR0_DEFAULT_M4 0x10110021
 #define MVFR1_DEFAULT_M4 0x11000011
 
+static int bp_addr_comparer(const void *left, const void *right)
+{
+    return ((struct flash_breakpoint *)left)->addr - ((struct flash_breakpoint *)right)->addr;
+}
+
+struct pending_page
+{
+    struct flash_bank *bank;
+    int page_number;
+    int first_bp, last_bp;
+};
+
+int commit_pending_page(struct target *target, struct pending_page *page)
+{
+    uint8_t *buf = malloc(page->bank->sectors[page->page_number].size);
+    uint32_t page_base = page->bank->base + page->bank->sectors[page->page_number].offset;
+    int retval = target_read_buffer(target, page_base, page->bank->sectors[page->page_number].size, buf);
+    int bps_added = 0, bps_removed = 0;
+    if (retval == ERROR_OK)
+    {
+        for (int i = page->first_bp; i <= page->last_bp; i++)
+        {
+            struct flash_breakpoint *bp = &target->flash_breakpoints.data[i];
+            if (bp->addr < page_base || bp->enabled == bp->inserted)
+                continue;
+            
+            int offset_in_page = bp->addr - page_base;
+            if (offset_in_page + bp->length > page->bank->sectors[page->page_number].size)
+                continue;
+            
+            memcpy(buf + offset_in_page, bp->enabled ? bp->breakpoint_code : bp->original_code, bp->length);
+            if (bp->enabled)
+                bps_added++;
+            else
+                bps_removed++;
+        }
+        
+        retval = flash_driver_erase(page->bank, page->page_number, page->page_number);
+        if (retval == ERROR_OK)
+        {
+            retval = flash_driver_write(page->bank, buf, page->bank->sectors[page->page_number].offset, page->bank->sectors[page->page_number].size);
+        }
+        
+        if (retval == ERROR_OK)
+        {
+            for (int i = page->first_bp; i <= page->last_bp; i++)
+            {
+                struct flash_breakpoint *bp = &target->flash_breakpoints.data[i];
+                if (bp->addr < page_base || bp->enabled == bp->inserted)
+                    continue;
+            
+                int offset_in_page = bp->addr - page_base;
+                if (offset_in_page + bp->length > page->bank->sectors[page->page_number].size)
+                    continue;
+            
+                bp->inserted = bp->enabled;
+            }
+        }
+    }
+    
+    free(buf);
+    LOG_INFO("Added %d, removed %d breakpoints in FLASH page at 0x%08x", bps_added, bps_removed, page_base);
+    return retval;
+}
+
+const uint32_t ARM_CORTEX_NVIC_ISER = 0xe000e100;    
+const uint32_t ARM_CORTEX_NVIC_ICER = 0xe000e180;    
+
+static int cortex_m_flash_breakpoint_event_handler(struct target *target, enum target_event event, void *priv)
+{
+	if (event == TARGET_EVENT_GDB_PREPARE_STEP_OR_CONTINUE)
+    {
+        int retval, bp_count = 0;
+        
+        for (int i = 0; i < target->flash_breakpoints.count; i++)
+        {
+            if (target->flash_breakpoints.data[i].enabled != target->flash_breakpoints.data[i].inserted)
+                bp_count++;
+        }
+        
+        if (bp_count == 0)
+            return ERROR_OK;
+        
+        uint32_t icsr = 0;
+        target_read_memory(target, 0xe000ed04, 4, 1, &icsr);
+        if (icsr != 0)
+        {
+            asm("nop"); //PROBLEM: despite explicitly disabling the interrupts, trying to program FLASH at this point will step into an ISR and break everything
+        }
+        
+        struct pending_page page = { .bank = NULL };
+       
+        qsort(target->flash_breakpoints.data, target->flash_breakpoints.count, sizeof(struct flash_breakpoint), bp_addr_comparer);
+        
+        for (int i = 0; i < target->flash_breakpoints.count; i++)
+        {
+            struct flash_bank *bank;
+            struct flash_breakpoint *bp = &target->flash_breakpoints.data[i];
+            if (bp->enabled == bp->inserted)
+                continue;
+            
+            retval = get_flash_bank_by_addr(target, bp->addr, false, &bank);
+            if (retval != ERROR_OK || !bank || !bank->sectors || !bank->num_sectors)
+                continue;
+            
+            int page_num = -1;
+            unsigned bp_offset_in_bank  = bp->addr - bank->base;
+            
+            for (int j = 0; j < bank->num_sectors; j++)
+                if (bank->sectors[j].offset < bp_offset_in_bank && (bank->sectors[j].offset + bank->sectors[j].size) >= (bp_offset_in_bank + bp->length))
+                {
+                    page_num = j;
+                    break;
+                }
+            
+            if (page_num == -1)
+                continue;
+            
+            if (bank != page.bank || page_num != page.page_number)
+            {
+                if (page.bank)
+                {
+                    retval = commit_pending_page(target, &page);
+                    if (retval != ERROR_OK)
+                        LOG_ERROR("Failed to commit FLASH breakpoints for page #%d of bank '%s'", page.page_number, page.bank->name);
+                }
+                    
+                page.bank = bank;
+                page.page_number = page_num;
+                page.first_bp = i;
+            }
+            
+            page.last_bp = i;
+        }
+        
+        if (page.bank && page.last_bp >= page.first_bp)
+        {
+            retval = commit_pending_page(target, &page);
+            if (retval != ERROR_OK)
+                LOG_ERROR("Failed to commit FLASH breakpoints for page #%d of bank '%s'", page.page_number, page.bank->name);
+        } 
+        
+        return retval;
+    }
+    
+    return ERROR_OK;
+}
+
 int cortex_m_examine(struct target *target)
 {
 	int retval;
@@ -1916,6 +2099,7 @@ int cortex_m_examine(struct target *target)
 	}
 
 	if (!target_was_examined(target)) {
+    	target_register_event_callback(cortex_m_flash_breakpoint_event_handler, NULL);
 		target_set_examined(target);
 
 		/* Read from Device Identification Registers */

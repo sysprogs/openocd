@@ -208,4 +208,6 @@ struct flash_bank *get_flash_bank_by_num_noprobe(int num);
 int get_flash_bank_by_addr(struct target *target, uint32_t addr, bool check,
 		struct flash_bank **result_bank);
 
+bool is_address_inside_flash(struct target *target, uint32_t addr);
+
 #endif /* FLASH_NOR_CORE_H */

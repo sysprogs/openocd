@@ -6209,3 +6209,56 @@ static int target_register_user_commands(struct command_context *cmd_ctx)
 
 	return register_commands(cmd_ctx, NULL, target_exec_command_handlers);
 }
+
+int target_request_flash_breakpoint(struct target *target, uint32_t addr, uint32_t length, bool insert, const void *bp_code, void *original_code)
+{
+    if (length > sizeof(target->flash_breakpoints.data[0].breakpoint_code))
+        return ERROR_COMMAND_ARGUMENT_OVERFLOW;    
+    
+    struct flash_breakpoint *bp = NULL;
+    for (int i = 0; i < target->flash_breakpoints.count; i++)
+        if (target->flash_breakpoints.data[i].addr == addr)
+        {
+            bp = &target->flash_breakpoints.data[i];
+            break;
+        }
+    
+    if (!bp)
+    {
+        if ((target->flash_breakpoints.count + 1) > target->flash_breakpoints.allocated)
+        {
+            target->flash_breakpoints.allocated += 32;
+            target->flash_breakpoints.data = realloc(target->flash_breakpoints.data, target->flash_breakpoints.allocated * sizeof(target->flash_breakpoints.data[0]));
+        }
+        
+        bp = &target->flash_breakpoints.data[target->flash_breakpoints.count++];
+        
+        bp->addr = addr;
+        bp->length = length;
+        bp->enabled = bp->inserted = false;
+    }
+    
+    if (bp->length != length)
+        return ERROR_COMMAND_ARGUMENT_INVALID;
+    
+    int retval = ERROR_OK;
+    
+    if (bp->enabled != insert)
+    {
+        if (insert)
+        {
+            memcpy(bp->breakpoint_code, bp_code, length);
+            if (!bp->inserted)
+            {
+                retval = target_read_memory(target, bp->addr, length, 1, (uint8_t *)bp->original_code);
+            }
+            
+            if (original_code)
+                memcpy(original_code, bp->original_code, length);
+        }
+        
+        bp->enabled = insert;
+    }
+    
+    return retval;
+}

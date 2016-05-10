@@ -124,6 +124,24 @@ enum target_register_class {
 	REG_CLASS_GENERAL,
 };
 
+struct flash_breakpoint
+{
+    uint32_t addr;
+    uint32_t length;
+    char original_code[4];
+    char breakpoint_code[4];
+    char inserted;  //Physically inserted into FLASH
+    char enabled;   //Requested to be inserted
+};
+
+struct flash_breakpoint_collection
+{
+    struct flash_breakpoint *data;
+    int allocated, count;
+};
+
+int target_request_flash_breakpoint(struct target *target, uint32_t addr, uint32_t length, bool insert, const void *bp_code, /* OUT, OPTIONAL */ void *original_code);
+
 /* target_type.h contains the full definition of struct target_type */
 struct target {
 	struct target_type *type;			/* target type definition (name, access functions) */
@@ -190,6 +208,8 @@ struct target {
 	int smp;							/* add some target attributes for smp support */
     int frozen;                         /* frozen targets won't be auto-resumed when receiving a 'step' or 'continue' command from gdb*/
     int report_flash_progress;          /* If set to 1, FLASH writing operations will generate detailed progress messages */
+    struct flash_breakpoint_collection flash_breakpoints;
+    
 	struct target_list *head;
 	/* the gdb service is there in case of smp, we have only one gdb server
 	 * for all smp target
@@ -270,6 +290,7 @@ enum target_event {
 	TARGET_EVENT_GDB_FLASH_WRITE_END,
 
 	TARGET_EVENT_TRACE_CONFIG,
+    TARGET_EVENT_GDB_PREPARE_STEP_OR_CONTINUE,
 };
 
 struct target_event_action {

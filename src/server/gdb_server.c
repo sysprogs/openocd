@@ -2739,6 +2739,8 @@ static int gdb_input_inner(struct connection *connection)
 				case 'c':
 				case 's':
 				{
+    				target_call_event_callbacks(target, TARGET_EVENT_GDB_PREPARE_STEP_OR_CONTINUE);
+    				
 					gdb_thread_packet(connection, packet, packet_size);
 					log_add_callback(gdb_log_callback, connection);
 
