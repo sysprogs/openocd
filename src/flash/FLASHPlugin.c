@@ -177,6 +177,7 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
         breakpoint_remove(target, init_done_address);
         if (retval != ERROR_OK)
             LOG_ERROR("FLASH plugin did not call FLASHPlugin_InitDone(). Ensure it is declared as non-inline.");
+        destroy_reg_param(&reg_params[0]);
     }
     
     return retval;
@@ -436,6 +437,9 @@ int plugin_write_async(struct target *target,
         }
     }
     
+    for (int i = 0; i < 6; i++)
+        destroy_reg_param(&reg_params[i]);
+    
     return retval;
 }
 
@@ -536,6 +540,9 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
     if (retval == ERROR_OK && result)
         *result = buf_get_u32(reg_params[r0ParamIndex].value, 0, 32);
     
+    for (int i = 0; i < reg_param_count; i++)
+        destroy_reg_param(&reg_params[i]);
+    
     return retval;
 }
 
@@ -554,6 +561,8 @@ static int plugin_probe(struct flash_bank *bank)
     struct plugin_flash_bank *plugin_info = bank->driver_priv;
     struct FLASHBankInfo bankInfo;
     struct loaded_plugin loaded_plugin;
+    
+    plugin_info->probed = 1;
     
     int retval = loaded_plugin_load(target, &plugin_info->image, &loaded_plugin, plugin_info->FLASHPlugin_InitDone, plugin_info->stack_size);
     if (retval == ERROR_OK)
@@ -606,7 +615,6 @@ static int plugin_probe(struct flash_bank *bank)
 
     loaded_plugin_unload(&loaded_plugin, plugin_info->FLASHPlugin_Unload);
     
-    plugin_info->probed = 1;
 
     return retval;
 }
