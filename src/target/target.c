@@ -3002,8 +3002,12 @@ COMMAND_HANDLER(handle_md_command)
 
 	struct target *target = get_current_target(CMD_CTX);
 	int retval = fn(target, address, size, count, buffer);
-	if (ERROR_OK == retval)
-		handle_md_output(CMD_CTX, target, address, size, count, buffer);
+    if (ERROR_OK == retval)
+        handle_md_output(CMD_CTX, target, address, size, count, buffer);
+    else
+    {
+        command_print(CMD_CTX, "0x%08x: ERROR %d", address, retval);
+    }
 
 	free(buffer);
 
