@@ -1,6 +1,7 @@
 add_library(ocdflashnor 
 	aduc702x.c
 	aducm360.c
+	ambiqmicro.c
 	at91sam3.c
 	at91sam4.c
 	at91sam4l.c
@@ -19,6 +20,7 @@ add_library(ocdflashnor
 	fm4.c
 	jtagspi.c
 	kinetis.c
+	kinetis_ke.c
 	lpc2000.c
 	lpc288x.c
 	lpc2900.c
@@ -47,4 +49,5 @@ add_library(ocdflashnor
 	tcl.c
 	tms470.c
 	virtual.c
+	xmc1xxx.c
 	xmc4xxx.c)

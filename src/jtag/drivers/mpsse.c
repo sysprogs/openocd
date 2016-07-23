@@ -13,9 +13,7 @@
  *   GNU General Public License for more details.                          *
  *                                                                         *
  *   You should have received a copy of the GNU General Public License     *
- *   along with this program; if not, write to the                         *
- *   Free Software Foundation, Inc.,                                       *
- *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.           *
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -106,12 +104,13 @@ static bool string_descriptor_equal(libusb_device_handle *device, uint8_t str_in
 
 static bool device_location_equal(libusb_device *device, const char *location)
 {
+	bool result = false;
+#ifdef HAVE_LIBUSB_GET_PORT_NUMBERS
 	char *loc = strdup(location);
 	uint8_t port_path[7];
 	int path_step, path_len;
 	uint8_t dev_bus = libusb_get_bus_number(device);
 	char *ptr;
-	bool result = false;
 
 	path_len = libusb_get_port_numbers(device, port_path, 7);
 	if (path_len == LIBUSB_ERROR_OVERFLOW) {
@@ -154,6 +153,7 @@ static bool device_location_equal(libusb_device *device, const char *location)
 
  done:
 	free(loc);
+#endif
 	return result;
 }
 

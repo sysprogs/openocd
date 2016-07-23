@@ -34,9 +34,7 @@
  *   GNU General Public License for more details.                          *
  *                                                                         *
  *   You should have received a copy of the GNU General Public License     *
- *   along with this program; if not, write to the                         *
- *   Free Software Foundation, Inc.,                                       *
- *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.           *
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -92,6 +90,7 @@ extern struct target_type cortexm_target;
 extern struct target_type cortexa_target;
 extern struct target_type cortexr4_target;
 extern struct target_type arm11_target;
+extern struct target_type ls1_sap_target;
 extern struct target_type mips_m4k_target;
 extern struct target_type avr_target;
 extern struct target_type dsp563xx_target;
@@ -122,6 +121,7 @@ static struct target_type *target_types[] = {
 	&cortexa_target,
 	&cortexr4_target,
 	&arm11_target,
+	&ls1_sap_target,
 	&mips_m4k_target,
 	&avr_target,
 	&dsp563xx_target,
@@ -532,7 +532,7 @@ int target_poll(struct target *target)
 		if (target->state == TARGET_HALTED)
 			target->halt_issued = false;
 		else {
-			long long t = timeval_ms() - target->halt_issued_time;
+			int64_t t = timeval_ms() - target->halt_issued_time;
 			if (t > DEFAULT_HALT_TIMEOUT) {
 				target->halt_issued = false;
 				LOG_INFO("Halt timed out, wake up GDB.");
@@ -2453,9 +2453,9 @@ static int sense_handler(void)
 	if (powerRestored)
 		runPowerRestore = 1;
 
-	long long current = timeval_ms();
-	static long long lastPower;
-	int waitMore = lastPower + 2000 > current;
+	int64_t current = timeval_ms();
+	static int64_t lastPower;
+	bool waitMore = lastPower + 2000 > current;
 	if (powerDropout && !waitMore) {
 		runPowerDropout = 1;
 		lastPower = current;
@@ -2468,7 +2468,7 @@ static int sense_handler(void)
 	int srstDeasserted;
 	srstDeasserted = prevSrstAsserted && !srstAsserted;
 
-	static long long lastSrst;
+	static int64_t lastSrst;
 	waitMore = lastSrst + 2000 > current;
 	if (srstDeasserted && !waitMore) {
 		runSrstDeasserted = 1;
@@ -2778,8 +2778,8 @@ COMMAND_HANDLER(handle_wait_halt_command)
 int target_wait_state(struct target *target, enum target_state state, int ms)
 {
 	int retval;
-	long long then = 0, cur;
-	int once = 1;
+	int64_t then = 0, cur;
+	bool once = true;
 
 	for (;;) {
 		retval = target_poll(target);
@@ -2789,7 +2789,7 @@ int target_wait_state(struct target *target, enum target_state state, int ms)
 			break;
 		cur = timeval_ms();
 		if (once) {
-			once = 0;
+			once = false;
 			then = timeval_ms();
 			LOG_DEBUG("waiting for target %s...",
 				Jim_Nvp_value2name_simple(nvp_target_state, state)->name);
@@ -4931,10 +4931,7 @@ static int jim_target_reset(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	struct target *target = Jim_CmdPrivData(goi.interp);
 	if (!target->tap->enabled)
 		return jim_target_tap_disabled(interp);
-	if (!(target_was_examined(target))) {
-		LOG_ERROR("Target not examined yet");
-		return ERROR_TARGET_NOT_EXAMINED;
-	}
+
 	if (!target->type->assert_reset || !target->type->deassert_reset) {
 		Jim_SetResultFormatted(interp,
 				"No target-specific reset for %s",
@@ -5678,7 +5675,7 @@ COMMAND_HANDLER(handle_fast_load_command)
 		return ERROR_FAIL;
 	}
 	int i;
-	int ms = timeval_ms();
+	int64_t ms = timeval_ms();
 	int size = 0;
 	int retval = ERROR_OK;
 	for (i = 0; i < fastload_num; i++) {
@@ -5692,7 +5689,7 @@ COMMAND_HANDLER(handle_fast_load_command)
 		size += fastload[i].length;
 	}
 	if (retval == ERROR_OK) {
-		int after = timeval_ms();
+		int64_t after = timeval_ms();
 		command_print(CMD_CTX, "Loaded image %f kBytes/s", (float)(size/1024.0)/((float)(after-ms)/1000.0));
 	}
 	return retval;

@@ -25,9 +25,7 @@
  *   GNU General Public License for more details.                          *
  *                                                                         *
  *   You should have received a copy of the GNU General Public License     *
- *   along with this program; if not, write to the                         *
- *   Free Software Foundation, Inc.,                                       *
- *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.           *
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -555,30 +553,11 @@ int kinetis_disable_wdog(struct target *target, uint32_t sim_sdid)
 	int retval;
 
 	static const uint8_t kinetis_unlock_wdog_code[] = {
-		/* WDOG_UNLOCK = 0xC520 */
-		0x4f, 0xf4, 0x00, 0x53,    /* mov.w   r3, #8192     ; 0x2000  */
-		0xc4, 0xf2, 0x05, 0x03,    /* movt    r3, #16389    ; 0x4005  */
-		0x4c, 0xf2, 0x20, 0x52,   /* movw    r2, #50464    ; 0xc520  */
-		0xda, 0x81,               /* strh    r2, [r3, #14]  */
-
-		/* WDOG_UNLOCK = 0xD928 */
-		0x4f, 0xf4, 0x00, 0x53,   /* mov.w   r3, #8192     ; 0x2000  */
-		0xc4, 0xf2, 0x05, 0x03,   /* movt    r3, #16389    ; 0x4005  */
-		0x4d, 0xf6, 0x28, 0x12,   /* movw    r2, #55592    ; 0xd928  */
-		0xda, 0x81,               /* strh    r2, [r3, #14]  */
-
-		/* WDOG_SCR = 0x1d2 */
-		0x4f, 0xf4, 0x00, 0x53,   /* mov.w   r3, #8192     ; 0x2000  */
-		0xc4, 0xf2, 0x05, 0x03,   /* movt    r3, #16389    ; 0x4005  */
-		0x4f, 0xf4, 0xe9, 0x72,   /* mov.w   r2, #466      ; 0x1d2  */
-		0x1a, 0x80,               /* strh    r2, [r3, #0]  */
-
-		/* END */
-		0x00, 0xBE,               /* bkpt #0 */
+#include "../../../contrib/loaders/watchdog/armv7m_kinetis_wdog.inc"
 	};
 
 	/* Decide whether the connected device needs watchdog disabling.
-	 * Disable for all Kx devices, i.e., return if it is a KLx */
+	 * Disable for all Kx and KVx devices, return if it is a KLx */
 
 	if ((sim_sdid & KINETIS_SDID_SERIESID_MASK) == KINETIS_SDID_SERIESID_KL)
 		return ERROR_OK;
@@ -1410,6 +1389,7 @@ static int kinetis_probe(struct flash_bank *bank)
 				LOG_ERROR("Unsupported Kinetis FAMILYID SUBFAMID");
 			}
 			break;
+
 		case KINETIS_SDID_SERIESID_KL:
 			/* KL-series */
 			pflash_sector_size_bytes = 1<<10;
@@ -1417,6 +1397,47 @@ static int kinetis_probe(struct flash_bank *bank)
 			/* autodetect 1 or 2 blocks */
 			kinfo->flash_support = FS_PROGRAM_LONGWORD;
 			break;
+
+		case KINETIS_SDID_SERIESID_KV:
+			/* KV-series */
+			switch (kinfo->sim_sdid & (KINETIS_SDID_FAMILYID_MASK | KINETIS_SDID_SUBFAMID_MASK)) {
+			case KINETIS_SDID_FAMILYID_K1X | KINETIS_SDID_SUBFAMID_KX0:
+				/* KV10: FTFA, 1kB sectors */
+				pflash_sector_size_bytes = 1<<10;
+				num_blocks = 1;
+				kinfo->flash_support = FS_PROGRAM_LONGWORD;
+				break;
+
+			case KINETIS_SDID_FAMILYID_K1X | KINETIS_SDID_SUBFAMID_KX1:
+				/* KV11: FTFA, 2kB sectors */
+				pflash_sector_size_bytes = 2<<10;
+				num_blocks = 1;
+				kinfo->flash_support = FS_PROGRAM_LONGWORD;
+				break;
+
+			case KINETIS_SDID_FAMILYID_K3X | KINETIS_SDID_SUBFAMID_KX0:
+				/* KV30: FTFA, 2kB sectors, 1 block */
+			case KINETIS_SDID_FAMILYID_K3X | KINETIS_SDID_SUBFAMID_KX1:
+				/* KV31: FTFA, 2kB sectors, 2 blocks */
+				pflash_sector_size_bytes = 2<<10;
+				/* autodetect 1 or 2 blocks */
+				kinfo->flash_support = FS_PROGRAM_LONGWORD | FS_INVALIDATE_CACHE;
+				break;
+
+			case KINETIS_SDID_FAMILYID_K4X | KINETIS_SDID_SUBFAMID_KX2:
+			case KINETIS_SDID_FAMILYID_K4X | KINETIS_SDID_SUBFAMID_KX4:
+			case KINETIS_SDID_FAMILYID_K4X | KINETIS_SDID_SUBFAMID_KX6:
+				/* KV4x: FTFA, 4kB sectors */
+				pflash_sector_size_bytes = 4<<10;
+				num_blocks = 1;
+				kinfo->flash_support = FS_PROGRAM_LONGWORD | FS_INVALIDATE_CACHE;
+				break;
+
+			default:
+				LOG_ERROR("Unsupported KV FAMILYID SUBFAMID");
+			}
+			break;
+
 		default:
 			LOG_ERROR("Unsupported K-series");
 		}
@@ -1573,7 +1594,10 @@ static int kinetis_probe(struct flash_bank *bank)
 		bank->base = 0x00000000 + bank->size * bank->bank_number;
 		kinfo->prog_base = bank->base;
 		kinfo->sector_size = pflash_sector_size_bytes;
-		kinfo->protection_size = pf_size / 32;
+		/* pflash is divided into 32 protection areas for
+		 * parts with more than 32K of PFlash. For parts with
+		 * less the protection unit is set to 1024 bytes */
+		kinfo->protection_size = MAX(pf_size / 32, 1024);
 		kinfo->protection_block = (32 / num_pflash_blocks) * bank->bank_number;
 
 	} else if ((unsigned)bank->bank_number < num_blocks) {
@@ -1894,7 +1918,7 @@ COMMAND_HANDLER(kinetis_nvm_partition)
 }
 
 
-static const struct command_registration kinetis_securtiy_command_handlers[] = {
+static const struct command_registration kinetis_security_command_handlers[] = {
 	{
 		.name = "check_security",
 		.mode = COMMAND_EXEC,
@@ -1918,7 +1942,7 @@ static const struct command_registration kinetis_exec_command_handlers[] = {
 		.mode = COMMAND_ANY,
 		.help = "",
 		.usage = "",
-		.chain = kinetis_securtiy_command_handlers,
+		.chain = kinetis_security_command_handlers,
 	},
 	{
 		.name = "disable_wdog",

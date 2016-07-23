@@ -16,13 +16,11 @@
  *   GNU General Public License for more details.                          *
  *                                                                         *
  *   You should have received a copy of the GNU General Public License     *
- *   along with this program; if not, write to the                         *
- *   Free Software Foundation, Inc.,                                       *
- *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.           *
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
-#ifndef FLASH_NOR_CORE_H
-#define FLASH_NOR_CORE_H
+#ifndef OPENOCD_FLASH_NOR_CORE_H
+#define OPENOCD_FLASH_NOR_CORE_H
 
 #include <flash/common.h>
 
@@ -208,4 +206,4 @@ struct flash_bank *get_flash_bank_by_num_noprobe(int num);
 int get_flash_bank_by_addr(struct target *target, uint32_t addr, bool check,
 		struct flash_bank **result_bank);
 
-#endif /* FLASH_NOR_CORE_H */
+#endif /* OPENOCD_FLASH_NOR_CORE_H */

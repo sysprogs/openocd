@@ -16,9 +16,7 @@
  *   GNU General Public License for more details.                          *
  *                                                                         *
  *   You should have received a copy of the GNU General Public License     *
- *   along with this program; if not, write to the                         *
- *   Free Software Foundation, Inc.,                                       *
- *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.           *
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -226,7 +224,7 @@ static int ChibiOS_update_stacking(struct rtos *rtos)
 	/* Sometimes the stacking can not be determined only by looking at the
 	 * target name but only a runtime.
 	 *
-	 * For example, this is the case for cortex-m4 targets and ChibiOS which
+	 * For example, this is the case for Cortex-M4 targets and ChibiOS which
 	 * only stack the FPU registers if it is enabled during ChibiOS build.
 	 *
 	 * Terminating which stacking is used is target depending.
@@ -248,7 +246,7 @@ static int ChibiOS_update_stacking(struct rtos *rtos)
 	struct ChibiOS_params *param;
 	param = (struct ChibiOS_params *) rtos->rtos_specific_params;
 
-	/* Check for armv7m with *enabled* FPU, i.e. a Cortex M4  */
+	/* Check for armv7m with *enabled* FPU, i.e. a Cortex-M4  */
 	struct armv7m_common *armv7m_target = target_to_armv7m(rtos->target);
 	if (is_armv7m(armv7m_target)) {
 		if (armv7m_target->fp_feature == FPv4_SP) {

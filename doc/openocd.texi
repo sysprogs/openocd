@@ -995,7 +995,7 @@ For example, there may be configuration files for your JTAG adapter
 and target chip, but you need a new board-specific config file
 giving access to your particular flash chips.
 Or you might need to write another target chip configuration file
-for a new chip built around the Cortex M3 core.
+for a new chip built around the Cortex-M3 core.
 
 @quotation Note
 When you write new configuration files, please submit
@@ -2564,6 +2564,8 @@ roots at @var{bus} and walks down the physical ports, with each
 @var{port} option specifying a deeper level in the bus topology, the last
 @var{port} denoting where the target adapter is actually plugged.
 The USB bus topology can be queried with the command @emph{lsusb -t}.
+
+This command is only available if your libusb1 is at least version 1.0.16.
 @end deffn
 
 @deffn {Config Command} {ftdi_channel} channel
@@ -4057,6 +4059,8 @@ compact Thumb2 instruction set.
 not a CPU type. It is based on the ARMv5 architecture.
 @item @code{openrisc} -- this is an OpenRISC 1000 core.
 The current implementation supports three JTAG TAP cores:
+@item @code{ls1_sap} -- this is the SAP on NXP LS102x CPUs,
+allowing access to physical memory addresses independently of CPU cores.
 @itemize @minus
 @item @code{OpenCores TAP} (See: @url{http://opencores.org/project,jtag})
 @item @code{Altera Virtual JTAG TAP} (See: @url{http://www.altera.com/literature/ug/ug_virtualjtag.pdf})
@@ -4815,6 +4819,8 @@ The CFI driver can accept the following optional parameters, in any order:
 like AM29LV010 and similar types.
 @item @var{x16_as_x8} ... when a 16-bit flash is hooked up to an 8-bit bus.
 @item @var{bus_swap} ... when data bytes in a 16-bit flash needs to be swapped.
+@item @var{data_swap} ... when data bytes in a 16-bit flash needs to be
+swapped when writing data values (ie. not CFI commands).
 @end itemize
 
 To configure two adjacent banks of 16 MBytes each, both sixteen bits (two bytes)
@@ -4956,6 +4962,52 @@ since all devices in this family have the same memory layout.
 @example
 flash bank $_FLASHNAME aduc702x 0 0 0 0 $_TARGETNAME
 @end example
+@end deffn
+
+@deffn {Flash Driver} ambiqmicro
+@cindex ambiqmicro
+@cindex apollo
+All members of the Apollo microcontroller family from
+Ambiq Micro include internal flash and use ARM's Cortex-M4 core.
+The host connects over USB to an FTDI interface that communicates
+with the target using SWD.
+
+The @var{ambiqmicro} driver reads the Chip Information Register detect
+the device class of the MCU.
+The Flash and Sram sizes directly follow device class, and are used
+to set up the flash banks.
+If this fails, the driver will use default values set to the minimum
+sizes of an Apollo chip.
+
+All Apollo chips have two flash banks of the same size.
+In all cases the first flash bank starts at location 0,
+and the second bank starts after the first.
+
+@example
+# Flash bank 0
+flash bank $_FLASHNAME ambiqmicro 0 0x00040000 0 0 $_TARGETNAME
+# Flash bank 1 - same size as bank0, starts after bank 0.
+flash bank $_FLASHNAME ambiqmicro 0x00040000 0x00040000 0 0 $_TARGETNAME
+@end example
+
+Flash is programmed using custom entry points into the bootloader.
+This is the only way to program the flash as no flash control registers
+are available to the user.
+
+The @var{ambiqmicro} driver adds some additional commands:
+
+@deffn Command {ambiqmicro mass_erase} <bank>
+Erase entire bank.
+@end deffn
+@deffn Command {ambiqmicro page_erase} <bank> <first> <last>
+Erase device pages.
+@end deffn
+@deffn Command {ambiqmicro program_otp} <bank> <offset> <count>
+Program OTP is a one time operation to create write protected flash.
+The user writes sectors to sram starting at 0x10000010.
+Program OTP will write these sectors from sram to flash, and write protect
+the flash.
+@end deffn
 @end deffn
 
 @anchor{at91samd}
@@ -5167,19 +5219,27 @@ The AVR 8-bit microcontrollers from Atmel integrate flash memory.
 
 @deffn {Flash Driver} efm32
 All members of the EFM32 microcontroller family from Energy Micro include
-internal flash and use ARM Cortex M3 cores. The driver automatically recognizes
+internal flash and use ARM Cortex-M3 cores. The driver automatically recognizes
 a number of these chips using the chip identification register, and
 autoconfigures itself.
 @example
 flash bank $_FLASHNAME efm32 0 0 0 0 $_TARGETNAME
 @end example
+A special feature of efm32 controllers is that it is possible to completely disable the
+debug interface by writing the correct values to the 'Debug Lock Word'. OpenOCD supports
+this via the following command:
+@example
+efm32 debuglock num
+@end example
+The @var{num} parameter is a value shown by @command{flash banks}.
+Note that in order for this command to take effect, the target needs to be reset.
 @emph{The current implementation is incomplete. Unprotecting flash pages is not
 supported.}
 @end deffn
 
 @deffn {Flash Driver} fm3
 All members of the FM3 microcontroller family from Fujitsu
-include internal flash and use ARM Cortex M3 cores.
+include internal flash and use ARM Cortex-M3 cores.
 The @var{fm3} driver uses the @var{target} parameter to select the
 correct bank config, it can currently be one of the following:
 @code{mb9bfxx1.cpu}, @code{mb9bfxx2.cpu}, @code{mb9bfxx3.cpu},
@@ -5190,10 +5250,28 @@ flash bank $_FLASHNAME fm3 0 0 0 0 $_TARGETNAME
 @end example
 @end deffn
 
+@deffn {Flash Driver} fm4
+All members of the FM4 microcontroller family from Spansion (formerly Fujitsu)
+include internal flash and use ARM Cortex-M4 cores.
+The @var{fm4} driver uses a @var{family} parameter to select the
+correct bank config, it can currently be one of the following:
+@code{MB9BFx64}, @code{MB9BFx65}, @code{MB9BFx66}, @code{MB9BFx67}, @code{MB9BFx68},
+@code{S6E2Cx8}, @code{S6E2Cx9}, @code{S6E2CxA} or @code{S6E2Dx},
+with @code{x} treated as wildcard and otherwise case (and any trailing
+characters) ignored.
+
+@example
+flash bank $@{_FLASHNAME@}0 fm4 0x00000000 0 0 0 $_TARGETNAME S6E2CCAJ0A
+flash bank $@{_FLASHNAME@}1 fm4 0x00100000 0 0 0 $_TARGETNAME S6E2CCAJ0A
+@end example
+@emph{The current implementation is incomplete. Protection is not supported,
+nor is Chip Erase (only Sector Erase is implemented).}
+@end deffn
+
 @deffn {Flash Driver} kinetis
 @cindex kinetis
 Kx and KLx members of the Kinetis microcontroller family from Freescale include
-internal flash and use ARM Cortex M0+ or M4 cores. The driver automatically
+internal flash and use ARM Cortex-M0+ or M4 cores. The driver automatically
 recognizes flash size and a number of flash banks (1-4) using the chip
 identification register, and autoconfigures itself.
 
@@ -5248,22 +5326,31 @@ Command disables watchdog timer.
 @end deffn
 @end deffn
 
-@deffn {Flash Driver} fm4
-All members of the FM4 microcontroller family from Spansion (formerly Fujitsu)
-include internal flash and use ARM Cortex-M4 cores.
-The @var{fm4} driver uses a @var{family} parameter to select the
-correct bank config, it can currently be one of the following:
-@code{MB9BFx64}, @code{MB9BFx65}, @code{MB9BFx66}, @code{MB9BFx67}, @code{MB9BFx68},
-@code{S6E2Cx8}, @code{S6E2Cx9}, @code{S6E2CxA} or @code{S6E2Dx},
-with @code{x} treated as wildcard and otherwise case (and any trailing
-characters) ignored.
+@deffn {Flash Driver} kinetis_ke
+@cindex kinetis_ke
+KE members of the Kinetis microcontroller family from Freescale include
+internal flash and use ARM Cortex-M0+. The driver automatically recognizes
+the KE family and sub-family using the chip identification register, and
+autoconfigures itself.
 
 @example
-flash bank $@{_FLASHNAME@}0 fm4 0x00000000 0 0 0 $_TARGETNAME S6E2CCAJ0A
-flash bank $@{_FLASHNAME@}1 fm4 0x00100000 0 0 0 $_TARGETNAME S6E2CCAJ0A
+flash bank $_FLASHNAME kinetis_ke 0 0 0 0 $_TARGETNAME
 @end example
-@emph{The current implementation is incomplete. Protection is not supported,
-nor is Chip Erase (only Sector Erase is implemented).}
+
+@deffn Command {kinetis_ke mdm check_security}
+Checks status of device security lock. Used internally in examine-end event.
+@end deffn
+
+@deffn Command {kinetis_ke mdm mass_erase}
+Issues a complete Flash erase via the MDM-AP.
+This can be used to erase a chip back to its factory state.
+Command removes security lock from a device (use of SRST highly recommended).
+It does not require the processor to be halted.
+@end deffn
+
+@deffn Command {kinetis_ke disable_wdog}
+Command disables watchdog timer.
+@end deffn
 @end deffn
 
 @deffn {Flash Driver} lpc2000
@@ -5603,7 +5690,7 @@ This will remove any Code Protection.
 
 @deffn {Flash Driver} psoc4
 All members of the PSoC 41xx/42xx microcontroller family from Cypress
-include internal flash and use ARM Cortex M0 cores.
+include internal flash and use ARM Cortex-M0 cores.
 The driver automatically recognizes a number of these chips using
 the chip identification register, and autoconfigures itself.
 
@@ -5637,7 +5724,7 @@ The @var{num} parameter is a value shown by @command{flash banks}.
 
 @deffn {Flash Driver} sim3x
 All members of the SiM3 microcontroller family from Silicon Laboratories
-include internal flash and use ARM Cortex M3 cores. It supports both JTAG
+include internal flash and use ARM Cortex-M3 cores. It supports both JTAG
 and SWD interface.
 The @var{sim3x} driver tries to probe the device to auto detect the MCU.
 If this failes, it will use the @var{size} parameter as the size of flash bank.
@@ -5948,6 +6035,11 @@ Reports the clock speed, which is used to calculate timings.
 Disables (@var{1}) or enables (@var{0}) use of the PLL to speed up
 the flash clock.
 @end deffn
+@end deffn
+
+@deffn {Flash Driver} xmc1xxx
+All members of the XMC1xxx microcontroller family from Infineon.
+This driver does not require the chip and bus width to be specified.
 @end deffn
 
 @deffn {Flash Driver} xmc4xxx
@@ -6637,6 +6729,11 @@ the initial log output channel is stderr.
 
 @deffn Command add_script_search_dir [directory]
 Add @var{directory} to the file/script search path.
+@end deffn
+
+@deffn Command bindto [name]
+Specify address by name on which to listen for incoming TCP/IP connections.
+By default, OpenOCD will listen on all available interfaces.
 @end deffn
 
 @anchor{targetstatehandling}
@@ -7737,6 +7834,12 @@ They are available in addition to other core-specific commands that may be avail
 @deffn Command {dap apid} [num]
 Displays ID register from AP @var{num},
 defaulting to the currently selected AP.
+@end deffn
+
+@deffn Command {dap apreg} ap_num reg [value]
+Displays content of a register @var{reg} from AP @var{ap_num}
+or set a new value @var{value}.
+@var{reg} is byte address of a word register, 0, 4, 8 ... 0xfc.
 @end deffn
 
 @deffn Command {dap apsel} [num]

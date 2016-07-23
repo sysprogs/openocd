@@ -19,9 +19,7 @@
  *   GNU General Public License for more details.                          *
  *                                                                         *
  *   You should have received a copy of the GNU General Public License     *
- *   along with this program; if not, write to the                         *
- *   Free Software Foundation, Inc.,                                       *
- *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.           *
+ *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -787,6 +785,7 @@ static int stm32x_probe(struct flash_bank *bank)
 	switch (device_id & 0xfff) {
 	case 0x411:
 	case 0x413:
+	case 0x441:
 		max_flash_size_in_kb = 1024;
 		break;
 	case 0x419:
@@ -800,6 +799,9 @@ static int stm32x_probe(struct flash_bank *bank)
 	case 0x433:
 	case 0x421:
 		max_flash_size_in_kb = 512;
+		break;
+	case 0x458:
+		max_flash_size_in_kb = 128;
 		break;
 	case 0x449:
 		max_flash_size_in_kb = 1024;
@@ -953,7 +955,6 @@ static int get_stm32x_info(struct flash_bank *bank, char *buf, int buf_size)
 
 	case 0x413:
 	case 0x419:
-	case 0x434:
 		device_str = "STM32F4xx";
 
 		switch (rev_id) {
@@ -990,6 +991,8 @@ static int get_stm32x_info(struct flash_bank *bank, char *buf, int buf_size)
 	case 0x423:
 	case 0x431:
 	case 0x433:
+	case 0x458:
+	case 0x441:
 		device_str = "STM32F4xx (Low Power)";
 
 		switch (rev_id) {
@@ -1013,6 +1016,15 @@ static int get_stm32x_info(struct flash_bank *bank, char *buf, int buf_size)
 
 		case 0x1001:
 			rev_str = "Z";
+			break;
+		}
+		break;
+	case 0x434:
+		device_str = "STM32F46x/F47x";
+
+		switch (rev_id) {
+		case 0x1000:
+			rev_str = "A";
 			break;
 		}
 		break;
@@ -1114,6 +1126,7 @@ COMMAND_HANDLER(stm32x_handle_unlock_command)
 static int stm32x_mass_erase(struct flash_bank *bank)
 {
 	int retval;
+	uint32_t flash_mer;
 	struct target *target = bank->target;
 	struct stm32x_flash_bank *stm32x_info = NULL;
 
@@ -1130,13 +1143,14 @@ static int stm32x_mass_erase(struct flash_bank *bank)
 
 	/* mass erase flash memory */
 	if (stm32x_info->has_large_mem)
-		retval = target_write_u32(target, stm32x_get_flash_reg(bank, STM32_FLASH_CR), FLASH_MER | FLASH_MER1);
+		flash_mer = FLASH_MER | FLASH_MER1;
 	else
-		retval = target_write_u32(target, stm32x_get_flash_reg(bank, STM32_FLASH_CR), FLASH_MER);
+		flash_mer = FLASH_MER;
+	retval = target_write_u32(target, stm32x_get_flash_reg(bank, STM32_FLASH_CR), flash_mer);
 	if (retval != ERROR_OK)
 		return retval;
 	retval = target_write_u32(target, stm32x_get_flash_reg(bank, STM32_FLASH_CR),
-		FLASH_MER | FLASH_STRT);
+		flash_mer | FLASH_STRT);
 	if (retval != ERROR_OK)
 		return retval;
 
