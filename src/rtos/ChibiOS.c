@@ -128,15 +128,13 @@ struct rtos_type ChibiOS_rtos = {
 enum ChibiOS_symbol_values {
 	ChibiOS_VAL_rlist = 0,
 	ChibiOS_VAL_ch = 1,
-	ChibiOS_VAL_ch_debug = 2,
-	ChibiOS_VAL_chSysInit = 3
+	ChibiOS_VAL_ch_debug = 2
 };
 
 static symbol_table_elem_t ChibiOS_symbol_list[] = {
 	{ "rlist", 0, true},		/* Thread ready list */
 	{ "ch", 0, true},			/* System data structure */
 	{ "ch_debug", 0, false},	/* Memory Signature containing offsets of fields in rlist */
-	{ "chSysInit", 0, false},	/* Necessary part of API, used for ChibiOS detection */
 	{ NULL, 0, false}
 };
 
@@ -359,7 +357,6 @@ static int ChibiOS_update_threads(struct rtos *rtos)
 				sizeof(struct thread_detail));
 		rtos->thread_details->threadid = 1;
 		rtos->thread_details->exists = true;
-		rtos->thread_details->display_str = NULL;
 
 		rtos->thread_details->extra_info_str = malloc(
 				sizeof(tmp_thread_extra_info));
@@ -450,7 +447,6 @@ static int ChibiOS_update_threads(struct rtos *rtos)
 		strcpy(curr_thrd_details->extra_info_str, state_desc);
 
 		curr_thrd_details->exists = true;
-		curr_thrd_details->display_str = NULL;
 
 		curr_thrd_details++;
 	}
@@ -518,12 +514,11 @@ static int ChibiOS_detect_rtos(struct target *target)
 {
 	if ((target->rtos->symbols != NULL) &&
 			((target->rtos->symbols[ChibiOS_VAL_rlist].address != 0) ||
-			 (target->rtos->symbols[ChibiOS_VAL_ch].address != 0)) &&
-			(target->rtos->symbols[ChibiOS_VAL_chSysInit].address != 0)) {
+			 (target->rtos->symbols[ChibiOS_VAL_ch].address != 0))) {
 
 		if (target->rtos->symbols[ChibiOS_VAL_ch_debug].address == 0) {
-			LOG_INFO("It looks like the target is running ChibiOS without "
-					"ch_debug.");
+			LOG_INFO("It looks like the target may be running ChibiOS "
+					"without ch_debug.");
 			return 0;
 		}
 

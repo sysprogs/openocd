@@ -1018,6 +1018,15 @@ int target_run_flash_async_algorithm(struct target *target,
 		retval = retval2;
 	}
 
+	if (retval == ERROR_OK) {
+		/* check if algorithm set rp = 0 after fifo writer loop finished */
+		retval = target_read_u32(target, rp_addr, &rp);
+		if (retval == ERROR_OK && rp == 0) {
+			LOG_ERROR("flash write algorithm aborted by target");
+			retval = ERROR_FLASH_OPERATION_FAILED;
+		}
+	}
+
 	return retval;
 }
 
@@ -3924,6 +3933,8 @@ static int target_mem2array(Jim_Interp *interp, struct target *target, int argc,
 	uint32_t count;
 	uint32_t v;
 	const char *varname;
+	const char *phys;
+	bool is_phys;
 	int  n, e, retval;
 	uint32_t i;
 
@@ -3932,8 +3943,8 @@ static int target_mem2array(Jim_Interp *interp, struct target *target, int argc,
 	 * argv[3] = memory address
 	 * argv[4] = count of times to read
 	 */
-	if (argc != 4) {
-		Jim_WrongNumArgs(interp, 1, argv, "varname width addr nelems");
+	if (argc < 4 || argc > 5) {
+		Jim_WrongNumArgs(interp, 1, argv, "varname width addr nelems [phys]");
 		return JIM_ERR;
 	}
 	varname = Jim_GetString(argv[0], &len);
@@ -3952,6 +3963,14 @@ static int target_mem2array(Jim_Interp *interp, struct target *target, int argc,
 	len = l;
 	if (e != JIM_OK)
 		return e;
+	is_phys = false;
+	if (argc > 4) {
+		phys = Jim_GetString(argv[4], &n);
+		if (!strncmp(phys, "phys", n))
+			is_phys = true;
+		else
+			return JIM_ERR;
+	}
 	switch (width) {
 		case 8:
 			width = 1;
@@ -4017,7 +4036,10 @@ static int target_mem2array(Jim_Interp *interp, struct target *target, int argc,
 		if (count > (buffersize / width))
 			count = (buffersize / width);
 
-		retval = target_read_memory(target, addr, width, count, buffer);
+		if (is_phys)
+			retval = target_read_phys_memory(target, addr, width, count, buffer);
+		else
+			retval = target_read_memory(target, addr, width, count, buffer);
 		if (retval != ERROR_OK) {
 			/* BOO !*/
 			LOG_ERROR("mem2array: Read @ 0x%08x, w=%d, cnt=%d, failed",
@@ -4113,6 +4135,8 @@ static int target_array2mem(Jim_Interp *interp, struct target *target,
 	uint32_t count;
 	uint32_t v;
 	const char *varname;
+	const char *phys;
+	bool is_phys;
 	int  n, e, retval;
 	uint32_t i;
 
@@ -4121,8 +4145,8 @@ static int target_array2mem(Jim_Interp *interp, struct target *target,
 	 * argv[3] = memory address
 	 * argv[4] = count to write
 	 */
-	if (argc != 4) {
-		Jim_WrongNumArgs(interp, 0, argv, "varname width addr nelems");
+	if (argc < 4 || argc > 5) {
+		Jim_WrongNumArgs(interp, 0, argv, "varname width addr nelems [phys]");
 		return JIM_ERR;
 	}
 	varname = Jim_GetString(argv[0], &len);
@@ -4141,6 +4165,14 @@ static int target_array2mem(Jim_Interp *interp, struct target *target,
 	len = l;
 	if (e != JIM_OK)
 		return e;
+	is_phys = false;
+	if (argc > 4) {
+		phys = Jim_GetString(argv[4], &n);
+		if (!strncmp(phys, "phys", n))
+			is_phys = true;
+		else
+			return JIM_ERR;
+	}
 	switch (width) {
 		case 8:
 			width = 1;
@@ -4227,7 +4259,10 @@ static int target_array2mem(Jim_Interp *interp, struct target *target,
 		}
 		len -= count;
 
-		retval = target_write_memory(target, addr, width, count, buffer);
+		if (is_phys)
+			retval = target_write_phys_memory(target, addr, width, count, buffer);
+		else
+			retval = target_write_memory(target, addr, width, count, buffer);
 		if (retval != ERROR_OK) {
 			/* BOO !*/
 			LOG_ERROR("array2mem: Write @ 0x%08x, w=%d, cnt=%d, failed",

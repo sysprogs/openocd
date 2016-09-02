@@ -2097,7 +2097,7 @@ only during configuration (before those ports are opened).
 
 For reasons including security, you may wish to prevent remote
 access using one or more of these ports.
-In such cases, just specify the relevant port number as zero.
+In such cases, just specify the relevant port number as "disabled".
 If you disable all access through TCP/IP, you will need to
 use the command line @option{-pipe} option.
 
@@ -2140,7 +2140,7 @@ output from the Tcl engine.
 Intended as a machine interface.
 When not specified during the configuration stage,
 the port @var{number} defaults to 6666.
-
+When specified as "disabled", this service is not activated.
 @end deffn
 
 @deffn {Command} telnet_port [number]
@@ -2149,7 +2149,7 @@ port on which to listen for incoming telnet connections.
 This port is intended for interaction with one human through TCL commands.
 When not specified during the configuration stage,
 the port @var{number} defaults to 4444.
-When specified as zero, this port is not activated.
+When specified as "disabled", this service is not activated.
 @end deffn
 
 @anchor{gdbconfiguration}
@@ -2515,7 +2515,8 @@ The driver uses a signal abstraction to enable Tcl configuration files to
 define outputs for one or several FTDI GPIO. These outputs can then be
 controlled using the @command{ftdi_set_signal} command. Special signal names
 are reserved for nTRST, nSRST and LED (for blink) so that they, if defined,
-will be used for their customary purpose.
+will be used for their customary purpose. Inputs can be read using the
+@command{ftdi_get_signal} command.
 
 Depending on the type of buffer attached to the FTDI GPIO, the outputs have to
 be controlled differently. In order to support tristateable signals such as
@@ -2582,7 +2583,7 @@ minimal impact on the target system. Avoid floating inputs, conflicting outputs
 and initially asserted reset signals.
 @end deffn
 
-@deffn {Config Command} {ftdi_layout_signal} name [@option{-data}|@option{-ndata} data_mask] [@option{-oe}|@option{-noe} oe_mask] [@option{-alias}|@option{-nalias} name]
+@deffn {Config Command} {ftdi_layout_signal} name [@option{-data}|@option{-ndata} data_mask] [@option{-input}|@option{-ninput} input_mask] [@option{-oe}|@option{-noe} oe_mask] [@option{-alias}|@option{-nalias} name]
 Creates a signal with the specified @var{name}, controlled by one or more FTDI
 GPIO pins via a range of possible buffer connections. The masks are FTDI GPIO
 register bitmasks to tell the driver the connection and type of the output
@@ -2590,7 +2591,9 @@ buffer driving the respective signal. @var{data_mask} is the bitmask for the
 pin(s) connected to the data input of the output buffer. @option{-ndata} is
 used with inverting data inputs and @option{-data} with non-inverting inputs.
 The @option{-oe} (or @option{-noe}) option tells where the output-enable (or
-not-output-enable) input to the output buffer is connected.
+not-output-enable) input to the output buffer is connected. The options
+@option{-input} and @option{-ninput} specify the bitmask for pins to be read
+with the method @command{ftdi_get_signal}.
 
 Both @var{data_mask} and @var{oe_mask} need not be specified. For example, a
 simple open-collector transistor driver would be specified with @option{-oe}
@@ -2618,6 +2621,10 @@ Set a previously defined signal to the specified level.
 @item @option{1}, drive high
 @item @option{z}, set to high-impedance
 @end itemize
+@end deffn
+
+@deffn {Command} {ftdi_get_signal} name
+Get the value of a previously defined signal.
 @end deffn
 
 @deffn {Command} {ftdi_tdo_sample_edge} @option{rising}|@option{falling}
@@ -4739,8 +4746,10 @@ and display that status.
 The @var{num} parameter is a value shown by @command{flash banks}.
 @end deffn
 
-@deffn Command {flash info} num
-Print info about flash bank @var{num}
+@deffn Command {flash info} num [sectors]
+Print info about flash bank @var{num}, a list of protection blocks
+and their status. Use @option{sectors} to show a list of sectors instead.
+
 The @var{num} parameter is a value shown by @command{flash banks}.
 This command will first query the hardware, it does not print cached
 and possibly stale information.
@@ -5279,15 +5288,37 @@ identification register, and autoconfigures itself.
 flash bank $_FLASHNAME kinetis 0 0 0 0 $_TARGETNAME
 @end example
 
+@deffn Command {kinetis fcf_source} [protection|write]
+Select what source is used when writing to a Flash Configuration Field.
+@option{protection} mode builds FCF content from protection bits previously
+set by 'flash protect' command.
+This mode is default. MCU is protected from unwanted locking by immediate
+writing FCF after erase of relevant sector.
+@option{write} mode enables direct write to FCF.
+Protection cannot be set by 'flash protect' command. FCF is written along
+with the rest of a flash image.
+@emph{BEWARE: Incorrect flash configuration may permanently lock the device!}
+@end deffn
+
+@deffn Command {kinetis fopt} [num]
+Set value to write to FOPT byte of Flash Configuration Field.
+Used in kinetis 'fcf_source protection' mode only.
+@end deffn
+
 @deffn Command {kinetis mdm check_security}
 Checks status of device security lock. Used internally in examine-end event.
 @end deffn
 
+@deffn Command {kinetis mdm halt}
+Issues a halt via the MDM-AP. This command can be used to break a watchdog reset
+loop when connecting to an unsecured target.
+@end deffn
+
 @deffn Command {kinetis mdm mass_erase}
-Issues a complete Flash erase via the MDM-AP.
-This can be used to erase a chip back to its factory state.
-Command removes security lock from a device (use of SRST highly recommended).
-It does not require the processor to be halted.
+Issues a complete flash erase via the MDM-AP. This can be used to erase a chip
+back to its factory state, removing security. It does not require the processor
+to be halted, however the target will remain in a halted state after this
+command completes.
 @end deffn
 
 @deffn Command {kinetis nvm_partition}
@@ -5318,6 +5349,11 @@ of 1024 bytes and its contents is not loaded to FlexRAM during reset:
 @example
 kinetis nvm_partition eebkp 16 1024 1024 off
 @end example
+@end deffn
+
+@deffn Command {kinetis mdm reset}
+Issues a reset via the MDM-AP. This causes the MCU to output a low pulse on the
+RESET pin, which can be used to reset other hardware on board.
 @end deffn
 
 @deffn Command {kinetis disable_wdog}
@@ -5827,8 +5863,8 @@ The @var{num} parameter is a value shown by @command{flash banks}.
 @end deffn
 
 @deffn {Flash Driver} stm32f2x
-All members of the STM32F2 and STM32F4 microcontroller families from ST Microelectronics
-include internal flash and use ARM Cortex-M3/M4 cores.
+All members of the STM32F2, STM32F4 and STM32F7 microcontroller families from ST Microelectronics
+include internal flash and use ARM Cortex-M3/M4/M7 cores.
 The driver automatically recognizes a number of these chips using
 the chip identification register, and autoconfigures itself.
 
@@ -5850,6 +5886,19 @@ The @var{num} parameter is a value shown by @command{flash banks}.
 @deffn Command {stm32f2x unlock} num
 Unlocks the entire stm32 device.
 The @var{num} parameter is a value shown by @command{flash banks}.
+@end deffn
+
+@deffn Command {stm32f2x options_read} num
+Reads and displays user options and (where implemented) boot_addr0 and boot_addr1.
+The @var{num} parameter is a value shown by @command{flash banks}.
+@end deffn
+
+@deffn Command {stm32f2x options_write} num user_options boot_addr0 boot_addr1
+Writes user options and (where implemented) boot_addr0 and boot_addr1 in raw format.
+Warning: The meaning of the various bits depends on the device, always check datasheet!
+The @var{num} parameter is a value shown by @command{flash banks}, user_options a
+12 bit value, consisting of bits 31-28 and 7-0 of FLASH_OPTCR, boot_addr0 and boot_addr1
+two halfwords (of FLASH_OPTCR1).
 @end deffn
 @end deffn
 
