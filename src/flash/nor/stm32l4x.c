@@ -617,6 +617,9 @@ static int stm32l4_probe(struct flash_bank *bank)
 	case 0x415:
 		max_flash_size_in_kb = 1024;
 		break;
+	case 0x435:
+		max_flash_size_in_kb = 256;
+		break;
 	default:
 		LOG_WARNING("Cannot identify target as a STM32L4 family.");
 		return ERROR_FAIL;
@@ -698,7 +701,7 @@ static int get_stm32l4_info(struct flash_bank *bank, char *buf, int buf_size)
 	if (retval != ERROR_OK)
 		return retval;
 
-	uint16_t device_id = dbgmcu_idcode & 0xffff;
+	uint16_t device_id = dbgmcu_idcode & 0xfff;
 	uint8_t rev_id = dbgmcu_idcode >> 28;
 	uint8_t rev_minor = 0;
 	int i;
@@ -713,8 +716,12 @@ static int get_stm32l4_info(struct flash_bank *bank, char *buf, int buf_size)
 	const char *device_str;
 
 	switch (device_id) {
-	case 0x6415:
+	case 0x415:
 		device_str = "STM32L4xx";
+		break;
+
+	case 0x435:
+		device_str = "STM32L43x";
 		break;
 
 	default:
