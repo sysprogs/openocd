@@ -2807,7 +2807,7 @@ int target_wait_state(struct target *target, enum target_state state, int ms)
 		if (cur-then > 500)
 			keep_alive();
 
-		if ((cur-then) > ms) {
+		if (ms >= 0 && ((cur-then) > ms)) {
 			LOG_ERROR("timed out while waiting for target %s",
 				Jim_Nvp_value2name_simple(nvp_target_state, state)->name);
 			return ERROR_FAIL;
@@ -5810,6 +5810,40 @@ COMMAND_HANDLER(handle_report_flash_progress)
     command_print(CMD_CTX, "FLASH progress reporting is now %s\n", target->report_flash_progress ? "on" : "off");
     return ERROR_OK;
 }
+
+COMMAND_HANDLER(handle_run_until_stop_fast)
+{
+    int timeout = 5000;
+    if (CMD_ARGC == 1)
+    {
+        COMMAND_PARSE_NUMBER(s32, CMD_ARGV[0], timeout);
+    }
+    struct target *target = get_current_target(CMD_CTX);
+    target_resume(target, 1, 0, 1, 0);
+    if (target_wait_state(target, TARGET_HALTED, timeout) == ERROR_OK)
+    {
+        command_print(CMD_CTX, "Target successfully stopped");
+    }
+    else
+        target_halt(target);
+    return ERROR_OK;
+}
+
+COMMAND_HANDLER(handle_wait_for_stop)
+{
+    int timeout = 5000;
+    if (CMD_ARGC == 1)
+    {
+        COMMAND_PARSE_NUMBER(s32, CMD_ARGV[0], timeout);
+    }
+    struct target *target = get_current_target(CMD_CTX);
+    if (target_wait_state(target, TARGET_HALTED, timeout) == ERROR_OK)
+        command_print(CMD_CTX, "Target successfully stopped");
+	else
+        command_print(CMD_CTX, "Target did not halt within %d msec", timeout);
+	
+    return ERROR_OK;
+}
     
 
 COMMAND_HANDLER(handle_test_mem_access_command)
@@ -6227,6 +6261,20 @@ static const struct command_registration target_exec_command_handlers[] = {
         .mode = COMMAND_EXEC,
         .help = "Enables/disables reporting FLASH programming progress",
         .usage = "[on/off]",
+    },
+    {
+        .name = "run_until_stop_fast",
+        .handler = handle_run_until_stop_fast,
+        .mode = COMMAND_EXEC,
+        .help = "Runs the target until a stop occurs",
+        .usage = "[timeout]",
+    },
+    {
+        .name = "wait_for_stop",
+        .handler = handle_wait_for_stop,
+        .mode = COMMAND_EXEC,
+        .help = "Waits for the target to stop",
+        .usage = "[timeout]",
     },
 
 	COMMAND_REGISTRATION_DONE

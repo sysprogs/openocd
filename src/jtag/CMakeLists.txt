@@ -57,6 +57,7 @@ add_library(ocdjlink STATIC
 	drivers/libjaylink/libjaylink/jtag.c
 	drivers/libjaylink/libjaylink/list.c
 	drivers/libjaylink/libjaylink/log.c
+	drivers/libjaylink/libjaylink/strutil.c
 	drivers/libjaylink/libjaylink/swd.c
 	drivers/libjaylink/libjaylink/swo.c
 	drivers/libjaylink/libjaylink/target.c
