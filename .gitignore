@@ -101,3 +101,8 @@ TAGS
 tags
 
 build
+.vs
+CodeDB
+VisualGDBCache
+*.sln
+*.vgdbcmake
