@@ -23,7 +23,6 @@ add_library(ocdjtagdrivers STATIC
 	drivers/driver.c
 	drivers/libusb1_common.c
 	drivers/usb_common.c
-	drivers/ft2232.c
 	drivers/ftdi.c
 	drivers/mpsse.c
 	drivers/usbprog.c
@@ -41,6 +40,7 @@ add_library(ocdjtagdrivers STATIC
 	drivers/stlink_usb.c
 	drivers/ti_icdi_usb.c
 	drivers/osbdm.c
+	drivers/kitprog.c
 	drivers/opendous.c
 	drivers/cmsis_dap_usb.c)
 

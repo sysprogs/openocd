@@ -1,6 +1,6 @@
 add_library(openrisc openrisc/or1k.c openrisc/or1k_du_adv.c openrisc/or1k_tap_mohor.c openrisc/or1k_tap_vjtag.c openrisc/or1k_tap_xilinx_bscan.c openrisc/jsp_server.c)
 
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xscale_debug.inc COMMAND run-sh ARGS -c "${CMAKE_CURRENT_SOURCE_DIR}/../helper/bin2char.sh < ${CMAKE_CURRENT_SOURCE_DIR}/xscale/debug_handler.bin > ${CMAKE_CURRENT_BINARY_DIR}/xscale_debug.inc" MAIN_DEPENDENCY xscale/debug_handler.bin)
+#add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xscale_debug.inc COMMAND run-sh ARGS -c "${CMAKE_CURRENT_SOURCE_DIR}/../helper/bin2char.sh < ${CMAKE_CURRENT_SOURCE_DIR}/xscale/debug_handler.bin > ${CMAKE_CURRENT_BINARY_DIR}/xscale_debug.inc" MAIN_DEPENDENCY xscale/debug_handler.bin)
 
 add_library(target
 	adi_v5_jtag.c
@@ -24,7 +24,12 @@ add_library(target
 	armv7a_cache_l2x.c
 	armv7m.c
 	armv7m_trace.c
+	armv8.c
+	armv8_cache.c
+	armv8_dpm.c
+	armv8_opcodes.c
 	arm_adi_v5.c
+	arm_cti.c
 	arm_disassembler.c
 	arm_dpm.c
 	arm_jtag.c

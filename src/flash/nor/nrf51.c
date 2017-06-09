@@ -120,6 +120,7 @@ struct nrf51_info {
 
 struct nrf51_device_spec {
 	uint16_t hwid;
+	const char *part;
 	const char *variant;
 	const char *build_code;
 	unsigned int flash_size_kb;
@@ -141,30 +142,35 @@ static const struct nrf51_device_spec nrf51_known_devices_table[] = {
 	/* nRF51822 Devices (IC rev 1). */
 	{
 		.hwid		= 0x001D,
+		.part		= "51822",
 		.variant	= "QFAA",
 		.build_code	= "CA/C0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0026,
+		.part		= "51822",
 		.variant	= "QFAB",
 		.build_code	= "AA",
 		.flash_size_kb	= 128,
 	},
 	{
 		.hwid		= 0x0027,
+		.part		= "51822",
 		.variant	= "QFAB",
 		.build_code	= "A0",
 		.flash_size_kb	= 128,
 	},
 	{
 		.hwid		= 0x0020,
+		.part		= "51822",
 		.variant	= "CEAA",
 		.build_code	= "BA",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x002F,
+		.part		= "51822",
 		.variant	= "CEAA",
 		.build_code	= "B0",
 		.flash_size_kb	= 256,
@@ -173,54 +179,63 @@ static const struct nrf51_device_spec nrf51_known_devices_table[] = {
 	/* nRF51822 Devices (IC rev 2). */
 	{
 		.hwid		= 0x002A,
+		.part		= "51822",
 		.variant	= "QFAA",
 		.build_code	= "FA0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0044,
+		.part		= "51822",
 		.variant	= "QFAA",
 		.build_code	= "GC0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x003C,
+		.part		= "51822",
 		.variant	= "QFAA",
 		.build_code	= "G0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0057,
+		.part		= "51822",
 		.variant	= "QFAA",
 		.build_code	= "G2",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0058,
+		.part		= "51822",
 		.variant	= "QFAA",
 		.build_code	= "G3",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x004C,
+		.part		= "51822",
 		.variant	= "QFAB",
 		.build_code	= "B0",
 		.flash_size_kb	= 128,
 	},
 	{
 		.hwid		= 0x0040,
+		.part		= "51822",
 		.variant	= "CEAA",
 		.build_code	= "CA0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0047,
+		.part		= "51822",
 		.variant	= "CEAA",
 		.build_code	= "DA0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x004D,
+		.part		= "51822",
 		.variant	= "CEAA",
 		.build_code	= "D00",
 		.flash_size_kb	= 256,
@@ -229,62 +244,79 @@ static const struct nrf51_device_spec nrf51_known_devices_table[] = {
 	/* nRF51822 Devices (IC rev 3). */
 	{
 		.hwid		= 0x0072,
+		.part		= "51822",
 		.variant	= "QFAA",
 		.build_code	= "H0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x007B,
+		.part		= "51822",
 		.variant	= "QFAB",
 		.build_code	= "C0",
 		.flash_size_kb	= 128,
 	},
 	{
 		.hwid		= 0x0083,
+		.part		= "51822",
 		.variant	= "QFAC",
 		.build_code	= "A0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0084,
+		.part		= "51822",
 		.variant	= "QFAC",
 		.build_code	= "A1",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x007D,
+		.part		= "51822",
 		.variant	= "CDAB",
 		.build_code	= "A0",
 		.flash_size_kb	= 128,
 	},
 	{
 		.hwid		= 0x0079,
+		.part		= "51822",
 		.variant	= "CEAA",
 		.build_code	= "E0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0087,
+		.part		= "51822",
 		.variant	= "CFAC",
 		.build_code	= "A0",
+		.flash_size_kb	= 256,
+	},
+	{
+		.hwid		= 0x008F,
+		.part		= "51822",
+		.variant	= "QFAA",
+		.build_code	= "H1",
 		.flash_size_kb	= 256,
 	},
 
 	/* nRF51422 Devices (IC rev 1). */
 	{
 		.hwid		= 0x001E,
+		.part		= "51422",
 		.variant	= "QFAA",
 		.build_code	= "CA",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0024,
+		.part		= "51422",
 		.variant	= "QFAA",
 		.build_code	= "C0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0031,
+		.part		= "51422",
 		.variant	= "CEAA",
 		.build_code	= "A0A",
 		.flash_size_kb	= 256,
@@ -293,24 +325,28 @@ static const struct nrf51_device_spec nrf51_known_devices_table[] = {
 	/* nRF51422 Devices (IC rev 2). */
 	{
 		.hwid		= 0x002D,
+		.part		= "51422",
 		.variant	= "QFAA",
 		.build_code	= "DAA",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x002E,
+		.part		= "51422",
 		.variant	= "QFAA",
 		.build_code	= "E0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0061,
+		.part		= "51422",
 		.variant	= "QFAB",
 		.build_code	= "A00",
 		.flash_size_kb	= 128,
 	},
 	{
 		.hwid		= 0x0050,
+		.part		= "51422",
 		.variant	= "CEAA",
 		.build_code	= "B0",
 		.flash_size_kb	= 256,
@@ -319,42 +355,49 @@ static const struct nrf51_device_spec nrf51_known_devices_table[] = {
 	/* nRF51422 Devices (IC rev 3). */
 	{
 		.hwid		= 0x0073,
+		.part		= "51422",
 		.variant	= "QFAA",
 		.build_code	= "F0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x007C,
+		.part		= "51422",
 		.variant	= "QFAB",
 		.build_code	= "B0",
 		.flash_size_kb	= 128,
 	},
 	{
 		.hwid		= 0x0085,
+		.part		= "51422",
 		.variant	= "QFAC",
 		.build_code	= "A0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0086,
+		.part		= "51422",
 		.variant	= "QFAC",
 		.build_code	= "A1",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x007E,
+		.part		= "51422",
 		.variant	= "CDAB",
 		.build_code	= "A0",
 		.flash_size_kb	= 128,
 	},
 	{
 		.hwid		= 0x007A,
+		.part		= "51422",
 		.variant	= "CEAA",
 		.build_code	= "C0",
 		.flash_size_kb	= 256,
 	},
 	{
 		.hwid		= 0x0088,
+		.part		= "51422",
 		.variant	= "CFAC",
 		.build_code	= "A0",
 		.flash_size_kb	= 256,
@@ -365,6 +408,7 @@ static const struct nrf51_device_spec nrf51_known_devices_table[] = {
 	   in the nRF51 Series Compatibility Matrix V1.0. */
 	{
 		.hwid		= 0x0071,
+		.part		= "51822",
 		.variant	= "QFAC",
 		.build_code	= "AB",
 		.flash_size_kb	= 256,
@@ -626,16 +670,18 @@ static int nrf51_probe(struct flash_bank *bank)
 			 * bytes of the CONFIGID register */
 
 	const struct nrf51_device_spec *spec = NULL;
-	for (size_t i = 0; i < ARRAY_SIZE(nrf51_known_devices_table); i++)
+	for (size_t i = 0; i < ARRAY_SIZE(nrf51_known_devices_table); i++) {
 		if (hwid == nrf51_known_devices_table[i].hwid) {
 			spec = &nrf51_known_devices_table[i];
 			break;
 		}
+	}
 
 	if (!chip->bank[0].probed && !chip->bank[1].probed) {
 		if (spec)
-			LOG_INFO("nRF51822-%s(build code: %s) %ukB Flash",
-				 spec->variant, spec->build_code, spec->flash_size_kb);
+			LOG_INFO("nRF%s-%s(build code: %s) %ukB Flash",
+				 spec->part, spec->variant, spec->build_code,
+				 spec->flash_size_kb);
 		else
 			LOG_WARNING("Unknown device (HWID 0x%08" PRIx32 ")", hwid);
 	}
@@ -651,14 +697,15 @@ static int nrf51_probe(struct flash_bank *bank)
 
 		/* Note the register name is misleading,
 		 * NRF51_FICR_CODESIZE is the number of pages in flash memory, not the number of bytes! */
-		res = target_read_u32(chip->target, NRF51_FICR_CODESIZE,
-				(uint32_t *) &bank->num_sectors);
+		uint32_t num_sectors;
+		res = target_read_u32(chip->target, NRF51_FICR_CODESIZE, &num_sectors);
 		if (res != ERROR_OK) {
 			LOG_ERROR("Couldn't read code memory size");
 			return res;
 		}
 
-		bank->size = bank->num_sectors * chip->code_page_size;
+		bank->num_sectors = num_sectors;
+		bank->size = num_sectors * chip->code_page_size;
 
 		if (spec && bank->size / 1024 != spec->flash_size_kb)
 			LOG_WARNING("Chip's reported Flash capacity does not match expected one");

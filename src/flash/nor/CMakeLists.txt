@@ -7,6 +7,7 @@ add_library(ocdflashnor
 	at91sam4l.c
 	at91sam7.c
 	at91samd.c
+	ath79.c
 	atsamv.c
 	avrf.c
 	cfi.c
