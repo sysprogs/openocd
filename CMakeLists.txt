@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.0)
 project (OpenOCD)
 
 INCLUDE (CheckIncludeFiles)
-SET(OPENOCD_VERSION 0.9.0)
+SET(OPENOCD_VERSION 0.10.0)
 
 include(config.cmake)
 
