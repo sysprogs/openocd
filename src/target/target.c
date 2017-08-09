@@ -936,6 +936,9 @@ int target_run_flash_async_algorithm(struct target *target,
 		LOG_ERROR("error starting target flash write algorithm");
 		return retval;
 	}
+    
+    if (target->report_flash_progress)
+        LOG_INFO("flash_write_progress_async_start:0x%x", block_size * count_orig);
 
 	while (count > 0) {
 
@@ -1011,7 +1014,7 @@ int target_run_flash_async_algorithm(struct target *target,
 			break;
     	
     	if (target->report_flash_progress)
-    	    LOG_INFO("FLASH: Programmed %d/%d bytes...", buffer - buffer_orig, block_size * count_orig);
+    	    LOG_INFO("flash_write_progress_async:0x%x|0x%x", buffer - buffer_orig, block_size * count_orig);
 	}
 
 	if (retval != ERROR_OK) {
@@ -6007,6 +6010,8 @@ static void binprint(struct command_context *cmd_ctx, const char *text, const ui
 	command_print(cmd_ctx, " ");
 }
     
+#include <flash/nor/imp.h>
+
 COMMAND_HANDLER(handle_report_flash_progress)
 {
     struct target *target = get_current_target(CMD_CTX);
@@ -6015,6 +6020,18 @@ COMMAND_HANDLER(handle_report_flash_progress)
         int new_val = 0;
         COMMAND_PARSE_ON_OFF(CMD_ARGV[0], new_val);
         target->report_flash_progress = new_val;
+        
+        if (new_val)
+        {
+            for (struct flash_bank *bank = flash_bank_list(); bank; bank = bank->next)
+            {
+                int r = bank->driver->probe(bank);
+                if (r != ERROR_OK)
+                    LOG_ERROR("FLASH bank probe failed for %s", bank->name);
+        
+                command_print(CMD_CTX, "flash_bank_summary:0x%x|0x%x|%s", bank->base, bank->size, bank->name);
+            }
+        }
     }
     command_print(CMD_CTX, "FLASH progress reporting is now %s\n", target->report_flash_progress ? "on" : "off");
     return ERROR_OK;

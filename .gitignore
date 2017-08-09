@@ -106,3 +106,5 @@ CodeDB
 VisualGDBCache
 *.sln
 *.vgdbcmake
+VisualGDB
+toolchain.cmake

@@ -30,10 +30,6 @@
 #include "advanced_elf_image.h"
 #include "nor/imp.h"
 
-#define FLASH_ERASE_TIMEOUT 60000
-#define FLASH_WRITE_TIMEOUT 1000
-#define FLASH_INIT_TIMEOUT 1000
-#define FLASH_PROTECT_TIMEOUT 1000
 
 struct WorkAreaInfo
 {
@@ -75,6 +71,21 @@ struct memory_backup
     void *original_contents;
 };
 
+struct plugin_timeouts
+{
+    unsigned erase;
+    unsigned write;
+    unsigned init;
+    unsigned load;
+    unsigned protect;
+};
+
+struct image_plugin_timeouts
+{
+    unsigned size;
+    struct plugin_timeouts timeouts;
+};
+
 struct loaded_plugin
 {
     int region_count;
@@ -85,6 +96,7 @@ struct loaded_plugin
     uint32_t usable_stack_pointer;
     
     struct memory_backup work_area_backup;
+    struct plugin_timeouts timeouts;
 };
 
 int save_region(struct target *target, struct memory_backup *region, Elf32_Addr sh_addr, Elf32_Size sh_size, int sectionNumber)
@@ -110,7 +122,16 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
     plugin->regions = (struct memory_backup *)calloc(image->num_sections + 1, sizeof(struct memory_backup));
     plugin->target = target;
     plugin->entry = image->header.e_entry;
+    
+    plugin->timeouts.erase = 60000;
+    plugin->timeouts.write = 1000;
+    plugin->timeouts.init = 1000;
+    plugin->timeouts.load = 10000;
+    plugin->timeouts.protect = 1000;
+    
     unsigned lastSectionEnd = 0;
+    
+    uint32_t timeoutTable = advanced_elf_image_find_symbol(image, "FLASHPlugin_TimeoutTable");
     
     int maxSize = 0;
     
@@ -153,6 +174,16 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
                 LOG_ERROR("Failed to read FLASH plugin contents\n");
                 retval = ERROR_FILEIO_OPERATION_FAILED;
             }
+            
+            if (timeoutTable && timeoutTable >= plugin->regions[i].base_address && timeoutTable < (plugin->regions[i].base_address + plugin->regions[i].size))
+            {
+                struct image_plugin_timeouts *timeouts_from_image = (struct image_plugin_timeouts *)((char *)pBuf + (timeoutTable - plugin->regions[i].base_address));
+                if (timeouts_from_image->size > sizeof(struct plugin_timeouts))
+                    LOG_WARNING("Invalid size of timeouts structure: %d\n", timeouts_from_image->size);
+                else
+                    memcpy(&plugin->timeouts, &timeouts_from_image->timeouts, timeouts_from_image->size);
+            }
+            
             retval = target_write_memory(target, plugin->regions[i].base_address, 4, (plugin->regions[i].size + 3) / 4, (uint8_t *)pBuf);
             if (retval != ERROR_OK)
                 break;
@@ -173,10 +204,10 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
         armv7m_info.core_mode = ARM_MODE_THREAD;
         int bp = breakpoint_add(target, init_done_address, 2, BKPT_SOFT);
 
-        retval = target_run_algorithm(target, 0, NULL, sizeof(reg_params) / sizeof(reg_params[0]), reg_params, plugin->entry, init_done_address, FLASH_WRITE_TIMEOUT, &armv7m_info);
+        retval = target_run_algorithm(target, 0, NULL, sizeof(reg_params) / sizeof(reg_params[0]), reg_params, plugin->entry, init_done_address, plugin->timeouts.load, &armv7m_info);
         breakpoint_remove(target, init_done_address);
         if (retval != ERROR_OK)
-            LOG_ERROR("FLASH plugin did not call FLASHPlugin_InitDone(). Ensure it is declared as non-inline.");
+            LOG_ERROR("FLASH plugin did not call FLASHPlugin_InitDone(). Ensure it is declared as non-inline and try increasing load timeout setting inside the plugin timeout table.");
         destroy_reg_param(&reg_params[0]);
     }
     
@@ -193,7 +224,7 @@ static int loaded_plugin_unload(struct loaded_plugin *plugin, uint32_t unload_fu
     if (unload_func)
     {
         uint32_t result;
-        retval = call_plugin_func(plugin->target, FLASH_INIT_TIMEOUT, unload_func, plugin->sp, &result, 0);
+        retval = call_plugin_func(plugin->target, plugin->timeouts.init, unload_func, plugin->sp, &result, 0);
         if (retval == ERROR_OK && result != 0)
         {
             LOG_ERROR("Plugin's Unload() function returned error %d\n", result);
@@ -358,7 +389,7 @@ int plugin_write_sync(struct target *target,
     }
     
     unsigned result = 0;
-    retval = call_plugin_func(target, FLASH_WRITE_TIMEOUT, plugin_info->FLASHPlugin_ProgramSync, loaded_plugin->sp, &result, 3, offset, plugin_info->WorkArea.Address, todo);
+    retval = call_plugin_func(target, loaded_plugin->timeouts.write, plugin_info->FLASHPlugin_ProgramSync, loaded_plugin->sp, &result, 3, offset, plugin_info->WorkArea.Address, todo);
     if (retval != ERROR_OK)
         return -1;
     return result;
@@ -468,6 +499,10 @@ static int plugin_write(struct flash_bank *bank,
                     retval = ERROR_FLASH_BANK_INVALID;   
                     break;
                 }
+                
+                if (target->report_flash_progress)
+                    LOG_INFO("flash_write_progress_sync:0x%x|0x%x|%s", bank->base + offset + done, bank->base + offset + done + doneNow, bank->name);
+
                 done += doneNow;
             }
         }
@@ -572,7 +607,7 @@ static int plugin_probe(struct flash_bank *bank)
         
         sp -= sizeof(struct FLASHBankInfo);
         
-        retval = call_plugin_func(target, FLASH_INIT_TIMEOUT, plugin_info->FLASHPlugin_Probe, sp, &result, 5, sp, bank->base, bank->size, bank->chip_width, bank->bus_width);
+        retval = call_plugin_func(target, loaded_plugin.timeouts.init, plugin_info->FLASHPlugin_Probe, sp, &result, 5, sp, bank->base, bank->size, bank->chip_width, bank->bus_width);
         if (retval == ERROR_OK)
         {
             retval = target_read_memory(target, sp, 4, sizeof(bankInfo) / 4, (uint8_t *)&bankInfo);
@@ -585,7 +620,7 @@ static int plugin_probe(struct flash_bank *bank)
         uint32_t sp = (loaded_plugin.sp - 4) & ~3;
         
         sp -= sizeof(struct WorkAreaInfo);
-        retval = call_plugin_func(target, FLASH_INIT_TIMEOUT, plugin_info->FLASHPlugin_FindWorkArea, sp, &result, 2, sp, loaded_plugin.sp);
+        retval = call_plugin_func(target, loaded_plugin.timeouts.init, plugin_info->FLASHPlugin_FindWorkArea, sp, &result, 2, sp, loaded_plugin.sp);
         if (retval == ERROR_OK)
         {
             retval = target_read_memory(target, sp, 4, sizeof(plugin_info->WorkArea) / 4, (uint8_t *)&plugin_info->WorkArea);
@@ -648,7 +683,7 @@ static int plugin_erase(struct flash_bank *bank, int first, int last)
         while (first <= last)
         {
             int32_t result;
-            retval = call_plugin_func(target, FLASH_ERASE_TIMEOUT, plugin_info->FLASHPlugin_EraseSectors, loaded_plugin.sp, &result, 2, first, last - first + 1);
+            retval = call_plugin_func(target, loaded_plugin.timeouts.erase, plugin_info->FLASHPlugin_EraseSectors, loaded_plugin.sp, &result, 2, first, last - first + 1);
             if (retval != ERROR_OK)
                 break;
             if (result < 0)
@@ -656,6 +691,9 @@ static int plugin_erase(struct flash_bank *bank, int first, int last)
                 LOG_ERROR("FLASHPlugin_EraseSectors() returned %d", result);
                 retval = ERROR_FLASH_BANK_INVALID;
             }
+            
+            if (target->report_flash_progress)
+                LOG_INFO("flash_erase_progress:0x%x|0x%x|%s", bank->base + bank->sectors[first].offset, bank->base + bank->sectors[first + result - 1].offset + bank->sectors[first + result - 1].size, bank->name);
             
             first += result;
         }
@@ -680,7 +718,7 @@ static int plugin_protect(struct flash_bank *bank, int set, int first, int last)
         while (first <= last)
         {
             int32_t result;
-            retval = call_plugin_func(target, FLASH_PROTECT_TIMEOUT, plugin_info->FLASHPlugin_ProtectSectors, loaded_plugin.sp, &result, 3, set, first, last - first + 1);
+            retval = call_plugin_func(target, loaded_plugin.timeouts.protect, plugin_info->FLASHPlugin_ProtectSectors, loaded_plugin.sp, &result, 3, set, first, last - first + 1);
             if (retval != ERROR_OK)
                 break;
             if (result < 0)
@@ -719,7 +757,7 @@ static int plugin_protect_check(struct flash_bank *bank)
             {
                 int sectors_to_check = MIN(workAreaSize * 8, bank->num_sectors - sector);
                 int32_t result;
-                retval = call_plugin_func(target, FLASH_PROTECT_TIMEOUT, plugin_info->FLASHPlugin_CheckSectorProtection, loaded_plugin.sp, &result, 3, sector, sectors_to_check, plugin_info->WorkArea.Address);
+                retval = call_plugin_func(target, loaded_plugin.timeouts.protect, plugin_info->FLASHPlugin_CheckSectorProtection, loaded_plugin.sp, &result, 3, sector, sectors_to_check, plugin_info->WorkArea.Address);
                 if (retval != ERROR_OK)
                     break;
                 if (result < 0 || result > sectors_to_check)
