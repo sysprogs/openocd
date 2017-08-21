@@ -25,21 +25,21 @@
 
 	.text
 	.syntax unified
-	.cpu cortex-m0
+	.cpu cortex-m4
 	.thumb
 	.thumb_func
 
 /* To assemble:
- * arm-none-eabi-gcc -c stm32l4x.S
+ * arm-none-eabi-gcc -c stm32h7x.S
  *
  * To disassemble:
- * arm-none-eabi-objdump -o stm32l4x.o
+ * arm-none-eabi-objdump -o stm32h7x.o
  *
  * To generate binary file:
- * arm-none-eabi-objcopy -O binary stm32l4x.o stm32l4_flash_write_code.bin
+ * arm-none-eabi-objcopy -O binary stm32h7x.o stm32h7_flash_write_code.bin
  *
  * To generate include file:
- * xxd -i stm32l4_flash_write_code.bin
+ * xxd -i stm32h7_flash_write_code.bin
  */
 
 /*
@@ -47,61 +47,59 @@
  * r0 = workarea start, status (out)
  * r1 = workarea end
  * r2 = target address
- * r3 = count (64bit words)
- * r4 = flash base
+ * r3 = count (256 bit words)
+ * r4 = flash reg base
  *
  * Clobbered:
- * r5   - rp
- * r6   - temp
- * r7   - wp
+ * r5 - index for loop
+ * r6 - temp
+ * r7 - rp
+ * r8 - wp, tmp
  */
 
-#define STM32_FLASH_CR_OFFSET	0x14	/* offset of CR register in FLASH struct */
+#define STM32_FLASH_CR_OFFSET	0x0C	/* offset of CR register in FLASH struct */
 #define STM32_FLASH_SR_OFFSET	0x10	/* offset of SR register in FLASH struct */
+#define STM32_PROG				0x32	/* Flash CR = PSIZE64 | PG */
 
 wait_fifo:
-	ldr		r7, [r0, #0]	/* read wp */
-	cmp		r7, #0			/* abort if wp == 0 */
-	beq		exit
-	ldr		r5, [r0, #4]	/* read rp */
-	subs	r6, r7, r5		/* number of bytes available for read in r6 */
-	bmi		negative		/* if wrapped around, add size of buffer */
-positive:
-	cmp		r6, #8			/* wait until 8 bytes are available */
-	bcc		wait_fifo
+	ldr 	r8, [r0, #0]	/* read wp */
+	cmp 	r8, #0			/* abort if wp == 0 */
+	beq 	exit
+	ldr 	r7, [r0, #4]	/* read rp */
+	subs	r6, r8, r7		/* number of bytes available for read in r6 */
+	itt 	mi              /* if wrapped around*/
+	addmi	r6, r1          /* add size of buffer */
+	submi	r6, r0
+	cmp 	r6, #32			/* wait until 32 bytes are available */
+	bcc 	wait_fifo
 
-	movs	r6, #1			/* FLASH_CR = 1 (Set PROG bit) */
+	mov		r6, #STM32_PROG
 	str		r6, [r4, #STM32_FLASH_CR_OFFSET]
-	ldmia	r5!, {r6}		/* read 1st word from src, increment ptr */
-	stmia	r2!, {r6}		/* write 1st word to dest, increment ptr */
+
+	mov		r5, #8			/* program by 8 words = 32 bytes */
+write_flash:
+	ldr 	r6, [r7], #0x04	/* read one word from src, increment ptr */
+	str 	r6, [r2], #0x04	/* write one word to dst, increment ptr */
 	dsb
-	ldmia	r5!, {r6}		/* read 2nd word from src, increment ptr */
-	stmia	r2!, {r6}		/* write 2nd word to dest, increment ptr */
-	dsb
+	subs	r5, r5, #1		/* decrement index */
+	bne		write_flash		/* loop if not done */
+
 busy:
-	ldr		r6, [r4, #STM32_FLASH_SR_OFFSET]
-	lsrs	r6, #17			/* BSY (bit16) == 1 => operation in progress */
-	bcs		busy			/* wait more... */
-	ldr		r6, [r4, #STM32_FLASH_SR_OFFSET]
-	uxtb	r6, r6			/* isolate error flags byte */
-	cmp		r6, #0			/* PGSERR | SIZERR | PGAERR | WRPERR | PROGERR | OPERR */
+	ldr 	r6, [r4, #STM32_FLASH_SR_OFFSET]
+	tst 	r6, #0x1		/* BSY (bit1) == 1 => operation in progress */
+	bne 	busy			/* wait more... */
+	tst		r6, #0x01ee0000	/* SNECCERR | RDSERR | RDPERR | OPERR | INCERR | STRBERR | PGSERR | WRPERR */
+	bne		error			/* fail... */
+	tst		r6, #0x02000000	/* DBECCERR */
 	bne		error			/* fail... */
 
-	cmp		r5, r1			/* wrap rp at end of buffer */
-	bcs		superior
-inferior:
-	str		r5, [r0, #4]	/* store rp */
-	subs	r3, r3, #1		/* decrement dword count */
-	beq		exit			/* loop if not done */
+	cmp 	r7, r1			/* wrap rp at end of buffer */
+	it  	cs
+	addcs	r7, r0, #8		/* skip loader args */
+	str 	r7, [r0, #4]	/* store rp */
+	subs	r3, r3, #1		/* decrement count */
+	cbz 	r3, exit		/* loop if not done */
 	b		wait_fifo
-negative:
-	add		r6, r6, r1		/* add size of buffer */
-	subs	r6, r0
-	b		positive
-superior:
-	mov		r5, r0			/* wrap rp (rp = r0 +8)   */
-	adds	r5, r5, #8		/* +8 to skip loader args */
-	b		inferior
 error:
 	movs	r1, #0
 	str		r1, [r0, #4]	/* set rp = 0 on error */

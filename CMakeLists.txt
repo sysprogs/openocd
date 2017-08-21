@@ -14,7 +14,7 @@ find_path(HIDAPI_INCLUDE_DIR hidapi.h
 	HINTS ${CMAKE_SYSTEM_INCLUDE_PATH} c:/mingw/include
 	PATH_SUFFIXES hidapi)
 	
-add_definitions(-DHAVE_CONFIG_H -DPKGDATADIR="." -DBINDIR="../../bin")
+add_definitions(-DHAVE_CONFIG_H -DPKGDATADIR="../../share/openocd" -DBINDIR="../../bin")
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${LIBUSB1_INCLUDE_DIR} ${HIDAPI_INCLUDE_DIR})
 set(CMAKE_C_FLAGS "-std=gnu99")
 

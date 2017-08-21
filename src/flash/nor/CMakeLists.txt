@@ -41,6 +41,7 @@ add_library(ocdflashnor
 	msp432p4.c
 	stm32f1x.c
 	stm32f2x.c
+	stm32h7x.c
 	stm32l4x.c
 	stm32lx.c
 	stmsmi.c
