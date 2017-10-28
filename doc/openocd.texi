@@ -682,7 +682,8 @@ bash$ openocd --help
 --version    | -v       display OpenOCD version
 --file       | -f       use configuration file <name>
 --search     | -s       dir to search for config files and scripts
---debug      | -d       set debug level <0-3>
+--debug      | -d       set debug level to 3
+             | -d<n>    set debug level to <level>
 --log_output | -l       redirect log output to file <name>
 --command    | -c       run <command>
 @end verbatim
@@ -5766,17 +5767,19 @@ Show information about flash driver.
 
 @end deffn
 
-@deffn {Flash Driver} nrf51
+@deffn {Flash Driver} nrf5
 All members of the nRF51 microcontroller families from Nordic Semiconductor
 include internal flash and use ARM Cortex-M0 core.
+Also, the nRF52832 microcontroller from Nordic Semiconductor, which include
+internal flash and use an ARM Cortex-M4F core.
 
 @example
-flash bank $_FLASHNAME nrf51 0 0x00000000 0 0 $_TARGETNAME
+flash bank $_FLASHNAME nrf5 0 0x00000000 0 0 $_TARGETNAME
 @end example
 
-Some nrf51-specific commands are defined:
+Some nrf5-specific commands are defined:
 
-@deffn Command {nrf51 mass_erase}
+@deffn Command {nrf5 mass_erase}
 Erases the contents of the code memory and user information
 configuration registers as well. It must be noted that this command
 works only for chips that do not have factory pre-programmed region 0
@@ -5988,16 +5991,21 @@ The @var{num} parameter is a value shown by @command{flash banks}.
 @end deffn
 
 @deffn Command {stm32f2x options_read} num
-Reads and displays user options and (where implemented) boot_addr0 and boot_addr1.
+Reads and displays user options and (where implemented) boot_addr0, boot_addr1, optcr2.
 The @var{num} parameter is a value shown by @command{flash banks}.
 @end deffn
 
 @deffn Command {stm32f2x options_write} num user_options boot_addr0 boot_addr1
 Writes user options and (where implemented) boot_addr0 and boot_addr1 in raw format.
 Warning: The meaning of the various bits depends on the device, always check datasheet!
-The @var{num} parameter is a value shown by @command{flash banks}, user_options a
-12 bit value, consisting of bits 31-28 and 7-0 of FLASH_OPTCR, boot_addr0 and boot_addr1
-two halfwords (of FLASH_OPTCR1).
+The @var{num} parameter is a value shown by @command{flash banks}, @var{user_options} a
+12 bit value, consisting of bits 31-28 and 7-0 of FLASH_OPTCR, @var{boot_addr0} and
+@var{boot_addr1} two halfwords (of FLASH_OPTCR1).
+@end deffn
+
+@deffn Command {stm32f2x optcr2_write} num optcr2
+Writes FLASH_OPTCR2 options. Warning: Clearing PCROPi bits requires a full mass erase!
+The @var{num} parameter is a value shown by @command{flash banks}, @var{optcr2} a 32-bit word.
 @end deffn
 @end deffn
 
@@ -6849,12 +6857,13 @@ non-zero exit code to the parent process.
 @deffn Command debug_level [n]
 @cindex message level
 Display debug level.
-If @var{n} (from 0..3) is provided, then set it to that level.
+If @var{n} (from 0..4) is provided, then set it to that level.
 This affects the kind of messages sent to the server log.
 Level 0 is error messages only;
 level 1 adds warnings;
 level 2 adds informational messages;
-and level 3 adds debugging messages.
+level 3 adds debugging messages;
+and level 4 adds verbose low-level debug messages.
 The default is level 2, but that can be overridden on
 the command line along with the location of that log
 file (which is normally the server's standard output).
@@ -7593,6 +7602,20 @@ is running. The target application must be linked against a library
 implementing the ARM semihosting convention that forwards operation
 requests by using a special SVC instruction that is trapped at the
 Supervisor Call vector by OpenOCD.
+@end deffn
+
+@deffn Command {arm semihosting_cmdline} [@option{enable}|@option{disable}]
+@cindex ARM semihosting
+Set the command line to be passed to the debuggee.
+
+@example
+arm semihosting_cmdline argv0 argv1 argv2 ...
+@end example
+
+This option lets one set the command line arguments to be passed to
+the program. The first argument (argv0) is the program name in a
+standard C environment (argv[0]). Depending on the program (not much
+programs look at argv[0]), argv0 is ignored and can be any string.
 @end deffn
 
 @deffn Command {arm semihosting_fileio} [@option{enable}|@option{disable}]
