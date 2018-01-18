@@ -30,7 +30,7 @@ add_library(ocdflashnor
 	mrvlqspi.c
 	niietcm4.c
 	non_cfi.c
-	nrf51.c
+	nrf5.c
 	numicro.c
 	ocl.c
 	pic32mx.c

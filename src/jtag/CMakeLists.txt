@@ -51,6 +51,8 @@ add_library(ocdjlink STATIC
 	drivers/libjaylink/libjaylink/core.c
 	drivers/libjaylink/libjaylink/device.c
 	drivers/libjaylink/libjaylink/discovery.c
+	drivers/libjaylink/libjaylink/discovery_tcp.c
+	drivers/libjaylink/libjaylink/transport_tcp.c
 	drivers/libjaylink/libjaylink/emucom.c
 	drivers/libjaylink/libjaylink/error.c
 	drivers/libjaylink/libjaylink/fileio.c
@@ -63,6 +65,7 @@ add_library(ocdjlink STATIC
 	drivers/libjaylink/libjaylink/target.c
 	drivers/libjaylink/libjaylink/transport.c
 	drivers/libjaylink/libjaylink/util.c
+	drivers/libjaylink/libjaylink/socket.c
 	drivers/libjaylink/libjaylink/version.c) 
 	
 add_library(jtag STATIC adapter.c core.c interface.c interfaces.c tcl.c commands.c)
