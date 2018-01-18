@@ -78,11 +78,21 @@ static int multicore_update_threads(struct rtos *rtos)
     struct thread_detail *details = (struct thread_detail *)malloc(sizeof(struct thread_detail) * threadCnt);
     memset(details, 0, sizeof(struct thread_detail) * threadCnt);
     int i = 0;
+    
+    int possible_event_target_count = 0;
+    int possible_event_target_core = 0;
+    
     for (struct target_list *pLst = rtos->target->head; pLst; pLst = pLst->next)
     {
         struct target *pThisTarget = pLst->target;
         if (!pThisTarget)
             continue;
+        
+        if (pThisTarget->debug_reason != DBG_REASON_DBGRQ)
+        {
+            possible_event_target_count++;
+            possible_event_target_core = rtos->target->gdb_service->target->coreid;
+        }
         
         if (i >= threadCnt)
             break;
@@ -97,7 +107,9 @@ static int multicore_update_threads(struct rtos *rtos)
     if (rtos->thread_details)
         free(rtos->thread_details);
     rtos->thread_details = details;
-    if (rtos->target->gdb_service && rtos->target->gdb_service->target)
+    if (possible_event_target_count == 1)
+        rtos->current_thread = possible_event_target_core + ThreadIdBase;
+    else if (rtos->target->gdb_service && rtos->target->gdb_service->target)
         rtos->current_thread = rtos->target->gdb_service->target->coreid + ThreadIdBase;
     else
         rtos->current_thread = 0;

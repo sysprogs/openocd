@@ -49,11 +49,13 @@ NOR_DRIVERS = \
 	%D%/stm32f2x.c \
 	%D%/stm32lx.c \
 	%D%/stm32l4x.c \
+	%D%/stm32h7x.c \
 	%D%/str7x.c \
 	%D%/str9x.c \
 	%D%/str9xpec.c \
 	%D%/tms470.c \
 	%D%/virtual.c \
+	%D%/xcf.c \
 	%D%/xmc1xxx.c \
 	%D%/xmc4xxx.c
 

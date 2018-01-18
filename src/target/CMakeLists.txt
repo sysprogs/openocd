@@ -80,6 +80,8 @@ add_library(target
 	testee.c
 	trace.c
 	x86_32_common.c
-	xscale.c)
+	xscale.c
+	aarch64.c
+	stm8.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

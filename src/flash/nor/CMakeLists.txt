@@ -51,5 +51,6 @@ add_library(ocdflashnor
 	tcl.c
 	tms470.c
 	virtual.c
+	xcf.c
 	xmc1xxx.c
 	xmc4xxx.c)

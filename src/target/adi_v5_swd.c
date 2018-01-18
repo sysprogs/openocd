@@ -124,7 +124,7 @@ static int swd_connect(struct adiv5_dap *dap)
 
 	/* Clear link state, including the SELECT cache. */
 	dap->do_reconnect = false;
-	dap->select = DP_SELECT_INVALID;
+	dap_invalidate_cache(dap);
 
 	swd_queue_dp_read(dap, DP_DPIDR, &dpidr);
 
@@ -427,7 +427,10 @@ static int swd_init(struct command_context *ctx)
 	/* First connect after init is not reconnecting. */
 	dap->do_reconnect = false;
 
-	return swd_connect(dap);
+	int retval = swd_connect(dap);
+	if (retval != ERROR_OK)
+		LOG_ERROR("SWD connect failed");
+	return retval;
 }
 
 static struct transport swd_transport = {

@@ -206,6 +206,8 @@ static uint8_t queued_seq_buf[1024]; /* TODO: make dynamic / move into cmsis obj
 
 static int queued_retval;
 
+static uint8_t output_pins = SWJ_PIN_SRST | SWJ_PIN_TRST;
+
 static struct cmsis_dap *cmsis_dap_handle;
 
 static int cmsis_dap_usb_open(void)
@@ -790,15 +792,21 @@ static int cmsis_dap_swd_switch_seq(enum swd_special_seq seq)
 	unsigned int s_len;
 	int retval;
 
-	/* First disconnect before connecting, Atmel EDBG needs it for SAMD/R/L/C */
-	cmsis_dap_cmd_DAP_Disconnect();
+	if ((output_pins & (SWJ_PIN_SRST | SWJ_PIN_TRST)) == (SWJ_PIN_SRST | SWJ_PIN_TRST)) {
+		/* Following workaround deasserts reset on most adapters.
+		 * Do not reconnect if a reset line is active!
+		 * Reconnecting would break connecting under reset. */
 
-	/* When we are reconnecting, DAP_Connect needs to be rerun, at
-	 * least on Keil ULINK-ME */
-	retval = cmsis_dap_cmd_DAP_Connect(seq == LINE_RESET || seq == JTAG_TO_SWD ?
+		/* First disconnect before connecting, Atmel EDBG needs it for SAMD/R/L/C */
+		cmsis_dap_cmd_DAP_Disconnect();
+
+		/* When we are reconnecting, DAP_Connect needs to be rerun, at
+		 * least on Keil ULINK-ME */
+		retval = cmsis_dap_cmd_DAP_Connect(seq == LINE_RESET || seq == JTAG_TO_SWD ?
 					   CONNECT_SWD : CONNECT_JTAG);
-	if (retval != ERROR_OK)
-		return retval;
+		if (retval != ERROR_OK)
+			return retval;
+	}
 
 	switch (seq) {
 	case LINE_RESET:
@@ -958,11 +966,14 @@ static int cmsis_dap_init(void)
 	retval = cmsis_dap_cmd_DAP_TFER_Configure(0, 64, 0);
 	if (retval != ERROR_OK)
 		return ERROR_FAIL;
-	/* Data Phase (bit 2) must be set to 1 if sticky overrun
-	 * detection is enabled */
-	retval = cmsis_dap_cmd_DAP_SWD_Configure(0);	/* 1 TRN, no Data Phase */
-	if (retval != ERROR_OK)
-		return ERROR_FAIL;
+
+	if (swd_mode) {
+		/* Data Phase (bit 2) must be set to 1 if sticky overrun
+		 * detection is enabled */
+		retval = cmsis_dap_cmd_DAP_SWD_Configure(0);	/* 1 TRN, no Data Phase */
+		if (retval != ERROR_OK)
+			return ERROR_FAIL;
+	}
 
 	retval = cmsis_dap_cmd_DAP_LED(0x03);		/* Both LEDs on */
 	if (retval != ERROR_OK)
@@ -1007,14 +1018,14 @@ static void cmsis_dap_execute_reset(struct jtag_command *cmd)
 {
 	/* Set both TRST and SRST even if they're not enabled as
 	 * there's no way to tristate them */
-	uint8_t pins = 0;
 
+	output_pins = 0;
 	if (!cmd->cmd.reset->srst)
-		pins |= SWJ_PIN_SRST;
+		output_pins |= SWJ_PIN_SRST;
 	if (!cmd->cmd.reset->trst)
-		pins |= SWJ_PIN_TRST;
+		output_pins |= SWJ_PIN_TRST;
 
-	int retval = cmsis_dap_cmd_DAP_SWJ_Pins(pins,
+	int retval = cmsis_dap_cmd_DAP_SWJ_Pins(output_pins,
 			SWJ_PIN_TRST | SWJ_PIN_SRST, 0, NULL);
 	if (retval != ERROR_OK)
 		LOG_ERROR("CMSIS-DAP: Interface reset failed");
