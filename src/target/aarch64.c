@@ -449,6 +449,11 @@ static int update_halt_gdb(struct target *target, enum target_debug_reason debug
 	struct target *gdb_target = NULL;
 	struct target_list *head;
 	struct target *curr;
+    
+    if (target->gdb_service) 
+    {
+        target->gdb_service->target = target;
+    }
 
 	if (debug_reason == DBG_REASON_NOTHALTED) {
 		LOG_INFO("Halting remaining targets in SMP group");
@@ -1999,6 +2004,21 @@ static int aarch64_read_cpu_memory(struct target *target,
 		LOG_WARNING("target not halted");
 		return ERROR_TARGET_NOT_HALTED;
 	}
+    
+    if (arm->core_state != ARM_STATE_AARCH64 && !(size == 4 && (address % 4) == 0)) 
+    {
+        target_addr_t alignedAddr = address & ~3;
+        int delta = (int)(address - alignedAddr);
+        int wordCount = ((size * count) + delta + 3) / 4;
+        uint8_t *pTmp = (uint8_t *)malloc(wordCount * 4);
+        int r = aarch64_read_cpu_memory(target, alignedAddr, 4, wordCount, pTmp);
+        if (r == ERROR_SUCCESS)
+        {
+            memcpy(buffer, pTmp + delta, size * count);
+        }
+        free(pTmp);
+        return r;
+    }
 
 	/* Mark register X0 as dirty, as it will be used
 	 * for transferring the data.
