@@ -1,4 +1,4 @@
-add_library(ocdflashnor 
+add_library(ocdflashnor
 	aduc702x.c
 	aducm360.c
 	ambiqmicro.c
@@ -53,4 +53,6 @@ add_library(ocdflashnor
 	virtual.c
 	xcf.c
 	xmc1xxx.c
-	xmc4xxx.c)
+	xmc4xxx.c
+	bluenrg-x.c
+	psoc6.c)
