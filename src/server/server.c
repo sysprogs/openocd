@@ -259,7 +259,7 @@ int add_service(char *name,
 		c->sin.sin_family = AF_INET;
 
 		if (bindto_name == NULL)
-			c->sin.sin_addr.s_addr = INADDR_ANY;
+			c->sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 		else {
 			hp = gethostbyname(bindto_name);
 			if (hp == NULL) {
@@ -300,10 +300,11 @@ int add_service(char *name,
 		}
 
 		struct sockaddr_in addr_in;
+		addr_in.sin_port = 0;
 		socklen_t addr_in_size = sizeof(addr_in);
-		getsockname(c->fd, (struct sockaddr *)&addr_in, &addr_in_size);
-		LOG_INFO("Listening on port %hu for %s connections",
-				ntohs(addr_in.sin_port), name);
+		if (getsockname(c->fd, (struct sockaddr *)&addr_in, &addr_in_size) == 0)
+			LOG_INFO("Listening on port %hu for %s connections",
+				 ntohs(addr_in.sin_port), name);
 	} else if (c->type == CONNECTION_STDINOUT) {
 		c->fd = fileno(stdin);
 
@@ -344,6 +345,21 @@ int add_service(char *name,
 	return ERROR_OK;
 }
 
+static void remove_connections(struct service *service)
+{
+	struct connection *connection;
+
+	connection = service->connections;
+
+	while (connection) {
+		struct connection *tmp;
+
+		tmp = connection->next;
+		remove_connection(service, connection);
+		connection = tmp;
+	}
+}
+
 static int remove_services(void)
 {
 	struct service *c = services;
@@ -351,6 +367,8 @@ static int remove_services(void)
 	/* loop service */
 	while (c) {
 		struct service *next = c->next;
+
+		remove_connections(c);
 
 		if (c->name)
 			free(c->name);
@@ -621,6 +639,13 @@ int server_quit(void)
 
 	/* return signal number so we can kill ourselves */
 	return last_signal;
+}
+
+void server_free(void)
+{
+	tcl_service_free();
+	telnet_service_free();
+	jsp_service_free();
 }
 
 void exit_on_signal(int sig)

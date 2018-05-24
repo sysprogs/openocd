@@ -5,6 +5,12 @@
  *   Copyright (C) 2011 Øyvind Harboe                                      *
  *   oyvind.harboe@zylin.com                                               *
  *                                                                         *
+ *   Copyright (C) 2011 Clement Burin des Roziers                          *
+ *   clement.burin-des-roziers@hikob.com                                   *
+ *                                                                         *
+ *   Copyright (C) 2017 Armin van der Togt                                 *
+ *   armin@otheruse.nl                                                     *
+ *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
  *   the Free Software Foundation; either version 2 of the License, or     *
@@ -21,61 +27,37 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.           *
  ***************************************************************************/
 
+
 	.text
 	.syntax unified
-	.cpu cortex-m3
+	.cpu cortex-m0
 	.thumb
-	.thumb_func
 
 /*
- * Params :
- * r0 = workarea start, status (out)
- * r1 = workarea end
- * r2 = target address
- * r3 = count (16bit words)
- * r4 = flash base
- *
- * Clobbered:
- * r6 - temp
- * r7 - rp
- * r8 - wp, tmp
- */
+	r0 - destination address
+	r1 - source address
+	r2 - count
+*/
 
-#define STM32_FLASH_CR_OFFSET	0x10			/* offset of CR register in FLASH struct */
-#define STM32_FLASH_SR_OFFSET	0x0c			/* offset of SR register in FLASH struct */
+	.thumb_func
+	.global _start
+_start:
+	// r2 = source + count * 4
+	lsls	r2, r2, #2
+	adds	r2, r1, r2
+	// Go to compare
+	b	test_done
+write_word:
+	// load word from address in r1 and increase r1 by 4
+	ldmia r1!, {r3}
+	// store word to address in r0 and increase r0 by 4
+	stmia r0!, {r3}
+test_done:
+	// compare r1 and r2
+	cmp	r1, r2
+	// loop if not equal
+	bne	write_word
 
-wait_fifo:
-	ldr 	r8, [r0, #0]	/* read wp */
-	cmp 	r8, #0			/* abort if wp == 0 */
-	beq 	exit
-	ldr 	r7, [r0, #4]	/* read rp */
-	cmp 	r7, r8			/* wait until rp != wp */
-	beq 	wait_fifo
-
-	ldr		r6, STM32_PROG16
-	str		r6, [r4, #STM32_FLASH_CR_OFFSET]
-	ldrh 	r6, [r7], #0x02						/* read one half-word from src, increment ptr */
-	strh 	r6, [r2], #0x02						/* write one half-word from src, increment ptr */
-	dsb
-busy:
-	ldr 	r6, [r4, #STM32_FLASH_SR_OFFSET]
-	tst 	r6, #0x10000						/* BSY (bit16) == 1 => operation in progress */
-	bne 	busy								/* wait more... */
-	tst		r6, #0xf0							/* PGSERR | PGPERR | PGAERR | WRPERR */
-	bne		error								/* fail... */
-
-	cmp 	r7, r1			/* wrap rp at end of buffer */
-	it  	cs
-	addcs	r7, r0, #8		/* skip loader args */
-	str 	r7, [r0, #4]	/* store rp */
-	subs	r3, r3, #1		/* decrement halfword count */
-	cbz 	r3, exit		/* loop if not done */
-	b		wait_fifo
-error:
-	movs	r1, #0
-	str		r1, [r0, #4]	/* set rp = 0 on error */
-exit:
-	mov		r0, r6			/* return status in r0 */
+	// Set breakpoint to exit
 	bkpt	#0x00
 
-STM32_PROG16: .word 0x101 	/* PG | PSIZE_16*/

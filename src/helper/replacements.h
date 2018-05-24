@@ -25,6 +25,8 @@
 #ifndef OPENOCD_HELPER_REPLACEMENTS_H
 #define OPENOCD_HELPER_REPLACEMENTS_H
 
+#include <stdint.h>
+
 /* MIN,MAX macros */
 #ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -196,6 +198,17 @@ static inline int close_socket(int sock)
 	return closesocket(sock);
 #else
 	return close(sock);
+#endif
+}
+
+static inline void socket_block(int fd)
+{
+#ifdef _WIN32
+	unsigned long nonblock = 0;
+	ioctlsocket(fd, FIONBIO, &nonblock);
+#else
+	int oldopts = fcntl(fd, F_GETFL, 0);
+	fcntl(fd, F_SETFL, oldopts & ~O_NONBLOCK);
 #endif
 }
 

@@ -51,11 +51,6 @@
  * any longer.
  */
 
-/**
- * Returns the type of a break point required by address location
- */
-#define BKPT_TYPE_BY_ADDR(addr) ((addr) < 0x20000000 ? BKPT_HARD : BKPT_SOFT)
-
 /* forward declarations */
 static int cortex_m_store_core_reg_u32(struct target *target,
 		uint32_t num, uint32_t value);
@@ -868,7 +863,7 @@ static int cortex_m_step(struct target *target, int current,
 				if (breakpoint)
 					retval = cortex_m_set_breakpoint(target, breakpoint);
 				else
-					retval = breakpoint_add(target, pc_value, 2, BKPT_TYPE_BY_ADDR(pc_value));
+					retval = breakpoint_add(target, pc_value, 2, BKPT_HARD);
 				bool tmp_bp_set = (retval == ERROR_OK);
 
 				/* No more breakpoints left, just do a step */
@@ -1131,9 +1126,6 @@ int cortex_m_set_breakpoint(struct target *target, struct breakpoint *breakpoint
 		return ERROR_OK;
 	}
 
-	if (cortex_m->auto_bp_type)
-		breakpoint->type = BKPT_TYPE_BY_ADDR(breakpoint->address);
-
 	if (breakpoint->type == BKPT_HARD) {
 		uint32_t fpcr_value;
 		while (comparator_list[fp_num].used && (fp_num < cortex_m->fp_num_code))
@@ -1253,21 +1245,6 @@ int cortex_m_add_breakpoint(struct target *target, struct breakpoint *breakpoint
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
 
-	if (cortex_m->auto_bp_type)
-		breakpoint->type = BKPT_TYPE_BY_ADDR(breakpoint->address);
-
-	if (breakpoint->type != BKPT_TYPE_BY_ADDR(breakpoint->address)) {
-		if (breakpoint->type == BKPT_HARD) {
-			LOG_INFO("flash patch comparator requested outside code memory region");
-			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
-		}
-
-		if (breakpoint->type == BKPT_SOFT) {
-			LOG_INFO("soft breakpoint requested in code (flash) memory region");
-			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
-		}
-	}
-
 	if ((breakpoint->type == BKPT_HARD) && (cortex_m->fp_code_available < 1)) {
 		LOG_INFO("no flash patch comparator unit available for hardware breakpoint");
 		return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
@@ -1298,9 +1275,6 @@ int cortex_m_remove_breakpoint(struct target *target, struct breakpoint *breakpo
 		LOG_WARNING("target not halted");
 		return ERROR_TARGET_NOT_HALTED;
 	}
-
-	if (cortex_m->auto_bp_type)
-		breakpoint->type = BKPT_TYPE_BY_ADDR(breakpoint->address);
 
 	if (breakpoint->set)
 		cortex_m_unset_breakpoint(target, breakpoint);
@@ -1787,8 +1761,7 @@ int cortex_m_profiling(struct target *target, uint32_t *samples,
 
 
 		gettimeofday(&now, NULL);
-		if (sample_count >= max_num_samples ||
-			(now.tv_sec >= timeout.tv_sec && now.tv_usec >= timeout.tv_usec)) {
+		if (sample_count >= max_num_samples || timeval_compare(&now, &timeout) > 0) {
 			LOG_INFO("Profiling completed. %" PRIu32 " samples.", sample_count);
 			break;
 		}
@@ -1855,6 +1828,18 @@ static struct dwt_reg dwt_comp[] = {
 	DWT_COMPARATOR(1),
 	DWT_COMPARATOR(2),
 	DWT_COMPARATOR(3),
+	DWT_COMPARATOR(4),
+	DWT_COMPARATOR(5),
+	DWT_COMPARATOR(6),
+	DWT_COMPARATOR(7),
+	DWT_COMPARATOR(8),
+	DWT_COMPARATOR(9),
+	DWT_COMPARATOR(10),
+	DWT_COMPARATOR(11),
+	DWT_COMPARATOR(12),
+	DWT_COMPARATOR(13),
+	DWT_COMPARATOR(14),
+	DWT_COMPARATOR(15),
 #undef DWT_COMPARATOR
 };
 
@@ -1888,6 +1873,7 @@ void cortex_m_dwt_setup(struct cortex_m_common *cm, struct target *target)
 	int reg, i;
 
 	target_read_u32(target, DWT_CTRL, &dwtcr);
+	LOG_DEBUG("DWT_CTRL: 0x%" PRIx32, dwtcr);
 	if (!dwtcr) {
 		LOG_DEBUG("no DWT");
 		return;
@@ -1993,12 +1979,6 @@ int cortex_m_examine(struct target *target)
 	/* stlink shares the examine handler but does not support
 	 * all its calls */
 	if (!armv7m->stlink) {
-		retval = dap_dp_init(swjdp);
-		if (retval != ERROR_OK) {
-			LOG_ERROR("Could not initialize the debug port");
-			return retval;
-		}
-
 		if (cortex_m->apsel < 0) {
 			/* Search for the MEM-AP */
 			retval = dap_find_ap(swjdp, AP_TYPE_AHB_AP, &armv7m->debug_ap);
@@ -2105,7 +2085,6 @@ int cortex_m_examine(struct target *target)
 
 		/* Setup FPB */
 		target_read_u32(target, FP_CTRL, &fpcr);
-		cortex_m->auto_bp_type = 1;
 		/* bits [14:12] and [7:4] */
 		cortex_m->fp_num_code = ((fpcr >> 8) & 0x70) | ((fpcr >> 4) & 0xF);
 		cortex_m->fp_num_lit = (fpcr >> 8) & 0xF;
@@ -2229,25 +2208,17 @@ static int cortex_m_handle_target_request(void *priv)
 }
 
 static int cortex_m_init_arch_info(struct target *target,
-	struct cortex_m_common *cortex_m, struct jtag_tap *tap)
+	struct cortex_m_common *cortex_m, struct adiv5_dap *dap)
 {
 	struct armv7m_common *armv7m = &cortex_m->armv7m;
 
 	armv7m_init_arch_info(target, armv7m);
 
-	/*  tap has no dap initialized */
-	if (!tap->dap) {
-		tap->dap = dap_init();
-
-		/* Leave (only) generic DAP stuff for debugport_init() */
-		tap->dap->tap = tap;
-	}
-
 	/* default reset mode is to use srst if fitted
 	 * if not it will use CORTEX_M3_RESET_VECTRESET */
 	cortex_m->soft_reset_config = CORTEX_M_RESET_VECTRESET;
 
-	armv7m->arm.dap = tap->dap;
+	armv7m->arm.dap = dap;
 
 	/* register arch-specific functions */
 	armv7m->examine_debug_reason = cortex_m_examine_debug_reason;
@@ -2267,16 +2238,16 @@ static int cortex_m_init_arch_info(struct target *target,
 static int cortex_m_target_create(struct target *target, Jim_Interp *interp)
 {
 	struct cortex_m_common *cortex_m = calloc(1, sizeof(struct cortex_m_common));
-
 	cortex_m->common_magic = CORTEX_M_COMMON_MAGIC;
-	cortex_m_init_arch_info(target, cortex_m, target->tap);
+	struct adiv5_private_config *pc;
 
-	if (target->private_config != NULL) {
-		struct adiv5_private_config *pc =
-				(struct adiv5_private_config *)target->private_config;
-		cortex_m->apsel = pc->ap_num;
-	} else
-		cortex_m->apsel = -1;
+	pc = (struct adiv5_private_config *)target->private_config;
+	if (adiv5_verify_config(pc) != ERROR_OK)
+		return ERROR_FAIL;
+
+	cortex_m->apsel = pc->ap_num;
+
+	cortex_m_init_arch_info(target, cortex_m, pc->dap);
 
 	return ERROR_OK;
 }
