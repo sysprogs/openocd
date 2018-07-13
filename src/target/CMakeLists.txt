@@ -83,6 +83,7 @@ add_library(target
 	xscale.c
 	aarch64.c
 	stm8.c
-	arm_dap.c)
+	arm_dap.c
+	semihosting_common.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

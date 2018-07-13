@@ -1137,6 +1137,10 @@ int cortex_m_set_breakpoint(struct target *target, struct breakpoint *breakpoint
 		breakpoint->set = fp_num + 1;
 		fpcr_value = breakpoint->address | 1;
 		if (cortex_m->fp_rev == 0) {
+			if (breakpoint->address > 0x1FFFFFFF) {
+				LOG_ERROR("Cortex-M Flash Patch Breakpoint rev.1 cannot handle HW breakpoint above address 0x1FFFFFFE");
+				return ERROR_FAIL;
+			}
 			uint32_t hilo;
 			hilo = (breakpoint->address & 0x2) ? FPCR_REPLACE_BKPT_HIGH : FPCR_REPLACE_BKPT_LOW;
 			fpcr_value = (fpcr_value & 0x1FFFFFFC) | hilo | 1;
@@ -1806,11 +1810,11 @@ static int cortex_m_dwt_set_reg(struct reg *reg, uint8_t *buf)
 
 struct dwt_reg {
 	uint32_t addr;
-	char *name;
+	const char *name;
 	unsigned size;
 };
 
-static struct dwt_reg dwt_base_regs[] = {
+static const struct dwt_reg dwt_base_regs[] = {
 	{ DWT_CTRL, "dwt_ctrl", 32, },
 	/* NOTE that Erratum 532314 (fixed r2p0) affects CYCCNT:  it wrongly
 	 * increments while the core is asleep.
@@ -1819,7 +1823,7 @@ static struct dwt_reg dwt_base_regs[] = {
 	/* plus some 8 bit counters, useful for profiling with TPIU */
 };
 
-static struct dwt_reg dwt_comp[] = {
+static const struct dwt_reg dwt_comp[] = {
 #define DWT_COMPARATOR(i) \
 		{ DWT_COMP0 + 0x10 * (i), "dwt_" #i "_comp", 32, }, \
 		{ DWT_MASK0 + 0x10 * (i), "dwt_" #i "_mask", 4, }, \
@@ -1848,7 +1852,7 @@ static const struct reg_arch_type dwt_reg_type = {
 	.set = cortex_m_dwt_set_reg,
 };
 
-static void cortex_m_dwt_addreg(struct target *t, struct reg *r, struct dwt_reg *d)
+static void cortex_m_dwt_addreg(struct target *t, struct reg *r, const struct dwt_reg *d)
 {
 	struct dwt_reg_state *state;
 

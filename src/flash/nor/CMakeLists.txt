@@ -55,4 +55,7 @@ add_library(ocdflashnor
 	xmc1xxx.c
 	xmc4xxx.c
 	bluenrg-x.c
-	psoc6.c)
+	psoc6.c
+	cc26xx.c
+	cc3220sf.c
+	psoc5lp.c)

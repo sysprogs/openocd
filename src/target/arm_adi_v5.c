@@ -102,8 +102,10 @@ static int mem_ap_setup_csw(struct adiv5_ap *ap, uint32_t csw)
 	if (csw != ap->csw_value) {
 		/* LOG_DEBUG("DAP: Set CSW %x",csw); */
 		int retval = dap_queue_ap_write(ap, MEM_AP_REG_CSW, csw);
-		if (retval != ERROR_OK)
+		if (retval != ERROR_OK) {
+			ap->csw_value = 0;
 			return retval;
+		}
 		ap->csw_value = csw;
 	}
 	return ERROR_OK;
@@ -114,8 +116,10 @@ static int mem_ap_setup_tar(struct adiv5_ap *ap, uint32_t tar)
 	if (!ap->tar_valid || tar != ap->tar_value) {
 		/* LOG_DEBUG("DAP: Set TAR %x",tar); */
 		int retval = dap_queue_ap_write(ap, MEM_AP_REG_TAR, tar);
-		if (retval != ERROR_OK)
+		if (retval != ERROR_OK) {
+			ap->tar_valid = false;
 			return retval;
+		}
 		ap->tar_value = tar;
 		ap->tar_valid = true;
 	}
@@ -152,6 +156,8 @@ static uint32_t mem_ap_get_tar_increment(struct adiv5_ap *ap)
 			return 2;
 		case CSW_32BIT:
 			return 4;
+		default:
+			return 0;
 		}
 	case CSW_ADDRINC_PACKED:
 		return 4;
@@ -1720,6 +1726,7 @@ COMMAND_HANDLER(dap_apreg_command)
 {
 	struct adiv5_dap *dap = adiv5_get_dap(CMD_DATA);
 	uint32_t apsel, reg, value;
+	struct adiv5_ap *ap;
 	int retval;
 
 	if (CMD_ARGC < 2 || CMD_ARGC > 3)
@@ -1729,6 +1736,7 @@ COMMAND_HANDLER(dap_apreg_command)
 	/* AP address is in bits 31:24 of DP_SELECT */
 	if (apsel >= 256)
 		return ERROR_COMMAND_SYNTAX_ERROR;
+	ap = dap_ap(dap, apsel);
 
 	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[1], reg);
 	if (reg >= 256 || (reg & 3))
@@ -1736,9 +1744,21 @@ COMMAND_HANDLER(dap_apreg_command)
 
 	if (CMD_ARGC == 3) {
 		COMMAND_PARSE_NUMBER(u32, CMD_ARGV[2], value);
-		retval = dap_queue_ap_write(dap_ap(dap, apsel), reg, value);
+		switch (reg) {
+		case MEM_AP_REG_CSW:
+			ap->csw_default = 0;  /* invalid, force write */
+			retval = mem_ap_setup_csw(ap, value);
+			break;
+		case MEM_AP_REG_TAR:
+			ap->tar_valid = false;  /* invalid, force write */
+			retval = mem_ap_setup_tar(ap, value);
+			break;
+		default:
+			retval = dap_queue_ap_write(ap, reg, value);
+			break;
+		}
 	} else {
-		retval = dap_queue_ap_read(dap_ap(dap, apsel), reg, &value);
+		retval = dap_queue_ap_read(ap, reg, &value);
 	}
 	if (retval == ERROR_OK)
 		retval = dap_run(dap);

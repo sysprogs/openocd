@@ -42,7 +42,8 @@ add_library(ocdjtagdrivers STATIC
 	drivers/osbdm.c
 	drivers/kitprog.c
 	drivers/opendous.c
-	drivers/cmsis_dap_usb.c)
+	drivers/cmsis_dap_usb.c
+	drivers/xds110.c)
 
 	
 add_library(ocdjlink STATIC
