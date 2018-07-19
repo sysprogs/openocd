@@ -936,6 +936,7 @@ static int gdb_new_connection(struct connection *connection)
 
 	target = get_target_from_connection(connection);
 	connection->priv = gdb_connection;
+	connection->cmd_ctx->current_target = target;
 
 	/* initialize gdb connection information */
 	gdb_connection->buf_p = gdb_connection->buffer;
@@ -3036,9 +3037,12 @@ static int gdb_v_packet(struct connection *connection,
 
 static int gdb_detach(struct connection *connection)
 {
-	target_call_event_callbacks(get_target_from_connection(connection),
-		TARGET_EVENT_GDB_DETACH);
-
+	/*
+	 * Only reply "OK" to GDB
+	 * it will close the connection and this will trigger a call to
+	 * gdb_connection_closed() that will in turn trigger the event
+	 * TARGET_EVENT_GDB_DETACH
+	 */
 	return gdb_put_packet(connection, "OK", 2);
 }
 
