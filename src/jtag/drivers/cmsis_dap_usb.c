@@ -729,6 +729,20 @@ static void cmsis_dap_swd_read_reg(uint8_t cmd, uint32_t *value, uint32_t ap_del
 	cmsis_dap_swd_queue_cmd(cmd, value, 0);
 }
 
+static int cmsis_dap_get_serial_info(void)
+{
+	uint8_t *data;
+
+	int retval = cmsis_dap_cmd_DAP_Info(INFO_ID_SERNUM, &data);
+	if (retval != ERROR_OK)
+		return retval;
+
+	if (data[0]) /* strlen */
+		LOG_INFO("CMSIS-DAP: Serial# = %s", &data[1]);
+
+	return ERROR_OK;
+}
+
 static int cmsis_dap_get_version_info(void)
 {
 	uint8_t *data;
@@ -870,6 +884,10 @@ static int cmsis_dap_init(void)
 		return retval;
 
 	retval = cmsis_dap_get_version_info();
+	if (retval != ERROR_OK)
+		return retval;
+
+	retval = cmsis_dap_get_serial_info();
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -1444,6 +1462,12 @@ static void cmsis_dap_execute_stableclocks(struct jtag_command *cmd)
 	cmsis_dap_stableclocks(cmd->cmd.runtest->num_cycles);
 }
 
+static void cmsis_dap_execute_tms(struct jtag_command *cmd)
+{
+	DEBUG_JTAG_IO("TMS: %d bits", cmd->cmd.tms->num_bits);
+	cmsis_dap_cmd_DAP_SWJ_Sequence(cmd->cmd.tms->num_bits, cmd->cmd.tms->bits);
+}
+
 /* TODO: Is there need to call cmsis_dap_flush() for the JTAG_PATHMOVE,
  * JTAG_RUNTEST, JTAG_STABLECLOCKS? */
 static void cmsis_dap_execute_command(struct jtag_command *cmd)
@@ -1474,6 +1498,8 @@ static void cmsis_dap_execute_command(struct jtag_command *cmd)
 			cmsis_dap_execute_stableclocks(cmd);
 			break;
 		case JTAG_TMS:
+			cmsis_dap_execute_tms(cmd);
+			break;
 		default:
 			LOG_ERROR("BUG: unknown JTAG command type 0x%X encountered", cmd->type);
 			exit(-1);
@@ -1636,6 +1662,7 @@ static const char * const cmsis_dap_transport[] = { "swd", "jtag", NULL };
 
 struct jtag_interface cmsis_dap_interface = {
 	.name = "cmsis-dap",
+	.supported = DEBUG_CAP_TMS_SEQ,
 	.commands = cmsis_dap_command_handlers,
 	.swd = &cmsis_dap_swd_driver,
 	.transports = cmsis_dap_transport,

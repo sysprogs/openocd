@@ -2080,7 +2080,7 @@ int cortex_m_examine(struct target *target)
 		if (retval != ERROR_OK)
 			return retval;
 
-		if (armv7m->trace_config.config_type != DISABLED) {
+		if (armv7m->trace_config.config_type != TRACE_CONFIG_TYPE_DISABLED) {
 			armv7m_trace_tpiu_config(target);
 			armv7m_trace_itm_config(target);
 		}
@@ -2274,20 +2274,6 @@ static int cortex_m_verify_pointer(struct command_context *cmd_ctx,
  * cortexm3_target structure, which is only used with CM3 targets.
  */
 
-static const struct {
-	char name[10];
-	unsigned mask;
-} vec_ids[] = {
-	{ "hard_err",   VC_HARDERR, },
-	{ "int_err",    VC_INTERR, },
-	{ "bus_err",    VC_BUSERR, },
-	{ "state_err",  VC_STATERR, },
-	{ "chk_err",    VC_CHKERR, },
-	{ "nocp_err",   VC_NOCPERR, },
-	{ "mm_err",     VC_MMERR, },
-	{ "reset",      VC_CORERESET, },
-};
-
 COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
@@ -2295,6 +2281,20 @@ COMMAND_HANDLER(handle_cortex_m_vector_catch_command)
 	struct armv7m_common *armv7m = &cortex_m->armv7m;
 	uint32_t demcr = 0;
 	int retval;
+
+	static const struct {
+		char name[10];
+		unsigned mask;
+	} vec_ids[] = {
+		{ "hard_err",   VC_HARDERR, },
+		{ "int_err",    VC_INTERR, },
+		{ "bus_err",    VC_BUSERR, },
+		{ "state_err",  VC_STATERR, },
+		{ "chk_err",    VC_CHKERR, },
+		{ "nocp_err",   VC_NOCPERR, },
+		{ "mm_err",     VC_MMERR, },
+		{ "reset",      VC_CORERESET, },
+	};
 
 	retval = cortex_m_verify_pointer(CMD_CTX, cortex_m);
 	if (retval != ERROR_OK)
