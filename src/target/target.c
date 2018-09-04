@@ -4803,7 +4803,7 @@ no_params:
 
 				if (target->has_dap) {
 					Jim_SetResultString(goi->interp,
-						"target requires -dap parameter instead of -chain-position!", -1);
+						"target requires -dap parameter instead of -chain-position, see http://visualgdb.com/support/chainposition", -1);
 					return JIM_ERR;
 				}
 

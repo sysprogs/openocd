@@ -1616,13 +1616,12 @@ COMMAND_HANDLER(dap_memaccess_command)
 COMMAND_HANDLER(dap_apsel_command)
 {
 	struct adiv5_dap *dap = adiv5_get_dap(CMD_DATA);
-	uint32_t apsel, apid;
-	int retval;
+	uint32_t apsel;
 
 	switch (CMD_ARGC) {
 	case 0:
-		apsel = dap->apsel;
-		break;
+		command_print(CMD_CTX, "%" PRIi32, dap->apsel);
+		return ERROR_OK;
 	case 1:
 		COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], apsel);
 		/* AP address is in bits 31:24 of DP_SELECT */
@@ -1634,18 +1633,7 @@ COMMAND_HANDLER(dap_apsel_command)
 	}
 
 	dap->apsel = apsel;
-
-	retval = dap_queue_ap_read(dap_ap(dap, apsel), AP_REG_IDR, &apid);
-	if (retval != ERROR_OK)
-		return retval;
-	retval = dap_run(dap);
-	if (retval != ERROR_OK)
-		return retval;
-
-	command_print(CMD_CTX, "ap %" PRIi32 " selected, identification register 0x%8.8" PRIx32,
-			apsel, apid);
-
-	return retval;
+	return ERROR_OK;
 }
 
 COMMAND_HANDLER(dap_apcsw_command)
@@ -1772,6 +1760,37 @@ COMMAND_HANDLER(dap_apreg_command)
 	return retval;
 }
 
+COMMAND_HANDLER(dap_dpreg_command)
+{
+	struct adiv5_dap *dap = adiv5_get_dap(CMD_DATA);
+	uint32_t reg, value;
+	int retval;
+
+	if (CMD_ARGC < 1 || CMD_ARGC > 2)
+		return ERROR_COMMAND_SYNTAX_ERROR;
+
+	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], reg);
+	if (reg >= 256 || (reg & 3))
+		return ERROR_COMMAND_SYNTAX_ERROR;
+
+	if (CMD_ARGC == 2) {
+		COMMAND_PARSE_NUMBER(u32, CMD_ARGV[1], value);
+		retval = dap_queue_dp_write(dap, reg, value);
+	} else {
+		retval = dap_queue_dp_read(dap, reg, &value);
+	}
+	if (retval == ERROR_OK)
+		retval = dap_run(dap);
+
+	if (retval != ERROR_OK)
+		return retval;
+
+	if (CMD_ARGC == 1)
+		command_print(CMD_CTX, "0x%08" PRIx32, value);
+
+	return retval;
+}
+
 COMMAND_HANDLER(dap_ti_be_32_quirks_command)
 {
 	struct adiv5_dap *dap = adiv5_get_dap(CMD_DATA);
@@ -1807,7 +1826,7 @@ const struct command_registration dap_instance_commands[] = {
 	{
 		.name = "apsel",
 		.handler = dap_apsel_command,
-		.mode = COMMAND_EXEC,
+		.mode = COMMAND_ANY,
 		.help = "Set the currently selected AP (default 0) "
 			"and display the result",
 		.usage = "[ap_num]",
@@ -1815,7 +1834,7 @@ const struct command_registration dap_instance_commands[] = {
 	{
 		.name = "apcsw",
 		.handler = dap_apcsw_command,
-		.mode = COMMAND_EXEC,
+		.mode = COMMAND_ANY,
 		.help = "Set CSW default bits",
 		.usage = "[value [mask]]",
 	},
@@ -1835,6 +1854,14 @@ const struct command_registration dap_instance_commands[] = {
 		.help = "read/write a register from AP "
 			"(reg is byte address of a word register, like 0 4 8...)",
 		.usage = "ap_num reg [value]",
+	},
+	{
+		.name = "dpreg",
+		.handler = dap_dpreg_command,
+		.mode = COMMAND_EXEC,
+		.help = "read/write a register from DP "
+			"(reg is byte address (bank << 4 | reg) of a word register, like 0 4 8...)",
+		.usage = "reg [value]",
 	},
 	{
 		.name = "baseaddr",

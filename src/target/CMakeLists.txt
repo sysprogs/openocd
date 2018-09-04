@@ -84,6 +84,12 @@ add_library(target
 	aarch64.c
 	stm8.c
 	arm_dap.c
-	semihosting_common.c)
+	semihosting_common.c
+	riscv/batch.c
+	riscv/program.c
+	riscv/riscv.c
+	riscv/riscv_semihosting.c
+	riscv/riscv-011.c
+	riscv/riscv-013.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

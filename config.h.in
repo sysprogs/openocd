@@ -86,6 +86,8 @@
 /* 0 if you do not want the OSBDM (JTAG only) Programmer. */
 #define BUILD_OSBDM 1
 
+#define BUILD_XDS110 1
+
 /* 0 if you don't want parport. */
 #define BUILD_PARPORT 0
 

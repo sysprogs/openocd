@@ -59,4 +59,5 @@ add_library(ocdflashnor
 	cc26xx.c
 	cc3220sf.c
 	psoc5lp.c
-	msp432.c)
+	msp432.c
+	max32xxx.c)
