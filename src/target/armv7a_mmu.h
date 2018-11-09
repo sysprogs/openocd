@@ -1,6 +1,6 @@
 /***************************************************************************
- *   Copyright (C) 2017 by Square, Inc.                                    *
- *   Steven Stallion <stallion@squareup.com>                               *
+ *   Copyright (C) 2016 by Matthias Welwarsky                              *
+ *   matthias.welwarsky@sysgo.com                                          *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -16,16 +16,13 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
-#ifndef OPENOCD_RTOS_RTOS_UCOS_III_STACKINGS_H
-#define OPENOCD_RTOS_RTOS_UCOS_III_STACKINGS_H
+#ifndef OPENOCD_TARGET_ARMV7A_MMU_H
+#define OPENOCD_TARGET_ARMV7A_MMU_H
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+extern int armv7a_mmu_translate_va(struct target *target,  uint32_t va, uint32_t *val);
+extern int armv7a_mmu_translate_va_pa(struct target *target, uint32_t va,
+	uint32_t *val, int meminfo);
 
-#include <rtos/rtos.h>
+extern const struct command_registration armv7a_mmu_command_handlers[];
 
-extern const struct rtos_register_stacking rtos_uCOS_III_Cortex_M_stacking;
-extern const struct rtos_register_stacking rtos_uCOS_III_eSi_RISC_stacking;
-
-#endif /* OPENOCD_RTOS_RTOS_UCOS_III_STACKINGS_H */
+#endif /* OPENOCD_TARGET_ARMV7A_MMU_H */
