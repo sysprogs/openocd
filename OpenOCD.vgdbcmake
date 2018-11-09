@@ -63,12 +63,13 @@
         <UseCMakeUpToDateCheck>false</UseCMakeUpToDateCheck>
         <RedundantTargetMode>HideOuterProjectTargets</RedundantTargetMode>
         <SortSourcesByName>true</SortSourcesByName>
+        <BuildAllTargetsInSubdir>false</BuildAllTargetsInSubdir>
       </ProjectItemSettings>
       <TargetSpecificSettings>
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/ftdi/olimex-arm-usb-ocd-h.cfg  -f target/imx6_dual.cfg -c initx2</Arguments>
+            <Arguments>-f board/ti_cc3220sf_launchpad.cfg</Arguments>
             <WorkingDirectory>C:\Users\ivan.SYSPROGS\AppData\Local\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
