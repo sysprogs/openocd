@@ -94,6 +94,7 @@ add_library(target
 	mem_ap.c
 	esirisc.c
 	esirisc_jtag.c
-	armv7a_mmu.c)
+	armv7a_mmu.c
+	esirisc_trace.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

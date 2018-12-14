@@ -14,7 +14,7 @@ set(JAYLINK_VERSION_LIB_REVISION 0)
 set(JAYLINK_VERSION_LIB_AGE 0)
 set(JAYLINK_VERSION_LIB "{$JAYLINK_VERSION_LIB_CURRENT}:{$JAYLINK_VERSION_LIB_REVISION}:{$JAYLINK_VERSION_LIB_AGE}")
 
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/drivers/libjaylink/libjaylink/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/jlink/version.h)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/libjaylink_version.h.in ${CMAKE_CURRENT_BINARY_DIR}/jlink/version.h)
 add_library(ocdhla STATIC hla/hla_transport.c hla/hla_tcl.c hla/hla_interface.c hla/hla_layout.c)
 add_library(ocdaice STATIC aice/aice_transport.c aice/aice_interface.c aice/aice_port.c aice/aice_usb.c aice/aice_pipe.c)
 add_library(ocdusbblaster STATIC drivers/usb_blaster/usb_blaster.c drivers/usb_blaster/ublast2_access_libusb.c)
