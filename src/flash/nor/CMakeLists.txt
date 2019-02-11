@@ -62,4 +62,7 @@ add_library(ocdflashnor
 	msp432.c
 	max32xxx.c
 	esirisc_flash.c
-	aducm302x.c)
+	aducm302x.c
+	atsame5.c
+	fespi.c
+	w600.c)

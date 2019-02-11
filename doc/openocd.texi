@@ -538,6 +538,12 @@ debuggers to ARM Cortex based targets @url{http://www.keil.com/support/man/docs/
 @item @b{TI XDS110 Debug Probe}
 @* The XDS110 is included as the embedded debug probe on many Texas Instruments
 LaunchPad evaluation boards.
+@* The XDS110 is also available as a stand-alone USB debug probe. The XDS110
+stand-alone probe has the additional ability to supply voltage to the target
+board via its AUX FUNCTIONS port. Use the
+@command{xds110_supply_voltage <millivolts>} command to set the voltage. 0 turns
+off the supply. Otherwise, the supply can be set to any value in the range 1800
+to 3600 millivolts.
 @* Link: @url{http://processors.wiki.ti.com/index.php/XDS110}
 @* Link: @url{http://processors.wiki.ti.com/index.php/XDS_Emulation_Software_Package#XDS110_Support_Utilities}
 @end itemize
@@ -2362,6 +2368,16 @@ the hardware can support.
 Returns the name of the debug adapter driver being used.
 @end deffn
 
+@deffn Command {adapter usb location} <bus>:<port>[.<port>]...
+Specifies the physical USB port of the adapter to use. The path
+roots at @var{bus} and walks down the physical ports, with each
+@var{port} option specifying a deeper level in the bus topology, the last
+@var{port} denoting where the target adapter is actually plugged.
+The USB bus topology can be queried with the command @emph{lsusb -t} or @emph{dmesg}.
+
+This command is only available if your libusb1 is at least version 1.0.16.
+@end deffn
+
 @section Interface Drivers
 
 Each of the interface drivers listed here must be explicitly
@@ -3458,6 +3474,7 @@ How long (in milliseconds) OpenOCD should wait after deasserting
 nTRST (active-low JTAG TAP reset) before starting new JTAG operations.
 @end deffn
 
+@anchor {reset_config}
 @deffn {Command} reset_config mode_flag ...
 This command displays or modifies the reset configuration
 of your combination of JTAG board and target in target
@@ -5346,16 +5363,27 @@ since the alternate function must be enabled on the GPIO pin
 CS1/CS2 is routed to on the given SoC.
 
 @example
-flash bank $_FLASHNAME ath79 0 0 0 0 $_TARGETNAME
+flash bank $_FLASHNAME ath79 0xbf000000 0 0 0 $_TARGETNAME
 
 # When using multiple chipselects the base should be different for each,
 # otherwise the write_image command is not able to distinguish the
 # banks.
-flash bank flash0 ath79 0x00000000 0 0 0 $_TARGETNAME cs0
+flash bank flash0 ath79 0xbf000000 0 0 0 $_TARGETNAME cs0
 flash bank flash1 ath79 0x10000000 0 0 0 $_TARGETNAME cs1
 flash bank flash2 ath79 0x20000000 0 0 0 $_TARGETNAME cs2
 @end example
 
+@end deffn
+
+@deffn {Flash Driver} fespi
+@cindex Freedom E SPI
+@cindex fespi
+
+SiFive's Freedom E SPI controller, used in HiFive and other boards.
+
+@example
+flash bank $_FLASHNAME fespi 0x20000000 0 0 0 $_TARGETNAME
+@end example
 @end deffn
 
 @subsection Internal Flash (Microcontrollers)
@@ -5451,9 +5479,16 @@ the flash.
 @anchor{at91samd}
 @deffn {Flash Driver} at91samd
 @cindex at91samd
-All members of the ATSAMD, ATSAMR, ATSAML and ATSAMC microcontroller
+All members of the ATSAM D2x, D1x, D0x, ATSAMR, ATSAML and ATSAMC microcontroller
 families from Atmel include internal flash and use ARM's Cortex-M0+ core.
-This driver uses the same command names/syntax as @xref{at91sam3}.
+
+Do not use for ATSAM D51 and E5x: use @xref{atsame5} instead.
+
+The devices have one flash bank:
+
+@example
+flash bank $_FLASHNAME at91samd 0x00000000 0 1 1 $_TARGETNAME
+@end example
 
 @deffn Command {at91samd chip-erase}
 Issues a complete Flash erase via the Device Service Unit (DSU). This can be
@@ -5615,9 +5650,72 @@ Command is used internally in event event reset-deassert-post.
 @end deffn
 @end deffn
 
+@anchor{atsame5}
+@deffn {Flash Driver} atsame5
+@cindex atsame5
+All members of the SAM E54, E53, E51 and D51 microcontroller
+families from Microchip (former Atmel) include internal flash
+and use ARM's Cortex-M4 core.
+
+The devices have two ECC flash banks with a swapping feature.
+This driver handles both banks together as it were one.
+Bank swapping is not supported yet.
+
+@example
+flash bank $_FLASHNAME atsame5 0x00000000 0 1 1 $_TARGETNAME
+@end example
+
+@deffn Command {atsame5 bootloader}
+Shows or sets the bootloader size configuration, stored in the User Page of the
+Flash. This is called the BOOTPROT region. When setting, the bootloader size
+must be specified in bytes. The nearest bigger protection size is used.
+Settings are written immediately but only take effect on MCU reset.
+Setting the bootloader size to 0 disables bootloader protection.
+
+@example
+atsame5 bootloader
+atsame5 bootloader 16384
+@end example
+@end deffn
+
+@deffn Command {atsame5 chip-erase}
+Issues a complete Flash erase via the Device Service Unit (DSU). This can be
+used to erase a chip back to its factory state and does not require the
+processor to be halted.
+@end deffn
+
+@deffn Command {atsame5 dsu_reset_deassert}
+This command releases internal reset held by DSU
+and prepares reset vector catch in case of reset halt.
+Command is used internally in event event reset-deassert-post.
+@end deffn
+
+@deffn Command {atsame5 userpage}
+Writes or reads the first 64 bits of NVM User Page which is located at
+0x804000. This field includes various fuses.
+Reading is done by invoking this command without any arguments.
+Writing is possible by giving 1 or 2 hex values. The first argument
+is the value to be written and the second one is an optional bit mask
+(a zero bit in the mask means the bit stays unchanged).
+The reserved fields are always masked out and cannot be changed.
+
+@example
+# Read
+>atsame5 userpage
+USER PAGE: 0xAEECFF80FE9A9239
+# Write
+>atsame5 userpage 0xAEECFF80FE9A9239
+# Write 2 to SEESBLK and 4 to SEEPSZ fields but leave other bits unchanged
+# (setup SmartEEPROM of virtual size 8192 bytes)
+>atsame5 userpage 0x4200000000 0x7f00000000
+@end example
+@end deffn
+
+@end deffn
+
 @deffn {Flash Driver} atsamv
 @cindex atsamv
-All members of the ATSAMV, ATSAMS, and ATSAME families from
+All members of the ATSAMV7x, ATSAMS70, and ATSAME70 families from
 Atmel include internal flash and use ARM's Cortex-M7 core.
 This driver uses the same command names/syntax as @xref{at91sam3}.
 @end deffn
@@ -5928,8 +6026,8 @@ Command disables watchdog timer.
 @deffn {Flash Driver} lpc2000
 This is the driver to support internal flash of all members of the
 LPC11(x)00 and LPC1300 microcontroller families and most members of
-the LPC800, LPC1500, LPC1700, LPC1800, LPC2000, LPC4000 and LPC54100
-microcontroller families from NXP.
+the LPC800, LPC1500, LPC1700, LPC1800, LPC2000, LPC4000, LPC54100,
+LPC8Nxx and NHS31xx microcontroller families from NXP.
 
 @quotation Note
 There are LPC2000 devices which are not supported by the @var{lpc2000}
@@ -5938,7 +6036,7 @@ The LPC2888 is supported by the @var{lpc288x} driver.
 The LPC29xx family is supported by the @var{lpc2900} driver.
 @end quotation
 
-The @var{lpc2000} driver defines two mandatory and one optional parameters,
+The @var{lpc2000} driver defines two mandatory and two optional parameters,
 which must appear in the following order:
 
 @itemize
@@ -5954,7 +6052,7 @@ LPC43x[2357])
 @option{lpc54100} (LPC541xx)
 @option{lpc4000} (LPC40xx)
 or @option{auto} - automatically detects flash variant and size for LPC11(x)00,
-LPC8xx, LPC13xx, LPC17xx and LPC40xx
+LPC8xx, LPC13xx, LPC17xx, LPC40xx, LPC8Nxx and NHS31xx
 @item @var{clock_kHz} ... the frequency, in kiloHertz,
 at which the core is running
 @item @option{calc_checksum} ... optional (but you probably want to provide this!),
@@ -5965,6 +6063,8 @@ table, the boot ROM will almost certainly ignore your flash image.
 However, if you do provide it,
 with most tool chains @command{verify_image} will fail.
 @end quotation
+@item @option{iap_entry} ... optional telling the driver to use a different
+ROM IAP entry point.
 @end itemize
 
 LPC flashes don't require the chip and bus width to be specified.
@@ -6546,9 +6646,10 @@ or upon executing the @command{stm32f1x options_load} command.
 The @var{num} parameter is a value shown by @command{flash banks}.
 @end deffn
 
-@deffn Command {stm32f1x options_write} num (@option{SWWDG}|@option{HWWDG}) (@option{RSTSTNDBY}|@option{NORSTSTNDBY}) (@option{RSTSTOP}|@option{NORSTSTOP})
+@deffn Command {stm32f1x options_write} num (@option{SWWDG}|@option{HWWDG}) (@option{RSTSTNDBY}|@option{NORSTSTNDBY}) (@option{RSTSTOP}|@option{NORSTSTOP}) (@option{USEROPT} user_data)
 Writes the stm32 option byte with the specified values.
 The @var{num} parameter is a value shown by @command{flash banks}.
+The @var{user_data} parameter is content of higher 16 bits of the option byte register (Data0 and Data1 as one 16bit number).
 @end deffn
 
 @deffn Command {stm32f1x options_load} num
@@ -6917,6 +7018,17 @@ Reports the clock speed, which is used to calculate timings.
 Disables (@var{1}) or enables (@var{0}) use of the PLL to speed up
 the flash clock.
 @end deffn
+@end deffn
+
+@deffn {Flash Driver} w600
+W60x series Wi-Fi SoC from WinnerMicro
+are designed with ARM Cortex-M3 and have 1M Byte QFLASH inside.
+The @var{w600} driver uses the @var{target} parameter to select the
+correct bank config.
+
+@example
+flash bank $_FLASHNAME w600 0x08000000 0 0 0 $_TARGETNAMEs
+@end example
 @end deffn
 
 @deffn {Flash Driver} xmc1xxx
@@ -9023,19 +9135,23 @@ must also be explicitly enabled.
 This finishes by listing the current vector catch configuration.
 @end deffn
 
-@deffn Command {cortex_m reset_config} (@option{srst}|@option{sysresetreq}|@option{vectreset})
-Control reset handling. The default @option{srst} is to use srst if fitted,
-otherwise fallback to @option{vectreset}.
+@deffn Command {cortex_m reset_config} (@option{sysresetreq}|@option{vectreset})
+Control reset handling if hardware srst is not fitted
+@xref{reset_config,,reset_config}.
+
 @itemize @minus
-@item @option{srst} use hardware srst if fitted otherwise fallback to @option{vectreset}.
-@item @option{sysresetreq} use NVIC SYSRESETREQ to reset system.
-@item @option{vectreset} use NVIC VECTRESET to reset system.
+@item @option{sysresetreq} use AIRCR SYSRESETREQ to reset system.
+@item @option{vectreset} use AIRCR VECTRESET to reset system (default).
 @end itemize
-Using @option{vectreset} is a safe option for all current Cortex-M cores.
+
+Using @option{vectreset} is a safe option for Cortex-M3, M4 and M7 cores.
 This however has the disadvantage of only resetting the core, all peripherals
-are unaffected. A solution would be to use a @code{reset-init} event handler to manually reset
-the peripherals.
+are unaffected. A solution would be to use a @code{reset-init} event handler
+to manually reset the peripherals.
 @xref{targetevents,,Target Events}.
+
+Cortex-M0, M0+ and M1 do not support @option{vectreset}, use @option{sysresetreq}
+instead.
 @end deffn
 
 @subsection ARMv8-A specific commands
