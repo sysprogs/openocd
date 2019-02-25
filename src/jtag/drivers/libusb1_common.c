@@ -114,8 +114,13 @@ int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
 	bool serial_mismatch = false;
 	struct jtag_libusb_device_handle *libusb_handle = NULL;
 
-	if (libusb_init(&jtag_libusb_context) < 0)
+	errCode = libusb_init(&jtag_libusb_context);
+	if (errCode < 0)
+	{
+		LOG_ERROR("libusb_init() failed with %s",
+				  libusb_error_name(errCode));
 		return ERROR_FAIL;
+	}
 
 	cnt = libusb_get_device_list(jtag_libusb_context, &devs);
     
