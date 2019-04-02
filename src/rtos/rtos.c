@@ -38,6 +38,8 @@ extern struct rtos_type mqx_rtos;
 extern struct rtos_type uCOS_III_rtos;
 extern struct rtos_type multicore_rtos;
 extern struct rtos_type nuttx_rtos;
+extern struct rtos_type hwthread_rtos;
+
 static struct rtos_type *rtos_types[] = {
 	&ThreadX_rtos,
 	&FreeRTOS_rtos,
@@ -50,6 +52,8 @@ static struct rtos_type *rtos_types[] = {
 	&uCOS_III_rtos,
 	&nuttx_rtos,
 	&multicore_rtos,
+	&hwthread_rtos,
+	NULL
 };
 
 int rtos_thread_packet(struct connection *connection, const char *packet, int packet_size);
