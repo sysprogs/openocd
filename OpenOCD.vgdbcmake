@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <VisualGDBProjectSettings2 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <ConfigurationName>Release</ConfigurationName>
+  <ConfigurationName>Debug</ConfigurationName>
   <Project xsi:type="com.visualgdb.project.windows">
     <CustomSourceDirectories>
       <Directories />
@@ -53,6 +53,7 @@
     <ExportCompileCommands>true</ExportCompileCommands>
     <DisableToolchainFile>false</DisableToolchainFile>
     <CMakeMakefileType>Ninja</CMakeMakefileType>
+    <DeployAsRoot>false</DeployAsRoot>
     <ProjectModeSettings>
       <ProjectItemSettings>
         <GroupSourcesByTypes>true</GroupSourcesByTypes>
@@ -64,12 +65,13 @@
         <RedundantTargetMode>HideOuterProjectTargets</RedundantTargetMode>
         <SortSourcesByName>true</SortSourcesByName>
         <BuildAllTargetsInSubdir>false</BuildAllTargetsInSubdir>
+        <FoldSingleItemPathLevels>false</FoldSingleItemPathLevels>
       </ProjectItemSettings>
       <TargetSpecificSettings>
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f board/ti_cc3220sf_launchpad.cfg</Arguments>
+            <Arguments>-f interface/stlink.cfg -f target/stm32f7x.cfg</Arguments>
             <WorkingDirectory>C:\Users\ivan.SYSPROGS\AppData\Local\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
@@ -78,6 +80,7 @@
             <DoNotDeployVersionedBinaries>false</DoNotDeployVersionedBinaries>
           </Deployment>
           <HeaderDiscoveryMode>Default</HeaderDiscoveryMode>
+          <ResourceDirectories />
         </CMakeTargetSpecificSettings>
       </TargetSpecificSettings>
       <SetLDLibraryPathFromDependentArtifacts>true</SetLDLibraryPathFromDependentArtifacts>
@@ -152,11 +155,12 @@
       <EnableNonStopMode>false</EnableNonStopMode>
       <MaxBreakpointLimit>0</MaxBreakpointLimit>
     </AdditionalGDBSettings>
-    <LaunchGDBSettings xsi:type="GDBLaunchParametersNewInstance">
+    <LaunchGDBSettings xsi:type="GDBLaunchParametersAttach">
       <DebuggedProgram>$(TargetPath)</DebuggedProgram>
       <GDBServerPort>2000</GDBServerPort>
-      <ProgramArguments>$(SelectedCMakeTargetArgs)</ProgramArguments>
-      <WorkingDirectory>$(SelectedCMakeTargetLaunchDir)</WorkingDirectory>
+      <AttachMode>NoAutoAttach</AttachMode>
+      <AutoAttachPID>0</AutoAttachPID>
+      <AutoAttachExecutable>$(TargetPath)</AutoAttachExecutable>
     </LaunchGDBSettings>
     <GenerateCtrlBreakInsteadOfCtrlC>false</GenerateCtrlBreakInsteadOfCtrlC>
   </Debug>

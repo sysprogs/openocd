@@ -123,21 +123,31 @@ int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
 	}
 
 	cnt = libusb_get_device_list(jtag_libusb_context, &devs);
-    
-    struct matched_dev *matching_devs = calloc(cnt, sizeof(struct matched_dev));
+	LOG_DEBUG("libusb reported %d devices", cnt);
+
+	struct matched_dev *matching_devs = calloc(cnt, sizeof(struct matched_dev));
     int num_matching_devs = 0;
 
 	for (idx = 0; idx < cnt; idx++) {
 		struct libusb_device_descriptor dev_desc;
 
 		if (libusb_get_device_descriptor(devs[idx], &dev_desc) != 0)
+		{
+			LOG_DEBUG("Could not get device descriptor for device #%d", idx);
 			continue;
+		}
 
 		if (!jtag_libusb_match(&dev_desc, vids, pids))
+		{
+			LOG_DEBUG("USB descriptor mismatch for device #%d (%04x/%04x)", idx, dev_desc.idVendor, dev_desc.idProduct);
 			continue;
+		}
 
 		if (jtag_usb_get_location() && !jtag_libusb_location_equal(devs[idx]))
+		{
+			LOG_DEBUG("Unexpected device location for device %d", idx);
 			continue;
+		}
 
 		errCode = libusb_open(devs[idx], &libusb_handle);
 
