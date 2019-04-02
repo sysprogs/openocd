@@ -54,6 +54,7 @@
     <DisableToolchainFile>false</DisableToolchainFile>
     <CMakeMakefileType>Ninja</CMakeMakefileType>
     <DeployAsRoot>false</DeployAsRoot>
+    <CleanMode>RemoveBuildDirectory</CleanMode>
     <ProjectModeSettings>
       <ProjectItemSettings>
         <GroupSourcesByTypes>true</GroupSourcesByTypes>
@@ -71,7 +72,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/stlink.cfg -f target/stm32f7x.cfg</Arguments>
+            <Arguments>-f interface/ftdi/olimex-arm-usb-ocd-h.cfg -f target/raspberrypi3.cfg</Arguments>
             <WorkingDirectory>C:\Users\ivan.SYSPROGS\AppData\Local\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
@@ -155,12 +156,11 @@
       <EnableNonStopMode>false</EnableNonStopMode>
       <MaxBreakpointLimit>0</MaxBreakpointLimit>
     </AdditionalGDBSettings>
-    <LaunchGDBSettings xsi:type="GDBLaunchParametersAttach">
+    <LaunchGDBSettings xsi:type="GDBLaunchParametersNewInstance">
       <DebuggedProgram>$(TargetPath)</DebuggedProgram>
       <GDBServerPort>2000</GDBServerPort>
-      <AttachMode>NoAutoAttach</AttachMode>
-      <AutoAttachPID>0</AutoAttachPID>
-      <AutoAttachExecutable>$(TargetPath)</AutoAttachExecutable>
+      <ProgramArguments>$(SelectedCMakeTargetArgs)</ProgramArguments>
+      <WorkingDirectory>$(SelectedCMakeTargetLaunchDir)</WorkingDirectory>
     </LaunchGDBSettings>
     <GenerateCtrlBreakInsteadOfCtrlC>false</GenerateCtrlBreakInsteadOfCtrlC>
   </Debug>

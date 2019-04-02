@@ -36,7 +36,7 @@
 static int multicore_create(struct target *target);
 static int multicore_smp_init(struct target *target);
 static int multicore_update_threads(struct rtos *rtos);
-static int multicore_get_thread_reg_list(struct rtos *rtos, int64_t thread_id, char **hex_reg_list);
+static int multicore_get_thread_reg_list(struct rtos *rtos, int64_t thread_id, struct rtos_reg **rtos_reg_list, int *num_regs);
 static int multicore_step_hook(struct target *target, int current, uint32_t address, int handle_breakpoints);
 static int multicore_symbol_list_lookup(symbol_table_elem_t *symbol_list[]);
 
@@ -135,7 +135,7 @@ static struct target *freeze_targets(struct target *target, int delta)
     return NULL;
 }
 
-static int multicore_get_thread_reg_list(struct rtos *rtos, int64_t thread_id, char **hex_reg_list)
+static int multicore_get_thread_reg_list(struct rtos *rtos, int64_t thread_id, struct rtos_reg **rtos_reg_list, int *num_regs)
 {
     struct reg **reg_list;
     int reg_list_size, reg_packet_size = 0;
@@ -154,25 +154,25 @@ static int multicore_get_thread_reg_list(struct rtos *rtos, int64_t thread_id, c
         REG_CLASS_GENERAL);
     if (retval != ERROR_OK)
         return retval;
-    
-    for (i = 0; i < reg_list_size; i++)
-        reg_packet_size += DIV_ROUND_UP(reg_list[i]->size, 8) * 2;
 
-    assert(reg_packet_size > 0);
+	*num_regs = reg_list_size;
+	*rtos_reg_list = calloc(*num_regs, sizeof(struct rtos_reg));
+	if (*rtos_reg_list == NULL)
+	{
+		free(reg_list);
+		return ERROR_FAIL;
+	}
 
-    char *reg_packet = malloc(reg_packet_size + 1);
-    *hex_reg_list = reg_packet;
-    if (reg_packet == NULL)
-        return ERROR_FAIL;
-    
-    for (i = 0; i < reg_list_size; i++) {
-        if (!reg_list[i]->valid)
-            reg_list[i]->type->get(reg_list[i]);
-        
-        gdb_str_to_target(target, reg_packet, reg_list[i]);
-        reg_packet += DIV_ROUND_UP(reg_list[i]->size, 8) * 2;
-    }
-    
+	for (int i = 0; i < *num_regs; i++)
+	{
+		(*rtos_reg_list)[i].number = (*reg_list)[i].number;
+		(*rtos_reg_list)[i].size = (*reg_list)[i].size;
+		memcpy((*rtos_reg_list)[i].value, (*reg_list)[i].value,
+			   ((*reg_list)[i].size + 7) / 8);
+	}
+
+	free(reg_list);
+	
     return 0;
 }
 
