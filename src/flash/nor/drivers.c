@@ -86,6 +86,8 @@ extern const struct flash_driver xmc4xxx_flash;
 
 extern struct flash_driver plugin_flash;
 extern struct flash_driver msp432p4_flash;
+extern struct flash_driver aducm302x_flash;
+extern struct flash_driver aducm4x50_flash;
 
 
 /**
