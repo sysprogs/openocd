@@ -249,6 +249,9 @@ static int hwthread_get_thread_reg_list(struct rtos *rtos, int64_t thread_id,
 	}
 
 	for (int i = 0; i < *num_regs; i++) {
+		if (!reg_list[i]->valid)
+			reg_list[i]->type->get(reg_list[i]);
+		
 		(*rtos_reg_list)[i].number = (*reg_list)[i].number;
 		(*rtos_reg_list)[i].size = (*reg_list)[i].size;
 		memcpy((*rtos_reg_list)[i].value, (*reg_list)[i].value,
