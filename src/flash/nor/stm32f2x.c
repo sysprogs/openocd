@@ -648,9 +648,9 @@ static int stm32x_erase(struct flash_bank *bank, int first, int last)
 		retval = stm32x_wait_status_busy(bank, FLASH_ERASE_TIMEOUT);
 		if (retval != ERROR_OK)
 			return retval;
-    	
-    	if (target->report_flash_progress)
-        	LOG_INFO("flash_erase_progress:0x%x|0x%x|%s", bank->base + bank->sectors[i].offset, bank->base + bank->sectors[i].offset + bank->sectors[i].size, bank->name);
+
+		if (target->report_flash_progress)
+			report_flash_progress("flash_erase_progress", bank->base + bank->sectors[i].offset, bank->base + bank->sectors[i].offset + bank->sectors[i].size, bank->name);
 
 		bank->sectors[i].is_erased = 1;
 	}
@@ -762,9 +762,9 @@ static int stm32x_write_block(struct flash_bank *bank, const uint8_t *buffer,
 	buf_set_u32(reg_params[2].value, 0, 32, address);
 	buf_set_u32(reg_params[3].value, 0, 32, count);
 	buf_set_u32(reg_params[4].value, 0, 32, STM32_FLASH_BASE);
-    
-    if (target->report_flash_progress)
-        LOG_INFO("flash_write_start:0x%x|0x%x|%s", address, address + count * 2, bank->name);
+
+	if (target->report_flash_progress)
+		report_flash_progress("flash_write_start", address, address + count * 2, bank->name);
 
 	retval = target_run_flash_async_algorithm(target, buffer, count, 2,
 			0, NULL,

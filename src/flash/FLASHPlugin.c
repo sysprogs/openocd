@@ -501,7 +501,7 @@ static int plugin_write(struct flash_bank *bank,
                 }
                 
                 if (target->report_flash_progress)
-                    LOG_INFO("flash_write_progress_sync:0x%x|0x%x|%s", bank->base + offset + done, bank->base + offset + done + doneNow, bank->name);
+                    report_flash_progress("flash_write_progress_sync", bank->base + offset + done, bank->base + offset + done + doneNow, bank->name);
 
                 done += doneNow;
             }
@@ -693,7 +693,7 @@ static int plugin_erase(struct flash_bank *bank, int first, int last)
             }
             
             if (target->report_flash_progress)
-                LOG_INFO("flash_erase_progress:0x%x|0x%x|%s", bank->base + bank->sectors[first].offset, bank->base + bank->sectors[first + result - 1].offset + bank->sectors[first + result - 1].size, bank->name);
+                report_flash_progress("flash_erase_progress", bank->base + bank->sectors[first].offset, bank->base + bank->sectors[first + result - 1].offset + bank->sectors[first + result - 1].size, bank->name);
             
             first += result;
         }

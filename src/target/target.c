@@ -6181,11 +6181,11 @@ COMMAND_HANDLER(handle_report_flash_progress)
         {
             for (struct flash_bank *bank = flash_bank_list(); bank; bank = bank->next)
             {
-                int r = bank->driver->probe(bank);
+				int r = bank->driver->probe(bank);
                 if (r != ERROR_OK)
-                    LOG_ERROR("FLASH bank probe failed for %s", bank->name);
-        
-                command_print(CMD_CTX, "flash_bank_summary:0x%x|0x%x|%s", bank->base, bank->size, bank->name);
+					LOG_ERROR("FLASH bank probe failed for %s", bank->name);
+
+				command_print(CMD_CTX, "flash_bank_summary:0x%x|0x%x|%s", (uint32_t)bank->base, (uint32_t)bank->size, bank->name);
             }
         }
     }

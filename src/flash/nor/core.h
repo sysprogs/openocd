@@ -277,4 +277,9 @@ int get_flash_bank_by_addr(struct target *target, target_addr_t addr, bool check
  */
 struct flash_sector *alloc_block_array(uint32_t offset, uint32_t size, int num_blocks);
 
+static void report_flash_progress(const char *op, uint64_t region_start, uint64_t region_end, const char *block_name)
+{
+	LOG_INFO("%s:0x%llx|0x%llx|%s", op, region_start, region_end, block_name);
+}
+
 #endif /* OPENOCD_FLASH_NOR_CORE_H */
