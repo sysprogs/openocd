@@ -4845,7 +4845,7 @@ no_params:
 				if (goi->argc != 0)
 					goto no_params;
 			}
-			Jim_SetResult(goi->interp, Jim_NewIntObj(goi->interp, target->working_area_size));
+			Jim_SetResult(goi->interp, Jim_NewIntObj(goi->interp, target->coreid));
 			/* loop for more */
 			break;
 
@@ -5904,6 +5904,7 @@ static const struct command_registration target_subcommand_handlers[] = {
 		.mode = COMMAND_CONFIG,
 		.handler = handle_target_init_command,
 		.help = "initialize targets",
+		.usage = "",
 	},
 	{
 		.name = "create",
@@ -6110,8 +6111,8 @@ static const struct command_registration target_command_handlers[] = {
 		.name = "target",
 		.mode = COMMAND_CONFIG,
 		.help = "configure target",
-
 		.chain = target_subcommand_handlers,
+		.usage = "",
 	},
 	COMMAND_REGISTRATION_DONE
 };

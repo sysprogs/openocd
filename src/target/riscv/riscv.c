@@ -271,16 +271,8 @@ static int riscv_init_target(struct command_context *cmd_ctx,
 	return ERROR_OK;
 }
 
-static void riscv_deinit_target(struct target *target)
+static void riscv_free_registers(struct target *target)
 {
-	LOG_DEBUG("riscv_deinit_target()");
-	struct target_type *tt = get_target_type(target);
-	if (tt) {
-		tt->deinit_target(target);
-		riscv_info_t *info = (riscv_info_t *) target->arch_info;
-		free(info->reg_names);
-		free(info);
-	}
 	/* Free the shared structure use for most registers. */
 	if (target->reg_cache) {
 		if (target->reg_cache->reg_list) {
@@ -293,6 +285,21 @@ static void riscv_deinit_target(struct target *target)
 		}
 		free(target->reg_cache);
 	}
+}
+
+static void riscv_deinit_target(struct target *target)
+{
+	LOG_DEBUG("riscv_deinit_target()");
+	struct target_type *tt = get_target_type(target);
+	if (tt) {
+		tt->deinit_target(target);
+		riscv_info_t *info = (riscv_info_t *) target->arch_info;
+		free(info->reg_names);
+		free(info);
+	}
+
+	riscv_free_registers(target);
+
 	target->arch_info = NULL;
 }
 
@@ -1900,28 +1907,28 @@ extern __COMMAND_HANDLER(handle_common_semihosting_cmdline);
  */
 static const struct command_registration arm_exec_command_handlers[] = {
 	{
-		"semihosting",
+		.name = "semihosting",
 		.handler = handle_common_semihosting_command,
 		.mode = COMMAND_EXEC,
 		.usage = "['enable'|'disable']",
 		.help = "activate support for semihosting operations",
 	},
 	{
-		"semihosting_cmdline",
+		.name = "semihosting_cmdline",
 		.handler = handle_common_semihosting_cmdline,
 		.mode = COMMAND_EXEC,
 		.usage = "arguments",
 		.help = "command line arguments to be passed to program",
 	},
 	{
-		"semihosting_fileio",
+		.name = "semihosting_fileio",
 		.handler = handle_common_semihosting_fileio_command,
 		.mode = COMMAND_EXEC,
 		.usage = "['enable'|'disable']",
 		.help = "activate support for semihosting fileio operations",
 	},
 	{
-		"semihosting_resexit",
+		.name = "semihosting_resexit",
 		.handler = handle_common_semihosting_resumable_exit_command,
 		.mode = COMMAND_EXEC,
 		.usage = "['enable'|'disable']",
@@ -2503,11 +2510,7 @@ int riscv_init_registers(struct target *target)
 {
 	RISCV_INFO(info);
 
-	if (target->reg_cache) {
-		if (target->reg_cache->reg_list)
-			free(target->reg_cache->reg_list);
-		free(target->reg_cache);
-	}
+	riscv_free_registers(target);
 
 	target->reg_cache = calloc(1, sizeof(*target->reg_cache));
 	target->reg_cache->name = "RISC-V Registers";

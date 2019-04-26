@@ -316,7 +316,7 @@ static struct command *command_new(struct command_context *cmd_ctx,
 	 * arguments.
 	*/
 	if ((cr->jim_handler == NULL) && (cr->usage == NULL)) {
-		LOG_DEBUG("BUG: command '%s%s%s' does not have the "
+		LOG_ERROR("BUG: command '%s%s%s' does not have the "
 			"'.usage' field filled out",
 			parent && parent->name ? parent->name : "",
 			parent && parent->name ? " " : "",
@@ -1119,7 +1119,7 @@ int help_add_command(struct command_context *cmd_ctx, struct command *parent,
 			.name = cmd_name,
 			.mode = COMMAND_ANY,
 			.help = help_text,
-			.usage = usage,
+			.usage = usage ? : "",
 		};
 		nc = register_command(cmd_ctx, parent, &cr);
 		if (NULL == nc) {
@@ -1144,8 +1144,9 @@ int help_add_command(struct command_context *cmd_ctx, struct command *parent,
 	if (usage) {
 		bool replaced = false;
 		if (nc->usage) {
+			if (*nc->usage)
+				replaced = true;
 			free(nc->usage);
-			replaced = true;
 		}
 		nc->usage = strdup(usage);
 		if (replaced)
@@ -1294,6 +1295,7 @@ static const struct command_registration command_builtin_handlers[] = {
 		.mode = COMMAND_ANY,
 		.help = "core command group (introspection)",
 		.chain = command_subcommand_handlers,
+		.usage = "",
 	},
 	COMMAND_REGISTRATION_DONE
 };

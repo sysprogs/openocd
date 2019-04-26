@@ -1239,12 +1239,14 @@ static const struct command_registration flash_config_command_handlers[] = {
 		.mode = COMMAND_CONFIG,
 		.handler = handle_flash_init_command,
 		.help = "Initialize flash devices.",
+		.usage = "",
 	},
 	{
 		.name = "banks",
 		.mode = COMMAND_ANY,
 		.handler = handle_flash_banks_command,
 		.help = "Display table with information about flash banks.",
+		.usage = "",
 	},
 	{
 		.name = "list",
@@ -1260,6 +1262,7 @@ static const struct command_registration flash_command_handlers[] = {
 		.mode = COMMAND_ANY,
 		.help = "NOR flash command group",
 		.chain = flash_config_command_handlers,
+		.usage = "",
 	},
 	COMMAND_REGISTRATION_DONE
 };
