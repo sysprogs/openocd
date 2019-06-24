@@ -147,91 +147,194 @@ struct stm32l4_flash_bank {
 	struct stm32l4_part_info *part_info;
 };
 
+
 static const struct stm32l4_rev stm32_415_revs[] = {
-	{ 0x1000, "1" }, { 0x1001, "2" }, { 0x1003, "3" }, { 0x1007, "4" }
+	{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x1003, "Y" }, { 0x1007, "X" },
 };
 
 static const struct stm32l4_rev stm32_435_revs[] = {
 	{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x2001, "Y" },
 };
 
+static const struct stm32l4_rev stm32_462_revs[] = {
+	{ 0x1000, "A" }, { 0x2000, "B" }, { 0x2001, "Y" },
+};
+
 static const struct stm32l4_rev stm32_461_revs[] = {
 	{ 0x1000, "A" }, { 0x2000, "B" },
 };
 
-static const struct stm32l4_rev stm32_462_revs[] = {
-		{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x2001, "Y" },
+static const struct stm32l4_rev stm32_495_revs[] = {
+	{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x2000, "B" }, { 0x2001, "Y" },
 };
 
 static const struct stm32l4_rev stm32_470_revs[] = {
 	{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x1003, "Y" }, { 0x100F, "W" },
 };
 
+static const struct stm32l4_rev stm32_464_revs[] = {
+	{ 0x1000, "A" },
+};
+
+static const struct stm32l4_rev stm32_460_revs[] = {
+	{ 0x1000, "A" }, { 0x2000, "B" },
+};
+
+static const struct stm32l4_rev stm32_466_revs[] = {
+	{ 0x1000, "A" },
+};
+
+static const struct stm32l4_rev stm32_468_revs[] = {
+	{ 0x1000, "A" }, { 0x2000, "B" }, { 0x2001, "Z" },
+};
+
+static const struct stm32l4_rev stm32_469_revs[] = {
+	{ 0x1000, "A" }, { 0x2000, "B" }, { 0x2001, "Z" },
+};
+
 static struct stm32l4_part_info stm32l4_parts[] = {
 	{
-	  .id                   = 0x415,
-	  .revs                 = stm32_415_revs,
-	  .num_revs             = ARRAY_SIZE(stm32_415_revs),
-	  .device_str           = "STM32L47/L48xx",
-	  .page_size            = 2048,
-	  .max_flash_size_kb    = 1024,
-	  .has_dual_bank        = true,
-	  .bank1_sectors        = 256,
-	  .hole_sectors         = 0,
-	  .flash_regs_base      = 0x40022000,
-	  .fsize_addr           = 0x1FFF75E0,
+	  .id					= 0x415,
+	  .revs					= stm32_415_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_415_revs),
+	  .device_str			= "STM32L47/L48xx",	/* 1M or 512K */
+	  .page_size			= 2048,
+	  .max_flash_size_kb	= 1024,
+	  .has_dual_bank		= 1,
+	  .bank1_sectors	= 256,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
 	},
 	{
-	  .id                   = 0x435,
-	  .revs                 = stm32_435_revs,
-	  .num_revs             = ARRAY_SIZE(stm32_435_revs),
-	  .device_str           = "STM32L43/L44xx",
-	  .page_size            = 2048,
-	  .max_flash_size_kb    = 256,
-	  .has_dual_bank        = false,
-	  .bank1_sectors        = 128,
-	  .hole_sectors         = 0,
-	  .flash_regs_base      = 0x40022000,
-	  .fsize_addr           = 0x1FFF75E0,
+	  .id					= 0x435,
+	  .revs					= stm32_435_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_435_revs),
+	  .device_str			= "STM32L43/L44xx", /* 256K */
+	  .page_size			= 2048,
+	  .max_flash_size_kb	= 256,
+	  .has_dual_bank		= 0,
+	  .bank1_sectors	= 128,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
 	},
 	{
-	  .id                   = 0x461,
-	  .revs                 = stm32_461_revs,
-	  .num_revs             = ARRAY_SIZE(stm32_461_revs),
-	  .device_str           = "STM32L49/L4Axx",
-	  .page_size            = 2048,
-	  .max_flash_size_kb    = 1024,
-	  .has_dual_bank        = true,
-	  .bank1_sectors        = 256,
-	  .hole_sectors         = 0,
-	  .flash_regs_base      = 0x40022000,
-	  .fsize_addr           = 0x1FFF75E0,
+	  .id					= 0x462,
+	  .revs					= stm32_462_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_462_revs),
+	  .device_str			= "STM32L45/L46xx", /* 512K */
+	  .page_size			= 2048,
+	  .max_flash_size_kb	= 512,
+	  .has_dual_bank		= 0,
+	  .bank1_sectors	= 256,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
 	},
 	{
-	  .id                   = 0x462,
-	  .revs                 = stm32_462_revs,
-	  .num_revs             = ARRAY_SIZE(stm32_462_revs),
-	  .device_str           = "STM32L45/L46xx",
-	  .page_size            = 2048,
-	  .max_flash_size_kb    = 512,
-	  .has_dual_bank        = false,
-	  .bank1_sectors        = 256,
-	  .hole_sectors         = 0,
-	  .flash_regs_base      = 0x40022000,
-	  .fsize_addr           = 0x1FFF75E0,
+	  .id					= 0x461,
+	  .revs					= stm32_461_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_461_revs),
+	  .device_str			= "STM32L49/L4Axx", /* 1M or 512K or 256K */
+	  .page_size			= 2048,
+	  .max_flash_size_kb	= 1024,
+	  .has_dual_bank		= 1,
+	  .bank1_sectors	= 256,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
 	},
 	{
-	  .id                   = 0x470,
-	  .revs                 = stm32_470_revs,
-	  .num_revs             = ARRAY_SIZE(stm32_470_revs),
-	  .device_str           = "STM32L4R/L4Sxx",
-	  .page_size            = 4096, /* or 8192, depending on DBANK option bit */
-	  .max_flash_size_kb    = 2048,
-	  .has_dual_bank        = true,
-	  .bank1_sectors        = 256,
-	  .hole_sectors         = 0,
-	  .flash_regs_base      = 0x40022000,
-	  .fsize_addr           = 0x1FFF75E0,
+	  .id					= 0x495,
+	  .revs					= stm32_495_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_495_revs),
+	  .device_str			= "STM32WBxx", /* 1M */
+	  .page_size			= 4096,
+	  .max_flash_size_kb	= 1024,
+	  .has_dual_bank		= 0,
+	  .bank1_sectors	= 256,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x58004000,
+	  .fsize_addr			= 0x1FFF75E0,
+	},
+	{
+	  .id					= 0x470,
+	  .revs					= stm32_470_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_470_revs),
+	  .device_str			= "STM32L4R/L4Sxx", /* 2M */
+	  .page_size			= 4096, /* or 8192, depending on DBANK option bit */
+	  .max_flash_size_kb	= 2048,
+	  .has_dual_bank		= 1,
+	  .bank1_sectors	= 256,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
+	},
+	{
+	  .id					= 0x464,
+	  .revs					= stm32_464_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_464_revs),
+	  .device_str			= "STM32L41/L42xx", /* 128K */
+	  .page_size			= 2048,
+	  .max_flash_size_kb	= 128,
+	  .has_dual_bank		= 0,
+	  .bank1_sectors	= 64,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
+	},
+	{
+	  .id					= 0x460,
+	  .revs					= stm32_460_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_460_revs),
+	  .device_str			= "STM32G07/G08xx", /* 128K */
+	  .page_size			= 2048,
+	  .max_flash_size_kb	= 128,
+	  .has_dual_bank		= 0,
+	  .bank1_sectors	= 64,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
+	},
+	{
+	  .id					= 0x466,
+	  .revs					= stm32_466_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_466_revs),
+	  .device_str			= "STM32G03/G04xx", /* 64K */
+	  .page_size			= 2048,
+	  .max_flash_size_kb	= 64,
+	  .has_dual_bank		= 0,
+	  .bank1_sectors	= 32,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
+	},
+	{
+	  .id					= 0x468,
+	  .revs					= stm32_468_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_468_revs),
+	  .device_str			= "STM32G43/G44xx", /* 128K */
+	  .page_size			= 2048,
+	  .max_flash_size_kb	= 128,
+	  .has_dual_bank		= 0,
+	  .bank1_sectors	= 64,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
+	},
+	{
+	  .id					= 0x469,
+	  .revs					= stm32_469_revs,
+	  .num_revs				= ARRAY_SIZE(stm32_469_revs),
+	  .device_str			= "STM32G47/G48xx", /* 512K */
+	  .page_size			= 2048, /* or 4096, depending on DBANK option bit */
+	  .max_flash_size_kb	= 512,
+	  .has_dual_bank		= 1,
+	  .bank1_sectors	= 128,
+	  .hole_sectors			= 0,
+	  .flash_regs_base			= 0x40022000,
+	  .fsize_addr			= 0x1FFF75E0,
 	},
 };
 

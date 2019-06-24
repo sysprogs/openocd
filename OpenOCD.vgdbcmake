@@ -72,7 +72,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/stlink-v2.cfg -f target/stm32f4x.cfg</Arguments>
+            <Arguments>-f interface/stlink.cfg -f target/stm32g4x.cfg -c init</Arguments>
             <WorkingDirectory>C:\Users\ivan.SYSPROGS\AppData\Local\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
