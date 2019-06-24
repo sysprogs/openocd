@@ -3017,7 +3017,7 @@ COMMAND_HANDLER(handle_cortex_a_freeze_core_command)
     
     if (!target->smp)
     {
-        command_print(CMD_CTX, "cortex_a core not in SMP mode");
+        command_print(cmd, "cortex_a core not in SMP mode");
         return ERROR_COMMAND_ARGUMENT_INVALID;
     }
     
@@ -3031,12 +3031,12 @@ COMMAND_HANDLER(handle_cortex_a_freeze_core_command)
             pThisTarget->frozen += delta;
             if (pThisTarget->frozen < 0)
                 pThisTarget->frozen = 0;
-            command_print(CMD_CTX, "core #%d is now %s (freeze count = %d)", coreid, pThisTarget->frozen ? "frozen" : "unfrozen", pThisTarget->frozen);
+            command_print(cmd, "core #%d is now %s (freeze count = %d)", coreid, pThisTarget->frozen ? "frozen" : "unfrozen", pThisTarget->frozen);
             return ERROR_OK;
         }
     }
 
-    command_print(CMD_CTX, "no such core: %d", coreid);
+    command_print(cmd, "no such core: %d", coreid);
     return ERROR_COMMAND_ARGUMENT_INVALID;
 }
 

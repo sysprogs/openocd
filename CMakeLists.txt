@@ -16,7 +16,7 @@ find_path(HIDAPI_INCLUDE_DIR hidapi.h
 	
 add_definitions(-DHAVE_CONFIG_H -DPKGDATADIR="../../share/openocd" -DBINDIR="../../bin" -D__USE_MINGW_ANSI_STDIO=1)
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${LIBUSB1_INCLUDE_DIR} ${HIDAPI_INCLUDE_DIR})
-set(CMAKE_C_FLAGS "-std=gnu99")
+set(CMAKE_C_FLAGS "-std=gnu99 -Werror=incompatible-pointer-types")
 
 add_subdirectory(jimtcl-cmake)
 add_subdirectory(src)

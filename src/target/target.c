@@ -3247,7 +3247,7 @@ COMMAND_HANDLER(handle_md_command)
 		target_handle_md_output(CMD, target, address, size, count, buffer);
     else
     {
-        command_print(CMD_CTX, "0x%08x: ERROR %d", address, retval);
+        command_print(cmd, "0x%08x: ERROR %d", address, retval);
     }
 
 	free(buffer);
@@ -5986,11 +5986,11 @@ COMMAND_HANDLER(handle_report_flash_progress)
                 if (r != ERROR_OK)
 					LOG_ERROR("FLASH bank probe failed for %s", bank->name);
 
-				command_print(CMD_CTX, "flash_bank_summary:0x%x|0x%x|%s", (uint32_t)bank->base, (uint32_t)bank->size, bank->name);
+				command_print(cmd, "flash_bank_summary:0x%x|0x%x|%s", (uint32_t)bank->base, (uint32_t)bank->size, bank->name);
             }
         }
     }
-    command_print(CMD_CTX, "FLASH progress reporting is now %s\n", target->report_flash_progress ? "on" : "off");
+    command_print(cmd, "FLASH progress reporting is now %s\n", target->report_flash_progress ? "on" : "off");
     return ERROR_OK;
 }
 
@@ -6005,7 +6005,7 @@ COMMAND_HANDLER(handle_run_until_stop_fast)
     target_resume(target, 1, 0, 1, 0);
     if (target_wait_state(target, TARGET_HALTED, timeout) == ERROR_OK)
     {
-        command_print(CMD_CTX, "Target successfully stopped");
+        command_print(cmd, "Target successfully stopped");
     }
     else
         target_halt(target);
@@ -6021,9 +6021,9 @@ COMMAND_HANDLER(handle_wait_for_stop)
     }
     struct target *target = get_current_target(CMD_CTX);
     if (target_wait_state(target, TARGET_HALTED, timeout) == ERROR_OK)
-        command_print(CMD_CTX, "Target successfully stopped");
+        command_print(cmd, "Target successfully stopped");
 	else
-        command_print(CMD_CTX, "Target did not halt within %d msec", timeout);
+        command_print(cmd, "Target did not halt within %d msec", timeout);
 	
     return ERROR_OK;
 }
