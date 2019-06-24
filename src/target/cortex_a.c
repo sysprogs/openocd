@@ -55,6 +55,7 @@
 #include "target_type.h"
 #include "arm_opcodes.h"
 #include "arm_semihosting.h"
+#include "jtag/interface.h"
 #include "transport/transport.h"
 #include "smp.h"
 #include <helper/time_support.h>
@@ -1658,7 +1659,7 @@ static int cortex_a_assert_reset(struct target *target)
 		 */
 		if (transport_is_swd() ||
 				(target->reset_halt && (jtag_get_reset_config() & RESET_SRST_NO_GATING)))
-			jtag_add_reset(0, 1);
+			adapter_assert_reset();
 
 	} else {
 		LOG_ERROR("%s: how to reset?", target_name(target));
@@ -1681,7 +1682,7 @@ static int cortex_a_deassert_reset(struct target *target)
 	LOG_DEBUG(" ");
 
 	/* be certain SRST is off */
-	jtag_add_reset(0, 0);
+	adapter_deassert_reset();
 
 	if (target_was_examined(target)) {
 		retval = cortex_a_poll(target);
@@ -2921,7 +2922,7 @@ static int cortex_a_virt2phys(struct target *target,
 		if (retval != ERROR_OK)
 		return retval;
 	return armv7a_mmu_translate_va_pa(target, (uint32_t)virt,
-						    (uint32_t *)phys, 1);
+						    phys, 1);
 }
 
 COMMAND_HANDLER(cortex_a_handle_cache_info_command)
@@ -2929,7 +2930,7 @@ COMMAND_HANDLER(cortex_a_handle_cache_info_command)
 	struct target *target = get_current_target(CMD_CTX);
 	struct armv7a_common *armv7a = target_to_armv7a(target);
 
-	return armv7a_handle_cache_info_command(CMD_CTX,
+	return armv7a_handle_cache_info_command(CMD,
 			&armv7a->armv7a_mmu.armv7a_cache);
 }
 
@@ -2968,7 +2969,7 @@ COMMAND_HANDLER(handle_cortex_a_mask_interrupts_command)
 	}
 
 	n = Jim_Nvp_value2name_simple(nvp_maskisr_modes, cortex_a->isrmasking_mode);
-	command_print(CMD_CTX, "cortex_a interrupt mask %s", n->name);
+	command_print(CMD, "cortex_a interrupt mask %s", n->name);
 
 	return ERROR_OK;
 }
@@ -2994,7 +2995,7 @@ COMMAND_HANDLER(handle_cortex_a_dacrfixup_command)
 	}
 
 	n = Jim_Nvp_value2name_simple(nvp_dacrfixup_modes, cortex_a->dacrfixup_mode);
-	command_print(CMD_CTX, "cortex_a domain access control fixup %s", n->name);
+	command_print(CMD, "cortex_a domain access control fixup %s", n->name);
 
 	return ERROR_OK;
 }

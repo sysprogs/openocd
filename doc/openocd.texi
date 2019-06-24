@@ -2370,8 +2370,8 @@ Returns the name of the debug adapter driver being used.
 @end deffn
 
 @anchor{adapter_usb_location}
-@deffn Command {adapter usb location} <bus>-<port>[.<port>]...
-Specifies the physical USB port of the adapter to use. The path
+@deffn Command {adapter usb location} [<bus>-<port>[.<port>]...]
+Displays or specifies the physical USB port of the adapter to use. The path
 roots at @var{bus} and walks down the physical ports, with each
 @var{port} option specifying a deeper level in the bus topology, the last
 @var{port} denoting where the target adapter is actually plugged.
@@ -3479,7 +3479,7 @@ How long (in milliseconds) OpenOCD should wait after deasserting
 nTRST (active-low JTAG TAP reset) before starting new JTAG operations.
 @end deffn
 
-@anchor {reset_config}
+@anchor{reset_config}
 @deffn {Command} reset_config mode_flag ...
 This command displays or modifies the reset configuration
 of your combination of JTAG board and target in target
@@ -4688,23 +4688,35 @@ Invokes the handler for the event named @var{event_name}.
 code, for example by the reset code in @file{startup.tcl}.)
 @end deffn
 
-@deffn Command {$target_name mdw} addr [count]
-@deffnx Command {$target_name mdh} addr [count]
-@deffnx Command {$target_name mdb} addr [count]
+@deffn Command {$target_name mdd} [phys] addr [count]
+@deffnx Command {$target_name mdw} [phys] addr [count]
+@deffnx Command {$target_name mdh} [phys] addr [count]
+@deffnx Command {$target_name mdb} [phys] addr [count]
 Display contents of address @var{addr}, as
+64-bit doublewords (@command{mdd}),
 32-bit words (@command{mdw}), 16-bit halfwords (@command{mdh}),
 or 8-bit bytes (@command{mdb}).
+When the current target has an MMU which is present and active,
+@var{addr} is interpreted as a virtual address.
+Otherwise, or if the optional @var{phys} flag is specified,
+@var{addr} is interpreted as a physical address.
 If @var{count} is specified, displays that many units.
 (If you want to manipulate the data instead of displaying it,
 see the @code{mem2array} primitives.)
 @end deffn
 
-@deffn Command {$target_name mww} addr word
-@deffnx Command {$target_name mwh} addr halfword
-@deffnx Command {$target_name mwb} addr byte
-Writes the specified @var{word} (32 bits),
-@var{halfword} (16 bits), or @var{byte} (8-bit) pattern,
+@deffn Command {$target_name mwd} [phys] addr doubleword [count]
+@deffnx Command {$target_name mww} [phys] addr word [count]
+@deffnx Command {$target_name mwh} [phys] addr halfword [count]
+@deffnx Command {$target_name mwb} [phys] addr byte [count]
+Writes the specified @var{doubleword} (64 bits), @var{word} (32 bits),
+@var{halfword} (16 bits), or @var{byte} (8-bit) value,
 at the specified address @var{addr}.
+When the current target has an MMU which is present and active,
+@var{addr} is interpreted as a virtual address.
+Otherwise, or if the optional @var{phys} flag is specified,
+@var{addr} is interpreted as a physical address.
+If @var{count} is specified, fills that many units of consecutive address.
 @end deffn
 
 @anchor{targetevents}
@@ -4914,7 +4926,6 @@ Use it in board specific configuration files, not interactively.
 @end quotation
 @end deffn
 
-@comment the REAL name for this command is "ocd_flash_banks"
 @comment less confusing would be: "flash list" (like "nand list")
 @deffn Command {flash banks}
 Prints a one-line summary of each device that was
@@ -7974,10 +7985,12 @@ Please use their TARGET object siblings to avoid making assumptions
 about what TAP is the current target, or about MMU configuration.
 @end enumerate
 
-@deffn Command mdw [phys] addr [count]
+@deffn Command mdd [phys] addr [count]
+@deffnx Command mdw [phys] addr [count]
 @deffnx Command mdh [phys] addr [count]
 @deffnx Command mdb [phys] addr [count]
 Display contents of address @var{addr}, as
+64-bit doublewords (@command{mdd}),
 32-bit words (@command{mdw}), 16-bit halfwords (@command{mdh}),
 or 8-bit bytes (@command{mdb}).
 When the current target has an MMU which is present and active,
@@ -7989,16 +8002,18 @@ If @var{count} is specified, displays that many units.
 see the @code{mem2array} primitives.)
 @end deffn
 
-@deffn Command mww [phys] addr word
-@deffnx Command mwh [phys] addr halfword
-@deffnx Command mwb [phys] addr byte
-Writes the specified @var{word} (32 bits),
+@deffn Command mwd [phys] addr doubleword [count]
+@deffnx Command mww [phys] addr word [count]
+@deffnx Command mwh [phys] addr halfword [count]
+@deffnx Command mwb [phys] addr byte [count]
+Writes the specified @var{doubleword} (64 bits), @var{word} (32 bits),
 @var{halfword} (16 bits), or @var{byte} (8-bit) value,
 at the specified address @var{addr}.
 When the current target has an MMU which is present and active,
 @var{addr} is interpreted as a virtual address.
 Otherwise, or if the optional @var{phys} flag is specified,
 @var{addr} is interpreted as a physical address.
+If @var{count} is specified, fills that many units of consecutive address.
 @end deffn
 
 @anchor{imageaccess}
@@ -9204,6 +9219,14 @@ Selects whether interrupts will be processed when single stepping. The default c
 @option{on}.
 @end deffn
 
+@deffn Command {$target_name catch_exc} [@option{off}|@option{sec_el1}|@option{sec_el3}|@option{nsec_el1}|@option{nsec_el2}]+
+Cause @command{$target_name} to halt when an exception is taken. Any combination of
+Secure (sec) EL1/EL3 or Non-Secure (nsec) EL1/EL2 is valid. The target
+@command{$target_name} will halt before taking the exception. In order to resume
+the target, the exception catch must be disabled again with @command{$target_name catch_exc off}.
+Issuing the command without options prints the current configuration.
+@end deffn
+
 @section EnSilica eSi-RISC Architecture
 
 eSi-RISC is a highly configurable microprocessor architecture for embedded systems
@@ -9347,7 +9370,7 @@ collection.
 
 @deffn Command {esirisc trace init}
 Initialize trace collection. This command must be called any time the
-configuration changes. If an trace buffer has been configured, the contents will
+configuration changes. If a trace buffer has been configured, the contents will
 be overwritten when trace collection starts.
 @end deffn
 
@@ -9379,14 +9402,6 @@ Dump collected trace data to file. This command may only be used if a trace
 buffer has been configured. If a trace FIFO has been configured, trace data must
 be copied to an in-memory buffer identified by the @option{address} and
 @option{size} options using DMA.
-@end deffn
-
-@deffn Command {$target_name catch_exc} [@option{off}|@option{sec_el1}|@option{sec_el3}|@option{nsec_el1}|@option{nsec_el2}]+
-Cause @command{$target_name} to halt when an exception is taken. Any combination of
-Secure (sec) EL1/EL3 or Non-Secure (nsec) EL1/EL2 is valid. The target
-@command{$target_name} will halt before taking the exception. In order to resume
-the target, the exception catch must be disabled again with @command{$target_name catch_exc off}.
-Issuing the command without options prints the current configuration.
 @end deffn
 
 @section Intel Architecture
@@ -9547,13 +9562,12 @@ The following commands can be used to authenticate to a RISC-V system. Eg.  a
 trivial challenge-response protocol could be implemented as follows in a
 configuration file, immediately following @command{init}:
 @example
-set challenge [ocd_riscv authdata_read]
+set challenge [riscv authdata_read]
 riscv authdata_write [expr $challenge + 1]
 @end example
 
 @deffn Command {riscv authdata_read}
-Return the 32-bit value read from authdata. Note that to get read value back in
-a TCL script, it needs to be invoked as @command{ocd_riscv authdata_read}.
+Return the 32-bit value read from authdata.
 @end deffn
 
 @deffn Command {riscv authdata_write} value
@@ -9566,9 +9580,7 @@ The following commands allow direct access to the Debug Module Interface, which
 can be used to interact with custom debug features.
 
 @deffn Command {riscv dmi_read}
-Perform a 32-bit DMI read at address, returning the value.  Note that to get
-read value back in a TCL script, it needs to be invoked as @command{ocd_riscv
-dmi_read}.
+Perform a 32-bit DMI read at address, returning the value.
 @end deffn
 
 @deffn Command {riscv dmi_write} address value
@@ -10452,10 +10464,6 @@ should be passed in to the proc in question.
 By "low-level," we mean commands that a human would typically not
 invoke directly.
 
-Some low-level commands need to be prefixed with "ocd_"; e.g.
-@command{ocd_flash_banks}
-is the low-level API upon which @command{flash banks} is implemented.
-
 @itemize @bullet
 @item @b{mem2array} <@var{varname}> <@var{width}> <@var{addr}> <@var{nelems}>
 
@@ -10463,7 +10471,7 @@ Read memory and return as a Tcl array for script processing
 @item @b{array2mem} <@var{varname}> <@var{width}> <@var{addr}> <@var{nelems}>
 
 Convert a Tcl array to memory locations and write the values
-@item @b{ocd_flash_banks} <@var{driver}> <@var{base}> <@var{size}> <@var{chip_width}> <@var{bus_width}> <@var{target}> [@option{driver options} ...]
+@item @b{flash banks} <@var{driver}> <@var{base}> <@var{size}> <@var{chip_width}> <@var{bus_width}> <@var{target}> [@option{driver options} ...]
 
 Return information about the flash banks
 
@@ -10522,8 +10530,8 @@ interpreter terminating it with @code{0x1a} and wait for the return
 value (it will be terminated with @code{0x1a} as well). This can be
 repeated as many times as desired without reopening the connection.
 
-Remember that most of the OpenOCD commands need to be prefixed with
-@code{ocd_} to get the results back. Sometimes you might also need the
+It is not needed anymore to prefix the OpenOCD commands with
+@code{ocd_} to get the results back. But sometimes you might need the
 @command{capture} command.
 
 See @file{contrib/rpc_examples/} for specific client implementations.

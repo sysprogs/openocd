@@ -54,7 +54,7 @@
     <DisableToolchainFile>false</DisableToolchainFile>
     <CMakeMakefileType>Ninja</CMakeMakefileType>
     <DeployAsRoot>false</DeployAsRoot>
-    <CleanMode>RemoveBuildDirectory</CleanMode>
+    <CMakeCleanMode>RemoveBuildDirectory</CMakeCleanMode>
     <ProjectModeSettings>
       <ProjectItemSettings>
         <GroupSourcesByTypes>true</GroupSourcesByTypes>
@@ -72,7 +72,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/ftdi/olimex-arm-usb-ocd-h.cfg -f target/raspberrypi3.cfg</Arguments>
+            <Arguments>-f interface/stlink-v2.cfg -f target/stm32f4x.cfg</Arguments>
             <WorkingDirectory>C:\Users\ivan.SYSPROGS\AppData\Local\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
