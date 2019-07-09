@@ -86,7 +86,32 @@ struct target_type {
 	 * reset run; halt
 	 */
 	int (*deassert_reset)(struct target *target);
+	/**
+	 * Substitutes assert_reset
+	 * Prepares debug circuitry before or during SRST
+	 * Optionally triggers reset using a debug register
+	 * DOES NOT CONTROL SRST LINE!!!
+	 *
+	 * @param target The target to work on
+	 * @param halt Prepare halt after reset
+	 * @param trigger Trigger reset by setting a debug register
+	 */
+	int (*reset_prepare_trigger)(struct target *target, bool halt, bool trigger);
 	int (*soft_reset_halt)(struct target *target);
+	/**
+	 * Internal target adjustment after reset
+	 * Typically sets target state and clears register cache
+	 */
+	int (*reset_clear_internal_state)(struct target *target);
+
+	/**
+	 * Target architecture for GDB.
+	 *
+	 * The string returned by this function will not be automatically freed;
+	 * if dynamic allocation is used for this value, it must be managed by
+	 * the target, ideally by caching the result for subsequent calls.
+	 */
+	const char *(*get_gdb_arch)(struct target *target);
 
 	/**
 	 * Target register access for GDB.  Do @b not call this function

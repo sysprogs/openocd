@@ -160,7 +160,7 @@ bool is_jtag_poll_safe(void)
 	 * It is also implicitly disabled while TRST is active and
 	 * while SRST is gating the JTAG clock.
 	 */
-	if (!transport_is_jtag())
+	if (!transport_is_jtag() && !transport_is_stlink_jtag())
 		return jtag_poll;
 
 	if (!jtag_poll || jtag_trst != 0)
@@ -640,11 +640,11 @@ void swd_add_reset(int req_srst)
 		/* SRST resets everything hooked up to that signal */
 		jtag_srst = req_srst;
 		if (jtag_srst) {
-			LOG_DEBUG("SRST line asserted");
+			LOG_INFO("SRST line asserted");
 			if (adapter_nsrst_assert_width)
 				jtag_add_sleep(adapter_nsrst_assert_width * 1000);
 		} else {
-			LOG_DEBUG("SRST line released");
+			LOG_INFO("SRST line released");
 			if (adapter_nsrst_delay)
 				jtag_add_sleep(adapter_nsrst_delay * 1000);
 		}
@@ -722,11 +722,11 @@ void jtag_add_reset(int req_tlr_or_trst, int req_srst)
 	if (jtag_srst != new_srst) {
 		jtag_srst = new_srst;
 		if (jtag_srst) {
-			LOG_DEBUG("SRST line asserted");
+			LOG_INFO("SRST line asserted");
 			if (adapter_nsrst_assert_width)
 				jtag_add_sleep(adapter_nsrst_assert_width * 1000);
 		} else {
-			LOG_DEBUG("SRST line released");
+			LOG_INFO("SRST line released");
 			if (adapter_nsrst_delay)
 				jtag_add_sleep(adapter_nsrst_delay * 1000);
 		}
@@ -1404,7 +1404,7 @@ int jtag_init_inner(struct command_context *cmd_ctx)
 	int retval;
 	bool issue_setup = true;
 
-	LOG_DEBUG("Init JTAG chain");
+	LOG_INFO("Init JTAG chain");
 
 	tap = jtag_tap_next_enabled(NULL);
 	if (tap == NULL) {
@@ -1505,9 +1505,10 @@ int swd_init_reset(struct command_context *cmd_ctx)
 
 	LOG_DEBUG("Initializing with hard SRST reset");
 
-	if (jtag_reset_config & RESET_HAS_SRST)
+	if ((jtag_reset_config & (RESET_HAS_SRST|RESET_SRST_NO_GATING)) == (RESET_HAS_SRST|RESET_SRST_NO_GATING))
 		swd_add_reset(1);
-	swd_add_reset(0);
+	/* leave SRST asserted if SWD trasport is usable in reset state */
+
 	retval = jtag_execute_queue();
 	return retval;
 }
@@ -1544,27 +1545,29 @@ int jtag_init_reset(struct command_context *cmd_ctx)
 	 * REVISIT once Tcl code can read the reset_config modes, this won't
 	 * need to be a C routine at all...
 	 */
-	if (jtag_reset_config & RESET_HAS_SRST) {
+	if ((jtag_reset_config & RESET_HAS_SRST)
+	     && (jtag_reset_config & RESET_SRST_NO_GATING)) {
 		jtag_add_reset(1, 1);
-		if ((jtag_reset_config & RESET_SRST_PULLS_TRST) == 0)
-			jtag_add_reset(0, 1);
 	} else {
 		jtag_add_reset(1, 0);	/* TAP_RESET, using TMS+TCK or TRST */
 	}
 
 	/* some targets enable us to connect with srst asserted */
-	if (jtag_reset_config & RESET_CNCT_UNDER_SRST) {
-		if (jtag_reset_config & RESET_SRST_NO_GATING)
-			jtag_add_reset(0, 1);
-		else {
+	if (jtag_reset_config & RESET_SRST_NO_GATING)
+		jtag_add_reset(0, 1);
+	else {
+		if (jtag_reset_config & RESET_CNCT_UNDER_SRST)
 			LOG_WARNING("\'srst_nogate\' reset_config option is required");
-			jtag_add_reset(0, 0);
-		}
-	} else
 		jtag_add_reset(0, 0);
+	}
+
 	retval = jtag_execute_queue();
 	if (retval != ERROR_OK)
 		return retval;
+
+	/* ST-Link cannot scan the JTAG chain */
+	if (transport_is_stlink_jtag())
+		return ERROR_OK;
 
 	/* Check that we can communication on the JTAG chain + eventually we want to
 	 * be able to perform enumeration only after OpenOCD has started
@@ -1816,30 +1819,33 @@ bool transport_is_jtag(void)
 
 void adapter_assert_reset(void)
 {
-	if (transport_is_jtag()) {
+	if (transport_is_jtag() || transport_is_stlink_jtag()) {
 		if (jtag_reset_config & RESET_SRST_PULLS_TRST)
 			jtag_add_reset(1, 1);
 		else
 			jtag_add_reset(0, 1);
-	} else if (transport_is_swd())
+	} else if (transport_is_swd() || transport_is_stlink_swd()) {
 		swd_add_reset(1);
-	else if (get_current_transport() != NULL)
-		LOG_ERROR("reset is not supported on %s",
-			get_current_transport()->name);
-	else
+	} else if (get_current_transport() != NULL) {
+		const char *name = get_current_transport()->name;
+		/* hla transports control srst through target assert_reset
+		 * and deassert_reset calls so no action here
+		 * Show error for other transports */
+		if (strcmp(name, "hla_swd") && strcmp(name, "hla_jtag")
+				&& strcmp(name, "stlink_swim"))
+			LOG_ERROR("reset is not supported on %s", name);
+	} else {
 		LOG_ERROR("transport is not selected");
+	}
 }
 
 void adapter_deassert_reset(void)
 {
-	if (transport_is_jtag())
+	if (transport_is_jtag() || transport_is_stlink_jtag())
 		jtag_add_reset(0, 0);
-	else if (transport_is_swd())
+	else if (transport_is_swd() || transport_is_stlink_swd())
 		swd_add_reset(0);
-	else if (get_current_transport() != NULL)
-		LOG_ERROR("reset is not supported on %s",
-			get_current_transport()->name);
-	else
+	else if (get_current_transport() == NULL)
 		LOG_ERROR("transport is not selected");
 }
 

@@ -226,7 +226,8 @@ int armv7a_mmu_translate_va(struct target *target,  uint32_t va, uint32_t *val)
 	LOG_DEBUG("1st lvl desc: %8.8" PRIx32 "", first_lvl_descriptor);
 
 	if ((first_lvl_descriptor & 0x3) == 0) {
-		LOG_ERROR("Address translation failure");
+		/* Avoid LOG_ERROR, probably GDB is guessing the stack frame */
+		LOG_WARNING("Address translation failure [1]: va %8.8" PRIx32 "", va);
 		return ERROR_TARGET_TRANSLATION_FAULT;
 	}
 
@@ -258,7 +259,8 @@ int armv7a_mmu_translate_va(struct target *target,  uint32_t va, uint32_t *val)
 	LOG_DEBUG("2nd lvl desc: %8.8" PRIx32 "", second_lvl_descriptor);
 
 	if ((second_lvl_descriptor & 0x3) == 0) {
-		LOG_ERROR("Address translation failure");
+		/* Avoid LOG_ERROR, probably GDB is guessing the stack frame */
+		LOG_WARNING("Address translation failure [2]: va %8.8" PRIx32 "", va);
 		return ERROR_TARGET_TRANSLATION_FAULT;
 	}
 
@@ -663,6 +665,19 @@ done:
 	armv7a_read_mpidr(target);
 	return retval;
 
+}
+
+/**
+ * Clears register cache during reset process
+ */
+int armv7a_reset_clear_internal_state(struct target *target)
+{
+	struct armv7a_common *armv7a = target_to_armv7a(target);
+
+	if (target_was_examined(target))
+		register_cache_invalidate(armv7a->arm.core_cache);
+
+	return target_reset_clear_internal_state_default(target);
 }
 
 static int armv7a_setup_semihosting(struct target *target, int enable)

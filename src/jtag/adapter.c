@@ -31,6 +31,7 @@
 #endif
 
 #include "jtag.h"
+#include "swd.h"
 #include "minidriver.h"
 #include "interface.h"
 #include "interfaces.h"
@@ -47,6 +48,26 @@
 
 extern struct jtag_interface *jtag_interface;
 const char * const jtag_only[] = { "jtag", NULL };
+static const Jim_Nvp nvp_assert[] = {
+	{ .name = "assert", NVP_ASSERT },
+	{ .name = "deassert", NVP_DEASSERT },
+	{ .name = "T", NVP_ASSERT },
+	{ .name = "F", NVP_DEASSERT },
+	{ .name = "t", NVP_ASSERT },
+	{ .name = "f", NVP_DEASSERT },
+	{ .name = NULL, .value = -1 }
+};
+
+#define RESET_TEST_INDEPENDENT_TRST -1
+static const Jim_Nvp nvp_reset_config_includes[] = {
+	{ .name = "srst", RESET_HAS_SRST },
+	{ .name = "trst", RESET_HAS_TRST },
+	{ .name = "srst_pulls_trst_or_combined", RESET_SRST_PULLS_TRST },
+	{ .name = "trst_pulls_srst_or_combined", RESET_TRST_PULLS_SRST },
+	{ .name = "srst_nogate", RESET_SRST_NO_GATING },
+	{ .name = "connect_assert_srst", RESET_CNCT_UNDER_SRST },
+	{ .name = "independent_trst", RESET_TEST_INDEPENDENT_TRST },
+};
 
 static int jim_adapter_name(Jim_Interp *interp, int argc, Jim_Obj * const *argv)
 {
@@ -400,6 +421,42 @@ next:
 	return ERROR_OK;
 }
 
+static int jim_reset_config_includes(Jim_Interp *interp, int argc, Jim_Obj * const *argv)
+{
+	Jim_GetOptInfo goi;
+	Jim_GetOpt_Setup(&goi, interp, argc - 1, argv + 1);
+
+	if (goi.argc < 1) {
+		Jim_WrongNumArgs(interp, 1, argv, "[srst_any][trst_any]...");
+		return JIM_ERR;
+	}
+
+	int cfg = jtag_get_reset_config();
+	bool result = true;
+
+	while (goi.argc) {
+		Jim_Nvp *n;
+		int e = Jim_GetOpt_Nvp(&goi, nvp_reset_config_includes, &n);
+		if (e != JIM_OK) {
+			Jim_GetOpt_NvpUnknown(&goi, nvp_reset_config_includes, 1);
+			return e;
+		}
+
+		if (n->value == RESET_TEST_INDEPENDENT_TRST) {
+			bool indep_trst = cfg & RESET_HAS_TRST;
+			if (cfg & RESET_HAS_SRST && cfg & RESET_SRST_PULLS_TRST)
+				indep_trst = false;
+
+			result = result && indep_trst;
+		} else {
+			result = result && cfg & n->value;
+		}
+	}
+
+	Jim_SetResultString(interp, result ? "1" : "0", -1);
+	return JIM_OK;
+}
+
 COMMAND_HANDLER(handle_adapter_nsrst_delay_command)
 {
 	if (CMD_ARGC > 1)
@@ -456,6 +513,57 @@ COMMAND_HANDLER(handle_adapter_khz_command)
 	return retval;
 }
 
+static int jim_arp_init_reset(Jim_Interp *interp, int argc, Jim_Obj*const *argv)
+{
+	int e = ERROR_OK;
+	Jim_GetOptInfo goi;
+	Jim_GetOpt_Setup(&goi, interp, argc-1, argv + 1);
+	if (goi.argc != 0) {
+		Jim_WrongNumArgs(goi.interp, 1, goi.argv-1, "(no params)");
+		return JIM_ERR;
+	}
+	struct command_context *context = current_command_context(interp);
+	if (transport_is_jtag() || transport_is_stlink_jtag())
+		e = jtag_init_reset(context);
+	else if (transport_is_swd() || transport_is_stlink_swd())
+		e = swd_init_reset(context);
+
+	if (e != ERROR_OK) {
+		Jim_Obj *eObj = Jim_NewIntObj(goi.interp, e);
+		Jim_SetResultFormatted(goi.interp, "error: %#s", eObj);
+		Jim_FreeNewObj(goi.interp, eObj);
+		return JIM_ERR;
+	}
+	return JIM_OK;
+}
+
+static int jim_arp_adapter_reset(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
+{
+	Jim_GetOptInfo goi;
+	Jim_GetOpt_Setup(&goi, interp, argc - 1, argv + 1);
+
+	if (goi.argc != 1) {
+		Jim_WrongNumArgs(interp, 0, argv, "([tT]|[fF]|assert|deassert)");
+		return JIM_ERR;
+	}
+
+	Jim_Nvp *n;
+	int e = Jim_GetOpt_Nvp(&goi, nvp_assert, &n);
+	if (e != JIM_OK) {
+		Jim_GetOpt_NvpUnknown(&goi, nvp_assert, 1);
+		return e;
+	}
+
+	if (jtag_get_reset_config() & RESET_HAS_SRST) {
+		if (n->value == NVP_ASSERT)
+			adapter_assert_reset();
+		else
+			adapter_deassert_reset();
+	}
+
+	return JIM_OK;
+}
+
 static const struct command_registration interface_command_handlers[] = {
 	{
 		.name = "adapter_khz",
@@ -509,6 +617,21 @@ static const struct command_registration interface_command_handlers[] = {
 		.help = "List all built-in debug adapter interfaces (drivers)",
 	},
 	{
+		.name = "arp_init_reset",
+		.mode = COMMAND_ANY,
+		.jim_handler = jim_arp_init_reset,
+		.help = "Uses TRST and SRST to try resetting everything on the JTAG scan chain."
+			" If SWD transport is selected command uses SRST only."
+			" SRST is left asserted if 'reset_config srst_no_gating'."
+	},
+	{
+		.name = "arp_adapter_reset",
+		.mode = COMMAND_ANY,
+		.jim_handler = jim_arp_adapter_reset,
+		.help = "Controls SRST line.",
+		.usage = "[assert|deassert]"
+	},
+	{
 		.name = "reset_config",
 		.handler = handle_reset_config_command,
 		.mode = COMMAND_ANY,
@@ -519,6 +642,15 @@ static const struct command_registration interface_command_handlers[] = {
 			"[trst_push_pull|trst_open_drain] "
 			"[srst_push_pull|srst_open_drain] "
 			"[connect_deassert_srst|connect_assert_srst]",
+	},
+	{
+		.name = "reset_config_includes",
+		.jim_handler = jim_reset_config_includes,
+		.mode = COMMAND_ANY,
+		.help = "Test adapter reset configuration",
+		.usage = "[trst] [srst] [srst_nogate] [connect_assert_srst]"
+			" [srst_pulls_trst_or_combined] [trst_pulls_srst_or_combined]"
+			" [independent_trst]"
 	},
 	COMMAND_REGISTRATION_DONE
 };

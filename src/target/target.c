@@ -74,6 +74,8 @@ static int target_gdb_fileio_end_default(struct target *target, int retcode,
 		int fileio_errno, bool ctrl_c);
 static int target_profiling_default(struct target *target, uint32_t *samples,
 		uint32_t max_num_samples, uint32_t *num_samples, uint32_t seconds);
+static void target_free_all_working_areas_restore(struct target *target, int restore);
+static void target_reset_examined(struct target *target);
 
 /* targets */
 extern struct target_type arm7tdmi_target;
@@ -163,6 +165,10 @@ static const Jim_Nvp nvp_assert[] = {
 	{ .name = "F", NVP_DEASSERT },
 	{ .name = "t", NVP_ASSERT },
 	{ .name = "f", NVP_DEASSERT },
+	{ .name = "prepare", NVP_PREPARE },
+	{ .name = "trigger", NVP_TRIGGER },
+	{ .name = "post_deassert", NVP_POST_DEASSERT },
+	{ .name = "clear_internal_state", NVP_CLEAR_INTERNAL_STATE },
 	{ .name = NULL, .value = -1 }
 };
 
@@ -209,10 +215,12 @@ static const Jim_Nvp nvp_target_event[] = {
 	{ .value = TARGET_EVENT_RESET_ASSERT_POST,   .name = "reset-assert-post" },
 	{ .value = TARGET_EVENT_RESET_DEASSERT_PRE,  .name = "reset-deassert-pre" },
 	{ .value = TARGET_EVENT_RESET_DEASSERT_POST, .name = "reset-deassert-post" },
+	{ .value = TARGET_EVENT_RESET_HALT,          .name = "reset-halt" },
 	{ .value = TARGET_EVENT_RESET_INIT,          .name = "reset-init" },
 	{ .value = TARGET_EVENT_RESET_END,           .name = "reset-end" },
 
 	{ .value = TARGET_EVENT_EXAMINE_START, .name = "examine-start" },
+	{ .value = TARGET_EVENT_EXAMINE_FAIL, .name = "examine-fail" },
 	{ .value = TARGET_EVENT_EXAMINE_END, .name = "examine-end" },
 
 	{ .value = TARGET_EVENT_DEBUG_HALTED, .name = "debug-halted" },
@@ -266,6 +274,14 @@ static const Jim_Nvp nvp_reset_modes[] = {
 	{ .name = "run"    , .value = RESET_RUN },
 	{ .name = "halt"   , .value = RESET_HALT },
 	{ .name = "init"   , .value = RESET_INIT },
+	{ .name = NULL     , .value = -1 },
+};
+
+static const Jim_Nvp nvp_dbg_under_srst[] = {
+	{ .name = "unknown", .value = DBG_UNDER_SRST_UNKNOWN },
+	{ .name = "working", .value = DBG_UNDER_SRST_WORKING },
+	{ .name = "gated", .value = DBG_UNDER_SRST_GATED },
+	{ .name = "cleared", .value = DBG_UNDER_SRST_CLEARED },
 	{ .name = NULL     , .value = -1 },
 };
 
@@ -697,18 +713,23 @@ static int default_examine(struct target *target)
 }
 
 /* no check by default */
+/*TODO: remove and use reset_deassert_post or reset_end event */
 static int default_check_reset(struct target *target)
 {
 	return ERROR_OK;
 }
 
+/* Equvivalent Tcl code arp_examine_one is in src/target/startup.tcl
+ * Keep in sync */
 int target_examine_one(struct target *target)
 {
 	target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_START);
 
 	int retval = target->type->examine(target);
-	if (retval != ERROR_OK)
+	if (retval != ERROR_OK) {
+		target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_FAIL);
 		return retval;
+	}
 
 	target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_END);
 
@@ -758,6 +779,41 @@ int target_examine(void)
 const char *target_type_name(struct target *target)
 {
 	return target->type->name;
+}
+
+int target_reset_prepare_trigger(struct target *target, bool halt, bool trigger)
+{
+	if (!target->type->reset_prepare_trigger) {
+		if (halt || trigger) {
+			LOG_ERROR("Target %s does not support reset_prepare_trigger",
+					target_name(target));
+			return ERROR_FAIL;
+		}
+		LOG_DEBUG("Target %s does not support reset_prepare",
+				target_name(target));
+		return ERROR_OK;
+	}
+	return target->type->reset_prepare_trigger(target, halt, trigger);
+}
+
+int target_reset_clear_internal_state_default(struct target *target)
+{
+	if (target->defer_examine)
+		target_reset_examined(target);
+
+	target_free_all_working_areas_restore(target, 0);
+	target->state = TARGET_RESET;
+	return ERROR_OK;
+}
+
+int target_reset_clear_internal_state(struct target *target)
+{
+	if (!target->type->reset_clear_internal_state) {
+		LOG_DEBUG("Target %s does not support reset_clear_internal_state",
+				target_name(target));
+		return ERROR_OK;
+	}
+	return target->type->reset_clear_internal_state(target);
 }
 
 static int target_soft_reset_halt(struct target *target)
@@ -1199,6 +1255,13 @@ int target_hit_watchpoint(struct target *target,
 	return target->type->hit_watchpoint(target, hit_watchpoint);
 }
 
+const char *target_get_gdb_arch(struct target *target)
+{
+	if (target->type->get_gdb_arch == NULL)
+		return NULL;
+	return target->type->get_gdb_arch(target);
+}
+
 int target_get_gdb_reg_list(struct target *target,
 		struct reg **reg_list[], int *reg_list_size,
 		enum target_register_class reg_class)
@@ -1252,7 +1315,6 @@ int target_profiling(struct target *target, uint32_t *samples,
 
 /**
  * Reset the @c examined flag for the given target.
- * Pure paranoia -- targets are zeroed on allocation.
  */
 static void target_reset_examined(struct target *target)
 {
@@ -4551,6 +4613,7 @@ enum target_cfg_param {
 	TCFG_RTOS,
 	TCFG_DEFER_EXAMINE,
 	TCFG_GDB_PORT,
+	TCFG_DBG_UNDER_SRST,
 };
 
 static Jim_Nvp nvp_config_opts[] = {
@@ -4567,6 +4630,7 @@ static Jim_Nvp nvp_config_opts[] = {
 	{ .name = "-rtos",             .value = TCFG_RTOS },
 	{ .name = "-defer-examine",    .value = TCFG_DEFER_EXAMINE },
 	{ .name = "-gdb-port",         .value = TCFG_GDB_PORT },
+	{ .name = "-dbg-under-srst",   .value = TCFG_DBG_UNDER_SRST },
 	{ .name = NULL, .value = -1 }
 };
 
@@ -4866,6 +4930,27 @@ no_params:
 					goto no_params;
 			}
 			Jim_SetResultString(goi->interp, target->gdb_port_override ? : "undefined", -1);
+			/* loop for more */
+			break;
+
+		case TCFG_DBG_UNDER_SRST:
+			if (goi->isconfigure) {
+				e = Jim_GetOpt_Nvp(goi, nvp_dbg_under_srst, &n);
+				if (e != JIM_OK) {
+					Jim_GetOpt_NvpUnknown(goi, nvp_dbg_under_srst, 1);
+					return e;
+				}
+				target->dbg_under_srst = n->value;
+			} else {
+				if (goi->argc != 0)
+					goto no_params;
+			}
+			n = Jim_Nvp_value2name_simple(nvp_dbg_under_srst, target->dbg_under_srst);
+			if (n->name == NULL) {
+				target->dbg_under_srst = DBG_UNDER_SRST_UNKNOWN;
+				n = Jim_Nvp_value2name_simple(nvp_dbg_under_srst, target->dbg_under_srst);
+			}
+			Jim_SetResultString(goi->interp, n->name, -1);
 			/* loop for more */
 			break;
 		}
@@ -5228,7 +5313,7 @@ static int jim_target_reset(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 
 	if (goi.argc != 2) {
 		Jim_WrongNumArgs(interp, 0, argv,
-				"([tT]|[fF]|assert|deassert) BOOL");
+				"[prepare|trigger|post_deassert|clear_internal_state|assert|deassert] [run|halt|BOOL]");
 		return JIM_ERR;
 	}
 
@@ -5239,35 +5324,106 @@ static int jim_target_reset(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 		return e;
 	}
 	/* the halt or not param */
-	jim_wide a;
-	e = Jim_GetOpt_Wide(&goi, &a);
+	Jim_Obj *o;
+	e = Jim_GetOpt_Obj(&goi, &o);
 	if (e != JIM_OK)
 		return e;
 
 	struct target *target = Jim_CmdPrivData(goi.interp);
+	Jim_Nvp *n2;
+	e = Jim_Nvp_name2value_obj(interp, nvp_reset_modes, o, &n2);
+	if (e == JIM_OK) {
+		target->reset_halt = n2->value == RESET_HALT || n2->value == RESET_INIT;
+	} else {
+		jim_wide a;
+		e = Jim_GetWide(interp, o, &a);
+		if (e == JIM_OK)
+			target->reset_halt = a != 0;
+	}
+	if (e != JIM_OK) {
+		Jim_GetOpt_NvpUnknown(&goi, nvp_reset_modes, 1);
+		return e;
+	}
+
 	if (!target->tap->enabled)
 		return jim_target_tap_disabled(interp);
 
-	if (!target->type->assert_reset || !target->type->deassert_reset) {
-		Jim_SetResultFormatted(interp,
-				"No target-specific reset for %s",
+	enum reset_types jtag_reset_config = jtag_get_reset_config();
+
+	e = ERROR_FAIL;
+	switch (n->value) {
+	case NVP_ASSERT:
+		if (!target->type->assert_reset) {
+			Jim_SetResultFormatted(interp,
+				"No target-specific reset assert for %s",
 				target_name(target));
-		return JIM_ERR;
-	}
-
-	if (target->defer_examine)
-		target_reset_examined(target);
-
-	/* determine if we should halt or not. */
-	target->reset_halt = !!a;
-	/* When this happens - all workareas are invalid. */
-	target_free_all_working_areas_restore(target, 0);
-
-	/* do the assert */
-	if (n->value == NVP_ASSERT)
+			return JIM_ERR;
+		}
 		e = target->type->assert_reset(target);
-	else
+		break;
+
+	case NVP_PREPARE:
+		if (target->type->reset_prepare_trigger) {
+			e = target->type->reset_prepare_trigger(target, target->reset_halt, false);
+		} else if (target->type->assert_reset
+			&& jtag_reset_config & RESET_HAS_SRST) {
+			/* old target compatibility */
+			LOG_DEBUG("No target-specific reset prepare for %s, using assert_reset",
+				target_name(target));
+			e = target->type->assert_reset(target);
+		} else {
+			LOG_DEBUG("No target-specific reset prepare for %s",
+				target_name(target));
+			e = ERROR_OK;
+		}
+		break;
+
+	case NVP_TRIGGER:
+		if (target->type->reset_prepare_trigger) {
+			e = target->type->reset_prepare_trigger(target, target->reset_halt, true);
+		} else if (target->type->assert_reset
+			&& (jtag_reset_config & RESET_HAS_SRST) == 0) {
+			/* old target compatibility */
+			LOG_DEBUG("No target-specific reset trigger for %s, using assert_reset",
+				target_name(target));
+			e = target->type->assert_reset(target);
+		} else {
+			Jim_SetResultFormatted(interp,
+				"No target-specific reset trigger for %s",
+				target_name(target));
+			return JIM_ERR;
+		}
+		break;
+
+	case NVP_DEASSERT:
+		if (!target->type->deassert_reset) {
+			Jim_SetResultFormatted(interp,
+				"No target-specific reset deassert for %s",
+				target_name(target));
+			return JIM_ERR;
+		}
 		e = target->type->deassert_reset(target);
+		break;
+
+	case NVP_POST_DEASSERT:
+		if (target->type->deassert_reset) {
+			e = target->type->deassert_reset(target);
+		} else {
+			LOG_DEBUG("No target-specific reset post_deassert for %s",
+				target_name(target));
+			e = ERROR_OK;
+		}
+		break;
+
+	case NVP_CLEAR_INTERNAL_STATE:
+		if (target->type->reset_clear_internal_state) {
+			e = target->type->reset_clear_internal_state(target);
+		} else {
+			LOG_DEBUG("No target-specific reset clear internal state for %s",
+				target_name(target));
+			e = target_reset_clear_internal_state_default(target);
+		}
+	}
 	return (e == ERROR_OK) ? JIM_OK : JIM_ERR;
 }
 

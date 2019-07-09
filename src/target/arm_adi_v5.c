@@ -331,6 +331,7 @@ static int mem_ap_write(struct adiv5_ap *ap, const uint8_t *buffer, uint32_t siz
 	const uint32_t csw_addrincr = addrinc ? CSW_ADDRINC_SINGLE : CSW_ADDRINC_OFF;
 	uint32_t csw_size;
 	uint32_t addr_xor;
+	uint32_t j = 0;
 	int retval = ERROR_OK;
 
 	/* TI BE-32 Quirks mode:
@@ -424,6 +425,9 @@ static int mem_ap_write(struct adiv5_ap *ap, const uint8_t *buffer, uint32_t siz
 		mem_ap_update_tar_cache(ap);
 		if (addrinc)
 			address += this_size;
+
+		if ((j++ % 32) == 0)
+			keep_alive();
 	}
 
 	/* REVISIT: Might want to have a queued version of this function that does not run. */
@@ -461,6 +465,7 @@ static int mem_ap_read(struct adiv5_ap *ap, uint8_t *buffer, uint32_t size, uint
 	const uint32_t csw_addrincr = addrinc ? CSW_ADDRINC_SINGLE : CSW_ADDRINC_OFF;
 	uint32_t csw_size;
 	uint32_t address = adr;
+	uint32_t j = 0;
 	int retval = ERROR_OK;
 
 	/* TI BE-32 Quirks mode:
@@ -523,6 +528,9 @@ static int mem_ap_read(struct adiv5_ap *ap, uint8_t *buffer, uint32_t size, uint
 			address += this_size;
 
 		mem_ap_update_tar_cache(ap);
+
+		if ((j++ % 32) == 0)
+			keep_alive();
 	}
 
 	if (retval == ERROR_OK)
@@ -594,24 +602,44 @@ static int mem_ap_read(struct adiv5_ap *ap, uint8_t *buffer, uint32_t size, uint
 int mem_ap_read_buf(struct adiv5_ap *ap,
 		uint8_t *buffer, uint32_t size, uint32_t count, uint32_t address)
 {
+	if (ap->dap->ops->ap_mem_read) {
+		int retval = ap->dap->ops->ap_mem_read(ap, buffer, size, count, address, true);
+		if (retval != ERROR_OP_NOT_SUPPORTED)
+			return retval;
+	}
 	return mem_ap_read(ap, buffer, size, count, address, true);
 }
 
 int mem_ap_write_buf(struct adiv5_ap *ap,
 		const uint8_t *buffer, uint32_t size, uint32_t count, uint32_t address)
 {
+	if (ap->dap->ops->ap_mem_write) {
+		int retval = ap->dap->ops->ap_mem_write(ap, buffer, size, count, address, true);
+		if (retval != ERROR_OP_NOT_SUPPORTED)
+			return retval;
+	}
 	return mem_ap_write(ap, buffer, size, count, address, true);
 }
 
 int mem_ap_read_buf_noincr(struct adiv5_ap *ap,
 		uint8_t *buffer, uint32_t size, uint32_t count, uint32_t address)
 {
+	if (ap->dap->ops->ap_mem_read) {
+		int retval = ap->dap->ops->ap_mem_read(ap, buffer, size, count, address, false);
+		if (retval != ERROR_OP_NOT_SUPPORTED)
+			return retval;
+	}
 	return mem_ap_read(ap, buffer, size, count, address, false);
 }
 
 int mem_ap_write_buf_noincr(struct adiv5_ap *ap,
 		const uint8_t *buffer, uint32_t size, uint32_t count, uint32_t address)
 {
+	if (ap->dap->ops->ap_mem_write) {
+		int retval = ap->dap->ops->ap_mem_write(ap, buffer, size, count, address, false);
+		if (retval != ERROR_OP_NOT_SUPPORTED)
+			return retval;
+	}
 	return mem_ap_write(ap, buffer, size, count, address, false);
 }
 
@@ -652,6 +680,15 @@ int dap_dp_init(struct adiv5_dap *dap)
 
 	dap_invalidate_cache(dap);
 
+	/*
+	 * Early initialize dap->dp_ctrl_stat.
+	 * In jtag mode only, if the following atomic reads fail and set the
+	 * sticky error, it will trigger the clearing of the sticky. Without this
+	 * initialization system and debug power would be disabled while clearing
+	 * the sticky error bit.
+	 */
+	dap->dp_ctrl_stat = CDBGPWRUPREQ | CSYSPWRUPREQ;
+
 	for (size_t i = 0; i < 30; i++) {
 		/* DP initialization */
 
@@ -660,7 +697,18 @@ int dap_dp_init(struct adiv5_dap *dap)
 			break;
 	}
 
-	retval = dap_queue_dp_write(dap, DP_CTRL_STAT, SSTICKYERR);
+	/*
+	 * This write operation clears the sticky error bit in jtag mode only and
+	 * is ignored in swd mode. It also powers-up system and debug domains in
+	 * both jtag and swd modes, if not done before.
+	 * Actually we do not need to clear the sticky error here because it has
+	 * been already cleared (if it was set) in the previous atomic read. This
+	 * write could be removed, but this initial part of dap_dp_init() is the
+	 * result of years of fine tuning and there are strong concerns about any
+	 * unnecessary code change. It doesn't harm, so let's keep it here and
+	 * preserve the historical sequence of read/write operations!
+	 */
+	retval = dap_queue_dp_write(dap, DP_CTRL_STAT, dap->dp_ctrl_stat | SSTICKYERR);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -668,7 +716,6 @@ int dap_dp_init(struct adiv5_dap *dap)
 	if (retval != ERROR_OK)
 		return retval;
 
-	dap->dp_ctrl_stat = CDBGPWRUPREQ | CSYSPWRUPREQ;
 	retval = dap_queue_dp_write(dap, DP_CTRL_STAT, dap->dp_ctrl_stat);
 	if (retval != ERROR_OK)
 		return retval;

@@ -67,6 +67,20 @@ enum target_state {
 enum nvp_assert {
 	NVP_DEASSERT,
 	NVP_ASSERT,
+	NVP_PREPARE,
+	NVP_TRIGGER,
+	NVP_POST_DEASSERT,
+	NVP_CLEAR_INTERNAL_STATE,
+};
+
+enum target_dbg_under_srst {
+	DBG_UNDER_SRST_UNKNOWN = 0,
+	DBG_UNDER_SRST_WORKING = 1,
+		/* Debug circuitry is working with SRST asserted */
+	DBG_UNDER_SRST_GATED = 2,
+		/* Debug circuitry holds the setting but access to it is blocked under SRST */
+	DBG_UNDER_SRST_CLEARED = 3,
+		/* SRST clears debug circuitry */
 };
 
 enum target_reset_mode {
@@ -152,7 +166,8 @@ struct target {
 
 	struct target_event_action *event_action;
 
-	int reset_halt;						/* attempt resetting the CPU into the halted mode? */
+	enum target_dbg_under_srst dbg_under_srst;	/* how SRST signal influences the debug circuitry */
+	int reset_halt;						/* attempt resetting the CPU into the halted mode */
 	target_addr_t working_area;				/* working area (initialised RAM). Evaluated
 										 * upon first allocation from virtual/physical address. */
 	bool working_area_virt_spec;		/* virtual address specified? */
@@ -259,6 +274,7 @@ enum target_event {
 	TARGET_EVENT_RESET_ASSERT_POST,
 	TARGET_EVENT_RESET_DEASSERT_PRE,
 	TARGET_EVENT_RESET_DEASSERT_POST,
+	TARGET_EVENT_RESET_HALT,
 	TARGET_EVENT_RESET_INIT,
 	TARGET_EVENT_RESET_END,
 
@@ -266,6 +282,7 @@ enum target_event {
 	TARGET_EVENT_DEBUG_RESUMED, /* target resumed to execute on behalf of the debugger */
 
 	TARGET_EVENT_EXAMINE_START,
+	TARGET_EVENT_EXAMINE_FAIL,
 	TARGET_EVENT_EXAMINE_END,
 
 	TARGET_EVENT_GDB_ATTACH,
@@ -369,6 +386,9 @@ int target_poll(struct target *target);
 int target_resume(struct target *target, int current, target_addr_t address,
 		int handle_breakpoints, int debug_execution);
 int target_halt(struct target *target);
+int target_reset_prepare_trigger(struct target *target, bool halt, bool trigger);
+int target_reset_clear_internal_state_default(struct target *target);
+int target_reset_clear_internal_state(struct target *target);
 int target_call_event_callbacks(struct target *target, enum target_event event);
 int target_call_reset_callbacks(struct target *target, enum target_reset_mode reset_mode);
 int target_call_trace_callbacks(struct target *target, size_t len, uint8_t *data);
@@ -471,6 +491,13 @@ int target_remove_watchpoint(struct target *target,
  */
 int target_hit_watchpoint(struct target *target,
 		struct watchpoint **watchpoint);
+
+/**
+ * Obtain the architecture for GDB.
+ *
+ * This routine is a wrapper for target->type->get_gdb_arch.
+ */
+const char *target_get_gdb_arch(struct target *target);
 
 /**
  * Obtain the registers for GDB.
