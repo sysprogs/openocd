@@ -886,11 +886,11 @@ COMMAND_HANDLER(stm32x_handle_lock_command)
 	stm32x_info->option_bytes.rdp = 0;
 
 	if (stm32x_write_options(bank) != ERROR_OK) {
-		command_print(CMD_CTX, "stm32x failed to lock device");
+		command_print(CMD, "stm32x failed to lock device");
 		return ERROR_OK;
 	}
 
-	command_print(CMD_CTX, "stm32x locked");
+	command_print(CMD, "stm32x locked");
 
 	return ERROR_OK;
 }
@@ -915,11 +915,11 @@ COMMAND_HANDLER(stm32x_handle_unlock_command)
 	}
 
 	if (stm32x_write_options(bank) != ERROR_OK) {
-		command_print(CMD_CTX, "stm32x failed to unlock device");
+		command_print(CMD, "stm32x failed to unlock device");
 		return ERROR_OK;
 	}
 
-	command_print(CMD_CTX, "stm32x unlocked.\n"
+	command_print(CMD, "stm32x unlocked.\n"
 			"INFO: a reset or power cycle is required "
 			"for the new settings to take effect.");
 
@@ -962,17 +962,17 @@ COMMAND_HANDLER(stm32x_handle_options_read_command)
 	if (retval != ERROR_OK)
 		return retval;
 
-	command_print(CMD_CTX, "option byte register = 0x%" PRIx32 "", options.user_rdp);
-	command_print(CMD_CTX, "write protection register A = 0x%" PRIx32 "", options.wrp1a);
-	command_print(CMD_CTX, "write protection register B = 0x%" PRIx32 "", options.wrp1b);
+	command_print(CMD, "option byte register = 0x%" PRIx32 "", options.user_rdp);
+	command_print(CMD, "write protection register A = 0x%" PRIx32 "", options.wrp1a);
+	command_print(CMD, "write protection register B = 0x%" PRIx32 "", options.wrp1b);
 
-	command_print(CMD_CTX, "window watchdog: %sware",
+	command_print(CMD, "window watchdog: %sware",
 			options.wwdg_sw ? "soft" : "hard");
 
-	command_print(CMD_CTX, "stop mode: %sreset generated upon entry",
+	command_print(CMD, "stop mode: %sreset generated upon entry",
 			options.rst_stop ? "no " : "");
 
-	command_print(CMD_CTX, "standby mode: %sreset generated upon entry",
+	command_print(CMD, "standby mode: %sreset generated upon entry",
 			options.rst_stdby ? "no " : "");
 
 	return ERROR_OK;
@@ -1084,11 +1084,11 @@ COMMAND_HANDLER(stm32x_handle_options_write_command)
 	stm32x_info->option_bytes = options;
 
 	if (stm32x_write_options(bank) != ERROR_OK) {
-		command_print(CMD_CTX, "stm32x failed to write options");
+		command_print(CMD, "stm32x failed to write options");
 		return ERROR_OK;
 	}
 
-	command_print(CMD_CTX, "stm32x write options complete.\n"
+	command_print(CMD, "stm32x write options complete.\n"
 			"INFO: %spower cycle is required "
 			"for the new settings to take effect.",
 			"'stm32g0x options_load' command or ");
@@ -1201,9 +1201,9 @@ COMMAND_HANDLER(stm32x_handle_mass_erase_command)
 		for (i = 0; i < bank->num_sectors; i++)
 			bank->sectors[i].is_erased = 1;
 
-		command_print(CMD_CTX, "stm32x mass erase complete");
+		command_print(CMD, "stm32x mass erase complete");
 	} else
-		command_print(CMD_CTX, "stm32x mass erase failed");
+		command_print(CMD, "stm32x mass erase failed");
 
 	return retval;
 }

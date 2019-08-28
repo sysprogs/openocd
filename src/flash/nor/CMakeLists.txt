@@ -65,4 +65,5 @@ add_library(ocdflashnor
 	aducm302x.c
 	atsame5.c
 	fespi.c
-	w600.c)
+	w600.c
+	stm32g0x.c)
