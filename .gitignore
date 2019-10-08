@@ -108,3 +108,4 @@ VisualGDBCache
 *.vgdbcmake
 VisualGDB
 toolchain.cmake
+/*.user

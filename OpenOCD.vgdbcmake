@@ -10,11 +10,11 @@
   </Project>
   <Build xsi:type="com.visualgdb.build.cmake">
     <ToolchainID>
-      <ID>com.sysprogs.imported.mingw</ID>
+      <ID>com.visualgdb.mingw32_libusb</ID>
       <Version>
         <GCC>7.2.0</GCC>
         <GDB>8.0.1</GDB>
-        <Revision>0</Revision>
+        <Revision>1</Revision>
       </Version>
     </ToolchainID>
     <RelativeSourceDirectory />
@@ -28,12 +28,7 @@
         <Transport>BuiltinShortcut</Transport>
       </RemoteHost>
       <Command>$(VISUALGDB_DIR)/ninja.exe</Command>
-      <Arguments />
       <WorkingDirectory>$(BuildDir)</WorkingDirectory>
-      <Environment>
-        <Records />
-        <EnvironmentSetupFiles />
-      </Environment>
       <BackgroundMode xsi:nil="true" />
     </MakeCommandTemplate>
     <CMakeCommand>
@@ -73,7 +68,7 @@
           <TargetID>openocd</TargetID>
           <Debug>
             <Arguments>-f interface/stlink.cfg -f target/stm32g4x.cfg -c init</Arguments>
-            <WorkingDirectory>C:\Users\ivan.SYSPROGS\AppData\Local\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
+            <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
             <Mode>Auto</Mode>
