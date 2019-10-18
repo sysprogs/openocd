@@ -115,7 +115,6 @@ struct stm32h7x_part_info {
 	const struct stm32h7x_rev *revs;
 	size_t num_revs;
 	unsigned int page_size;
-	unsigned int pages_per_sector;
 	uint16_t max_flash_size_kb;
 	uint8_t has_dual_bank;
 	uint16_t first_bank_size_kb; /* Used when has_dual_bank is true */
@@ -141,7 +140,7 @@ static const struct stm32h7x_part_info stm32h7x_parts[] = {
 	.id					= 0x450,
 	.revs				= stm32_450_revs,
 	.num_revs			= ARRAY_SIZE(stm32_450_revs),
-	.device_str			= "STM32H7xx 2M",
+	.device_str			= "STM32H74x/75x",
 	.page_size			= 128,  /* 128 KB */
 	.max_flash_size_kb	= 2048,
 	.first_bank_size_kb	= 1024,

@@ -43,6 +43,7 @@
 #include <target/register.h>
 #include <target/target.h>
 #include <target/target_type.h>
+#include <target/semihosting_common.h>
 #include "server.h"
 #include <flash/nor/core.h>
 #include "gdb_server.h"
@@ -2221,14 +2222,11 @@ static int gdb_generate_target_description(struct target *target, char **tdesc_o
 	int reg_list_size;
 	char const *architecture;
 	char const **features = NULL;
-	char const **arch_defined_types = NULL;
 	int feature_list_size = 0;
-	int num_arch_defined_types = 0;
 	char *tdesc = NULL;
 	int pos = 0;
 	int size = 0;
 
-	arch_defined_types = calloc(1, sizeof(char *));
 
 	retval = target_get_gdb_reg_list_noread(target, &reg_list,
 			&reg_list_size, REG_CLASS_ALL);
@@ -2270,7 +2268,10 @@ static int gdb_generate_target_description(struct target *target, char **tdesc_o
 	/* generate target description according to register list */
 	if (features != NULL) {
 		while (features[current_feature]) {
+			char const **arch_defined_types = NULL;
+			int num_arch_defined_types = 0;
 
+			arch_defined_types = calloc(1, sizeof(char *));
 			xml_printf(&retval, &tdesc, &pos, &size,
 					"<feature name=\"%s\">\n",
 					features[current_feature]);
@@ -2335,6 +2336,7 @@ static int gdb_generate_target_description(struct target *target, char **tdesc_o
 					"</feature>\n");
 
 			current_feature++;
+			free(arch_defined_types);
 		}
 	}
 
@@ -2344,7 +2346,6 @@ static int gdb_generate_target_description(struct target *target, char **tdesc_o
 error:
 	free(features);
 	free(reg_list);
-	free(arch_defined_types);
 
 	if (retval == ERROR_OK)
 		*tdesc_out = tdesc;
@@ -2903,6 +2904,96 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 	return false;
 }
 
+static char *next_hex_encoded_field(const char **str, char sep)
+{
+	size_t hexlen;
+	const char *hex = *str;
+	if (hex[0] == '\0')
+		return NULL;
+
+	const char *end = strchr(hex, sep);
+	if (end == NULL)
+		hexlen = strlen(hex);
+	else
+		hexlen = end - hex;
+	*str = hex + hexlen + 1;
+
+	if (hexlen % 2 != 0) {
+		/* Malformed hex data */
+		return NULL;
+	}
+
+	size_t count = hexlen / 2;
+	char *decoded = malloc(count + 1);
+	if (decoded == NULL)
+		return NULL;
+
+	size_t converted = unhexify((void *)decoded, hex, count);
+	if (converted != count) {
+		free(decoded);
+		return NULL;
+	}
+
+	decoded[count] = '\0';
+	return decoded;
+}
+
+/* handle extended restart packet */
+static void gdb_restart_inferior(struct connection *connection, const char *packet, int packet_size)
+{
+	struct gdb_connection *gdb_con = connection->priv;
+	struct target *target = get_target_from_connection(connection);
+
+	breakpoint_clear_target(target);
+	watchpoint_clear_target(target);
+	command_run_linef(connection->cmd_ctx, "ocd_gdb_restart %s",
+			target_name(target));
+	/* set connection as attached after reset */
+	gdb_con->attached = true;
+	/*  info rtos parts */
+	gdb_thread_packet(connection, packet, packet_size);
+}
+
+static bool gdb_handle_vrun_packet(struct connection *connection, const char *packet, int packet_size)
+{
+	struct target *target = get_target_from_connection(connection);
+	const char *parse = packet;
+
+	/* Skip "vRun" */
+	parse += 4;
+
+	if (parse[0] != ';')
+		return false;
+	parse++;
+
+	/* Skip first field "filename"; don't know what to do with it. */
+	free(next_hex_encoded_field(&parse, ';'));
+
+	char *cmdline = next_hex_encoded_field(&parse, ';');
+	char *arg;
+	while (cmdline != NULL && (arg = next_hex_encoded_field(&parse, ';')) != NULL) {
+		char *new_cmdline = alloc_printf("%s %s", cmdline, arg);
+		free(cmdline);
+		free(arg);
+		cmdline = new_cmdline;
+	}
+
+	if (cmdline != NULL) {
+		if (target->semihosting != NULL) {
+			LOG_INFO("GDB set inferior command line to '%s'", cmdline);
+			free(target->semihosting->cmdline);
+			target->semihosting->cmdline = cmdline;
+		} else {
+			LOG_INFO("GDB set inferior command line to '%s' but semihosting is unavailable", cmdline);
+			free(cmdline);
+		}
+	}
+
+	gdb_restart_inferior(connection, packet, packet_size);
+	gdb_put_packet(connection, "S00", 3);
+	return true;
+}
+
 static int gdb_v_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
@@ -2918,6 +3009,16 @@ static int gdb_v_packet(struct connection *connection,
 		packet_size -= 5;
 
 		handled = gdb_handle_vcont_packet(connection, packet, packet_size);
+		if (!handled)
+			gdb_put_packet(connection, "", 0);
+
+		return ERROR_OK;
+	}
+
+	if (strncmp(packet, "vRun", 4) == 0) {
+		bool handled;
+
+		handled = gdb_handle_vrun_packet(connection, packet, packet_size);
 		if (!handled)
 			gdb_put_packet(connection, "", 0);
 
@@ -3320,14 +3421,7 @@ static int gdb_input_inner(struct connection *connection)
 					break;
 				case 'R':
 					/* handle extended restart packet */
-					breakpoint_clear_target(target);
-					watchpoint_clear_target(target);
-					command_run_linef(connection->cmd_ctx, "ocd_gdb_restart %s",
-							target_name(target));
-					/* set connection as attached after reset */
-					gdb_con->attached = true;
-					/*  info rtos parts */
-					gdb_thread_packet(connection, packet, packet_size);
+					gdb_restart_inferior(connection, packet, packet_size);
 					break;
 
 				case 'j':
