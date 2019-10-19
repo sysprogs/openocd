@@ -13,6 +13,8 @@ find_path(LIBUSB1_INCLUDE_DIR libusb.h
 find_path(HIDAPI_INCLUDE_DIR hidapi.h
 	HINTS ${CMAKE_SYSTEM_INCLUDE_PATH}
 	PATH_SUFFIXES hidapi)
+
+find_library(LIBUSB1_LIBRARY usb-1.0 PATHS $ENV{TOOLCHAIN_ROOT}/msys/1.0/local/lib)
 	
 add_definitions(-DHAVE_CONFIG_H -DPKGDATADIR="../../share/openocd" -DBINDIR="../../bin" -D__USE_MINGW_ANSI_STDIO=1)
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${LIBUSB1_INCLUDE_DIR} ${HIDAPI_INCLUDE_DIR})

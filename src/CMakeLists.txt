@@ -41,7 +41,7 @@ target_link_libraries(openocd
 	ocdusbblaster
 	openrisc
 	target
-	ws2_32 hidapi setupapi usb usb-1.0 ftd2xx helper)
+	ws2_32 hidapi setupapi usb ${LIBUSB1_LIBRARY} ftd2xx helper)
 	
 SET_TARGET_PROPERTIES(openocd PROPERTIES COMPILE_FLAGS "-DPKGBLDDATE=\\\"${BUILD_TIMESTAMP}\\\" -DRELSTR=\\\"\\\" -DGITVERSION=\\\"\\\"")
 
