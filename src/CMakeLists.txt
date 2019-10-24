@@ -15,9 +15,9 @@ add_subdirectory(flash)
 
 set(CMAKE_C_LINK_EXECUTABLE "<CMAKE_C_COMPILER>  <FLAGS> <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> <OBJECTS>  -o <TARGET> -Wl,--start-group <LINK_LIBRARIES> -Wl,--end-group")
 
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl COMMAND run-sh ARGS -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/helper/startup.tcl ${CMAKE_CURRENT_SOURCE_DIR}/jtag/startup.tcl ${CMAKE_CURRENT_SOURCE_DIR}/target/startup.tcl ${CMAKE_CURRENT_SOURCE_DIR}/flash/startup.tcl ${CMAKE_CURRENT_SOURCE_DIR}/server/startup.tcl > ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl" MAIN_DEPENDENCY helper/startup.tcl)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl COMMAND ${SH_WRAPPER} ARGS -c "cat ${CMAKE_CURRENT_SOURCE_DIR}/helper/startup.tcl ${CMAKE_CURRENT_SOURCE_DIR}/jtag/startup.tcl ${CMAKE_CURRENT_SOURCE_DIR}/target/startup.tcl ${CMAKE_CURRENT_SOURCE_DIR}/flash/startup.tcl ${CMAKE_CURRENT_SOURCE_DIR}/server/startup.tcl > ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl" MAIN_DEPENDENCY helper/startup.tcl)
 
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc COMMAND run-sh ARGS -c "${CMAKE_CURRENT_SOURCE_DIR}/helper/bin2char.sh < ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl > ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc" MAIN_DEPENDENCY ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc COMMAND ${SH_WRAPPER} ARGS -c "${CMAKE_CURRENT_SOURCE_DIR}/helper/bin2char.sh < ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl > ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc" MAIN_DEPENDENCY ${CMAKE_CURRENT_BINARY_DIR}/startup.tcl)
 
 string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d")
 
@@ -41,9 +41,11 @@ target_link_libraries(openocd
 	ocdusbblaster
 	openrisc
 	target
-	ws2_32 hidapi setupapi usb ${LIBUSB1_LIBRARY} ftd2xx helper)
+	ws2_32 
+	setupapi
+	helper)
 	
-SET_TARGET_PROPERTIES(openocd PROPERTIES COMPILE_FLAGS "-DPKGBLDDATE=\\\"${BUILD_TIMESTAMP}\\\" -DRELSTR=\\\"\\\" -DGITVERSION=\\\"\\\"")
+SET_TARGET_PROPERTIES(openocd PROPERTIES COMPILE_FLAGS "-DPKGBLDDATE=\\\"${BUILD_TIMESTAMP}\\\" -DRELSTR=\\\"\\\" -DGITVERSION=\\\"\\\" -DLIBUSB1_COMMIT=\\\"${LIBUSB1_COMMIT_HASH}\\\"")
 
 install(TARGETS openocd DESTINATION bin)
 INSTALL(FILES jtag/drivers/OpenULINK/ulink_firmware.hex DESTINATION share/openocd/OpenULINK)

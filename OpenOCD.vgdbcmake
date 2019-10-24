@@ -9,11 +9,12 @@
     <MainSourceDirectory>$(ProjectDir)\.</MainSourceDirectory>
   </Project>
   <Build xsi:type="com.visualgdb.build.cmake">
+    <BuildLogMode xsi:nil="true" />
     <ToolchainID>
-      <ID>com.visualgdb.mingw32_libusb</ID>
+      <ID>com.visualgdb.mingw32</ID>
       <Version>
-        <GCC>7.2.0</GCC>
-        <GDB>8.0.1</GDB>
+        <GCC>8.1.0</GCC>
+        <GDB>8.1</GDB>
         <Revision>1</Revision>
       </Version>
     </ToolchainID>
@@ -150,12 +151,14 @@
       <EnableAsyncExecutionMode>false</EnableAsyncExecutionMode>
       <EnableNonStopMode>false</EnableNonStopMode>
       <MaxBreakpointLimit>0</MaxBreakpointLimit>
+      <EnableVerboseMode>true</EnableVerboseMode>
     </AdditionalGDBSettings>
     <LaunchGDBSettings xsi:type="GDBLaunchParametersNewInstance">
       <DebuggedProgram>$(TargetPath)</DebuggedProgram>
       <GDBServerPort>2000</GDBServerPort>
       <ProgramArguments>$(SelectedCMakeTargetArgs)</ProgramArguments>
       <WorkingDirectory>$(SelectedCMakeTargetLaunchDir)</WorkingDirectory>
+      <ArgumentEscapingMode>Auto</ArgumentEscapingMode>
     </LaunchGDBSettings>
     <GenerateCtrlBreakInsteadOfCtrlC>false</GenerateCtrlBreakInsteadOfCtrlC>
   </Debug>
