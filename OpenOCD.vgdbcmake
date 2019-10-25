@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <VisualGDBProjectSettings2 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <ConfigurationName>Debug</ConfigurationName>
+  <ConfigurationName>Release</ConfigurationName>
   <Project xsi:type="com.visualgdb.project.windows">
     <CustomSourceDirectories>
       <Directories />
@@ -13,8 +13,8 @@
     <ToolchainID>
       <ID>com.visualgdb.mingw32</ID>
       <Version>
-        <GCC>8.1.0</GCC>
-        <GDB>8.1</GDB>
+        <GCC>9.1.0</GCC>
+        <GDB>8.3</GDB>
         <Revision>1</Revision>
       </Version>
     </ToolchainID>
