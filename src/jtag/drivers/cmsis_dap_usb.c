@@ -273,6 +273,7 @@ static int cmsis_dap_usb_open(void)
 			/* check serial number matches if given */
 			if (cmsis_dap_serial != NULL) {
 				if ((cur_dev->serial_number != NULL) && wcsicmp(cmsis_dap_serial, cur_dev->serial_number) == 0) {
+					wcscpy(cmsis_dap_serial, cur_dev->serial_number);	//The hidapi library will do a case-sensitive comparison on the serial number. Hence we need to make sure it matches.
 					serial_found = true;
 					break;
 				}
