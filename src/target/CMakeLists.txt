@@ -95,6 +95,9 @@ add_library(target
 	esirisc.c
 	esirisc_jtag.c
 	armv7a_mmu.c
-	esirisc_trace.c)
+	esirisc_trace.c
+	mips_mips64.c
+	mips64.c
+	mips64_pracc.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})
