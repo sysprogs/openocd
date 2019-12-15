@@ -554,6 +554,40 @@ static int cortex_m_debug_entry(struct target *target)
 	return ERROR_OK;
 }
 
+static int cortex_m_halt(struct target *target);
+
+static int cortex_m_halt_amp(struct target *target)
+{
+	int retval = 0;
+	struct target_list *head;
+	struct target *curr;
+	head = target->head;
+	while (head != (struct target_list *)NULL)
+	{
+		curr = head->target;
+
+		if ((curr != target) && (curr->state != TARGET_HALTED) && target_was_examined(curr))
+			LOG_INFO("cortex_m_halt_amp : propagate halt to %d", curr->coreid);
+		retval += cortex_m_halt(curr);
+		head = head->next;
+	}
+	return retval;
+}
+
+static int update_halt_gdb(struct target *target)
+{
+	int retval = 0;
+	if (target->gdb_service && target->gdb_service->core[0] == -1)
+	{
+		target->gdb_service->target = target;
+		target->gdb_service->core[0] = target->coreid;
+		LOG_INFO("update_halt_gdb : propagate halt_gdb to %d", target->coreid);
+
+		retval += cortex_m_halt_amp(target);
+	}
+	return retval;
+}
+
 static int cortex_m_poll(struct target *target)
 {
 	int detected_failure = ERROR_OK;
@@ -608,6 +642,14 @@ static int cortex_m_poll(struct target *target)
 			target->state = TARGET_UNKNOWN;
 			return retval;
 		}
+
+		if (target->amp)
+		{
+			retval = update_halt_gdb(target);
+			if (retval != ERROR_OK)
+				return retval;
+		}
+		
 		target->state = TARGET_RUNNING;
 		prev_target_state = TARGET_RUNNING;
 	}
@@ -620,6 +662,13 @@ static int cortex_m_poll(struct target *target)
 			if (retval != ERROR_OK)
 				return retval;
 
+			if (target->amp)
+			{
+				retval = update_halt_gdb(target);
+				if (retval != ERROR_OK)
+					return retval;
+			}
+
 			if (arm_semihosting(target, &retval) != 0)
 				return retval;
 
@@ -630,6 +679,13 @@ static int cortex_m_poll(struct target *target)
 			retval = cortex_m_debug_entry(target);
 			if (retval != ERROR_OK)
 				return retval;
+
+			if (target->amp)
+			{
+				retval = update_halt_gdb(target);
+				if (retval != ERROR_OK)
+					return retval;
+			}
 
 			target_call_event_callbacks(target, TARGET_EVENT_DEBUG_HALTED);
 		}
@@ -2603,6 +2659,70 @@ COMMAND_HANDLER(handle_cortex_m_reset_config_command)
 	return ERROR_OK;
 }
 
+COMMAND_HANDLER(cortex_m_handle_amp_on_command)
+{
+	struct target *target = get_current_target(CMD_CTX);
+	struct target_list *head;
+	struct target *curr;
+	head = target->head;
+
+	LOG_INFO("target =%p", target);
+	if (head != (struct target_list *)NULL)
+	{
+		target->amp = 1;
+		while (head != (struct target_list *)NULL)
+		{
+			curr = head->target;
+			curr->amp = 1;
+			head = head->next;
+		}
+	}
+	return ERROR_OK;
+}
+
+COMMAND_HANDLER(cortex_m_handle_amp_off_command)
+{
+	struct target *target = get_current_target(CMD_CTX);
+	/* check target is an amp target */
+	struct target_list *head;
+	struct target *curr;
+	head = target->head;
+	target->amp = 0;
+	if (head != (struct target_list *)NULL)
+	{
+		while (head != (struct target_list *)NULL)
+		{
+			curr = head->target;
+			curr->amp = 0;
+			head = head->next;
+		}
+		/* fixes the target display to the debugger */
+		target->gdb_service->target = target;
+	}
+	return ERROR_OK;
+}
+
+COMMAND_HANDLER(cortex_m_handle_amp_gdb_command)
+{
+	struct target *target = get_current_target(CMD_CTX);
+	int retval = ERROR_OK;
+	struct target_list *head;
+	head = target->head;
+	if (head != (struct target_list *)NULL)
+	{
+		if (CMD_ARGC == 1)
+		{
+			int coreid = 0;
+			COMMAND_PARSE_NUMBER(int, CMD_ARGV[0], coreid);
+			if (ERROR_OK != retval)
+				return retval;
+			target->gdb_service->core[1] = coreid;
+		}
+		command_print(cmd, "gdb coreid  %" PRId32 " -> %" PRId32, target->gdb_service->core[0], target->gdb_service->core[1]);
+	}
+	return ERROR_OK;
+}
+
 static const struct command_registration cortex_m_exec_command_handlers[] = {
 	{
 		.name = "maskisr",
@@ -2624,6 +2744,27 @@ static const struct command_registration cortex_m_exec_command_handlers[] = {
 		.mode = COMMAND_ANY,
 		.help = "configure software reset handling",
 		.usage = "['sysresetreq'|'vectreset']",
+	},
+	{
+		.name = "amp_off",
+		.handler = cortex_m_handle_amp_off_command,
+		.mode = COMMAND_EXEC,
+		.help = "Stop amp handling",
+		.usage = "",
+	},
+	{
+		.name = "amp_on",
+		.handler = cortex_m_handle_amp_on_command,
+		.mode = COMMAND_EXEC,
+		.help = "Restart amp handling",
+		.usage = "",
+	},
+	{
+		.name = "amp_gdb",
+		.handler = cortex_m_handle_amp_gdb_command,
+		.mode = COMMAND_EXEC,
+		.help = "display/fix current core played to gdb",
+		.usage = "",
 	},
 	COMMAND_REGISTRATION_DONE
 };

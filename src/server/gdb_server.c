@@ -997,7 +997,7 @@ static int gdb_new_connection(struct connection *connection)
 		for (i = 0; i < flash_get_bank_count(); i++) {
 			struct flash_bank *p;
 			p = get_flash_bank_by_num_noprobe(i);
-			if (p->target != target)
+			if (!target->amp && p->target != target)
 				continue;
 			retval = get_flash_bank_by_num(i, &p);
 			if (retval != ERROR_OK) {

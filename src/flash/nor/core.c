@@ -278,7 +278,7 @@ int get_flash_bank_by_addr(struct target *target,
 
 	/* cycle through bank list */
 	for (c = flash_banks; c; c = c->next) {
-		if (c->target != target)
+		if (!target->amp && c->target != target)
 			continue;
 
 		int retval;
