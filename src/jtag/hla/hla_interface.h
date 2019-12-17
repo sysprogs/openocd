@@ -48,6 +48,10 @@ struct hl_interface_param_s {
 	bool connect_under_reset;
 	/** Initial interface clock clock speed */
 	int initial_interface_speed;
+	/** */
+	unsigned long port;
+	/** */
+	unsigned long current_core;
 };
 
 struct hl_interface_s {

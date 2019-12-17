@@ -55,9 +55,9 @@ struct icdi_usb_handle_s {
 };
 
 static int icdi_usb_read_mem(void *handle, uint32_t addr, uint32_t size,
-		uint32_t count, uint8_t *buffer);
+		uint32_t count, uint8_t *buffer, struct target *target);
 static int icdi_usb_write_mem(void *handle, uint32_t addr, uint32_t size,
-		uint32_t count, const uint8_t *buffer);
+		uint32_t count, const uint8_t *buffer, struct target *target);
 
 static int remote_escape_output(const char *buffer, int len, char *out_buf, int *out_len, int out_maxlen)
 {
@@ -277,29 +277,29 @@ static int icdi_get_cmd_result(void *handle)
 	return ERROR_OK;
 }
 
-static int icdi_usb_idcode(void *handle, uint32_t *idcode)
+static int icdi_usb_idcode(void *handle, uint32_t *idcode, struct target *target)
 {
 	*idcode = 0;
 	return ERROR_OK;
 }
 
-static int icdi_usb_write_debug_reg(void *handle, uint32_t addr, uint32_t val)
+static int icdi_usb_write_debug_reg(void *handle, uint32_t addr, uint32_t val, struct target *target)
 {
 	uint8_t buf[4];
 	/* REVISIT: There's no target pointer here so there's no way to use target_buffer_set_u32().
 	 * I guess all supported chips are little-endian anyway. */
 	h_u32_to_le(buf, val);
-	return icdi_usb_write_mem(handle, addr, 4, 1, buf);
+	return icdi_usb_write_mem(handle, addr, 4, 1, buf, target);
 }
 
-static enum target_state icdi_usb_state(void *handle)
+static enum target_state icdi_usb_state(void *handle, struct target *target)
 {
 	int result;
 	struct icdi_usb_handle_s *h = handle;
 	uint32_t dhcsr;
 	uint8_t buf[4];
 
-	result = icdi_usb_read_mem(h, DCB_DHCSR, 4, 1, buf);
+	result = icdi_usb_read_mem(h, DCB_DHCSR, 4, 1, buf, target);
 	if (result != ERROR_OK)
 		return TARGET_UNKNOWN;
 
@@ -413,7 +413,7 @@ static int icdi_usb_assert_srst(void *handle, int srst)
 	return ERROR_COMMAND_NOTFOUND;
 }
 
-static int icdi_usb_run(void *handle)
+static int icdi_usb_run(void *handle, struct target *target)
 {
 	int result;
 
@@ -432,7 +432,7 @@ static int icdi_usb_run(void *handle)
 	return result;
 }
 
-static int icdi_usb_halt(void *handle)
+static int icdi_usb_halt(void *handle, struct target *target)
 {
 	int result;
 
@@ -451,7 +451,7 @@ static int icdi_usb_halt(void *handle)
 	return result;
 }
 
-static int icdi_usb_step(void *handle)
+static int icdi_usb_step(void *handle, struct target *target)
 {
 	int result;
 
@@ -470,13 +470,13 @@ static int icdi_usb_step(void *handle)
 	return result;
 }
 
-static int icdi_usb_read_regs(void *handle)
+static int icdi_usb_read_regs(void *handle, struct target *target)
 {
 	/* currently unsupported */
 	return ERROR_OK;
 }
 
-static int icdi_usb_read_reg(void *handle, int num, uint32_t *val)
+static int icdi_usb_read_reg(void *handle, int num, uint32_t *val, struct target *target)
 {
 	int result;
 	struct icdi_usb_handle_s *h = handle;
@@ -505,7 +505,7 @@ static int icdi_usb_read_reg(void *handle, int num, uint32_t *val)
 	return result;
 }
 
-static int icdi_usb_write_reg(void *handle, int num, uint32_t val)
+static int icdi_usb_write_reg(void *handle, int num, uint32_t val, struct target *target)
 {
 	int result;
 	char cmd[20];
@@ -589,7 +589,7 @@ static int icdi_usb_write_mem_int(void *handle, uint32_t addr, uint32_t len, con
 }
 
 static int icdi_usb_read_mem(void *handle, uint32_t addr, uint32_t size,
-		uint32_t count, uint8_t *buffer)
+		uint32_t count, uint8_t *buffer, struct target *target)
 {
 	int retval = ERROR_OK;
 	struct icdi_usb_handle_s *h = handle;
@@ -617,7 +617,7 @@ static int icdi_usb_read_mem(void *handle, uint32_t addr, uint32_t size,
 }
 
 static int icdi_usb_write_mem(void *handle, uint32_t addr, uint32_t size,
-		uint32_t count, const uint8_t *buffer)
+		uint32_t count, const uint8_t *buffer, struct target *target)
 {
 	int retval = ERROR_OK;
 	struct icdi_usb_handle_s *h = handle;

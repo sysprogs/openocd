@@ -68,7 +68,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/stlink.cfg -f target/stm32g4x.cfg -c init</Arguments>
+            <Arguments>-f interface/stlink.cfg -f target/stm32h7x_dual_core.cfg -c init -c "reset init"</Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>

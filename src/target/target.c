@@ -4572,7 +4572,11 @@ void target_handle_event(struct target *target, enum target_event e)
 			struct command_context *cmd_ctx = current_command_context(teap->interp);
 			struct target *saved_target_override = cmd_ctx->current_target_override;
 			cmd_ctx->current_target_override = target;
-			retval = Jim_EvalObj(teap->interp, teap->body);
+
+			if ((teap->event == TARGET_EVENT_GDB_FLASH_ERASE_START || teap->event == TARGET_EVENT_GDB_FLASH_WRITE_END) && target->first_reset)
+				retval = JIM_OK;
+			else 
+				retval = Jim_EvalObj(teap->interp, teap->body);
 
 			if (retval == JIM_RETURN)
 				retval = teap->interp->returnCode;

@@ -31,6 +31,8 @@ struct hl_interface_param_s;
 /** */
 extern struct hl_layout_api_s stlink_usb_layout_api;
 extern struct hl_layout_api_s icdi_usb_layout_api;
+extern struct hl_layout_api_s stlink_tcp_layout_api;
+
 
 /** */
 struct hl_layout_api_s {
@@ -43,25 +45,27 @@ struct hl_layout_api_s {
 	/** */
 	int (*assert_srst) (void *handle, int srst);
 	/** */
-	int (*run) (void *handle);
+	int (*run) (void *handle, struct target *target);
 	/** */
-	int (*halt) (void *handle);
+	int (*halt) (void *handle, struct target *target);
 	/** */
-	int (*step) (void *handle);
+	int (*step) (void *handle, struct target *target);
 	/** */
-	int (*read_regs) (void *handle);
+	int (*read_regs) (void *handle, struct target *target);
 	/** */
-	int (*read_reg) (void *handle, int num, uint32_t *val);
+	int (*read_reg) (void *handle, int num, uint32_t *val, struct target *target);
 	/** */
-	int (*write_reg) (void *handle, int num, uint32_t val);
+	int (*write_reg) (void *handle, int num, uint32_t val, struct target *target);
 	/** */
 	int (*read_mem) (void *handle, uint32_t addr, uint32_t size,
-			uint32_t count, uint8_t *buffer);
+			uint32_t count, uint8_t *buffer, struct target *target);
 	/** */
 	int (*write_mem) (void *handle, uint32_t addr, uint32_t size,
-			uint32_t count, const uint8_t *buffer);
+			uint32_t count, const uint8_t *buffer, struct target *target);
 	/** */
-	int (*write_debug_reg) (void *handle, uint32_t addr, uint32_t val);
+	int (*read_debug_reg) (void *handle, uint32_t addr, uint32_t *val, struct target *target);
+	/** */
+	int (*write_debug_reg) (void *handle, uint32_t addr, uint32_t val, struct target *target);
 	/**
 	 * Read the idcode of the target connected to the adapter
 	 *
@@ -72,7 +76,7 @@ struct hl_layout_api_s {
 	 * @param idcode Storage for the detected idcode
 	 * @returns ERROR_OK on success, or an error code on failure.
 	 */
-	int (*idcode) (void *handle, uint32_t *idcode);
+	int (*idcode) (void *handle, uint32_t *idcode, struct target *target);
 	/** */
 	int (*override_target) (const char *targetname);
 	/** */
@@ -105,7 +109,11 @@ struct hl_layout_api_s {
 	 */
 	int (*poll_trace)(void *handle, uint8_t *buf, size_t *size);
 	/** */
-	enum target_state (*state) (void *fd);
+	enum target_state (*state) (void *fd, struct target *target);
+	/** */
+	int (*init_core)(void *handle, unsigned char ap_num);
+	/** */
+	int (*close_core)(void *handle, unsigned char ap_num);
 };
 
 /** */
