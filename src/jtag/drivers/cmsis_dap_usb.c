@@ -1127,21 +1127,22 @@ static int cmsis_dap_quit(void)
 	return ERROR_OK;
 }
 
-static void cmsis_dap_execute_reset(struct jtag_command *cmd)
+static int cmsis_dap_reset(int trst, int srst)
 {
 	/* Set both TRST and SRST even if they're not enabled as
 	 * there's no way to tristate them */
 
 	output_pins = 0;
-	if (!cmd->cmd.reset->srst)
+	if (!srst)
 		output_pins |= SWJ_PIN_SRST;
-	if (!cmd->cmd.reset->trst)
+	if (!trst)
 		output_pins |= SWJ_PIN_TRST;
 
 	int retval = cmsis_dap_cmd_DAP_SWJ_Pins(output_pins,
 			SWJ_PIN_TRST | SWJ_PIN_SRST, 0, NULL);
 	if (retval != ERROR_OK)
 		LOG_ERROR("CMSIS-DAP: Interface reset failed");
+	return retval;
 }
 
 static void cmsis_dap_execute_sleep(struct jtag_command *cmd)
@@ -1582,10 +1583,6 @@ static void cmsis_dap_execute_tms(struct jtag_command *cmd)
 static void cmsis_dap_execute_command(struct jtag_command *cmd)
 {
 	switch (cmd->type) {
-		case JTAG_RESET:
-			cmsis_dap_flush();
-			cmsis_dap_execute_reset(cmd);
-			break;
 		case JTAG_SLEEP:
 			cmsis_dap_flush();
 			cmsis_dap_execute_sleep(cmd);
@@ -1790,17 +1787,23 @@ static const struct swd_driver cmsis_dap_swd_driver = {
 
 static const char * const cmsis_dap_transport[] = { "swd", "jtag", NULL };
 
-struct jtag_interface cmsis_dap_interface = {
-	.name = "cmsis-dap",
+static struct jtag_interface cmsis_dap_interface = {
 	.supported = DEBUG_CAP_TMS_SEQ,
-	.commands = cmsis_dap_command_handlers,
-	.swd = &cmsis_dap_swd_driver,
-	.transports = cmsis_dap_transport,
-
 	.execute_queue = cmsis_dap_execute_queue,
-	.speed = cmsis_dap_speed,
-	.speed_div = cmsis_dap_speed_div,
-	.khz = cmsis_dap_khz,
+};
+
+struct adapter_driver cmsis_dap_adapter_driver = {
+	.name = "cmsis-dap",
+	.transports = cmsis_dap_transport,
+	.commands = cmsis_dap_command_handlers,
+
 	.init = cmsis_dap_init,
 	.quit = cmsis_dap_quit,
+	.reset = cmsis_dap_reset,
+	.speed = cmsis_dap_speed,
+	.khz = cmsis_dap_khz,
+	.speed_div = cmsis_dap_speed_div,
+
+	.jtag_ops = &cmsis_dap_interface,
+	.swd_ops = &cmsis_dap_swd_driver,
 };

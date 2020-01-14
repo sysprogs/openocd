@@ -51,7 +51,6 @@ static volatile uint32_t *pio_base;
 
 static bb_value_t bcm2835gpio_read(void);
 static int bcm2835gpio_write(int tck, int tms, int tdi);
-static int bcm2835gpio_reset(int trst, int srst);
 
 static int bcm2835_swdio_read(void);
 static void bcm2835_swdio_drive(bool is_output);
@@ -62,7 +61,6 @@ static int bcm2835gpio_quit(void);
 static struct bitbang_interface bcm2835gpio_bitbang = {
 	.read = bcm2835gpio_read,
 	.write = bcm2835gpio_write,
-	.reset = bcm2835gpio_reset,
 	.swdio_read = bcm2835_swdio_read,
 	.swdio_drive = bcm2835_swdio_drive,
 	.blink = NULL
@@ -407,18 +405,25 @@ static const struct command_registration bcm2835gpio_command_handlers[] = {
 
 static const char * const bcm2835_transports[] = { "jtag", "swd", NULL };
 
-struct jtag_interface bcm2835gpio_interface = {
-	.name = "bcm2835gpio",
+static struct jtag_interface bcm2835gpio_interface = {
 	.supported = DEBUG_CAP_TMS_SEQ,
 	.execute_queue = bitbang_execute_queue,
+};
+
+struct adapter_driver bcm2835gpio_adapter_driver = {
+	.name = "bcm2835gpio",
 	.transports = bcm2835_transports,
-	.swd = &bitbang_swd,
+	.commands = bcm2835gpio_command_handlers,
+
+	.init = bcm2835gpio_init,
+	.quit = bcm2835gpio_quit,
+	.reset = bcm2835gpio_reset,
 	.speed = bcm2835gpio_speed,
 	.khz = bcm2835gpio_khz,
 	.speed_div = bcm2835gpio_speed_div,
-	.commands = bcm2835gpio_command_handlers,
-	.init = bcm2835gpio_init,
-	.quit = bcm2835gpio_quit,
+
+	.jtag_ops = &bcm2835gpio_interface,
+	.swd_ops = &bitbang_swd,
 };
 
 static bool bcm2835gpio_jtag_mode_possible(void)

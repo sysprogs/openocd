@@ -91,6 +91,8 @@ struct gdb_connection {
 	 * normally we reply with a S reply via gdb_last_signal_packet.
 	 * as a side note this behaviour only effects gdb > 6.8 */
 	bool attached;
+	/* set when extended protocol is used */
+	bool extended_protocol;
 	/* temporarily used for target description support */
 	struct target_desc_format target_desc;
 	/* temporarily used for thread list support */
@@ -800,7 +802,7 @@ static void gdb_fileio_reply(struct target *target, struct connection *connectio
 	if (strcmp(target->fileio_info->identifier, "open") == 0)
 		sprintf(fileio_command, "F%s,%" PRIx64 "/%" PRIx64 ",%" PRIx64 ",%" PRIx64, target->fileio_info->identifier,
 				target->fileio_info->param_1,
-				target->fileio_info->param_2,
+				target->fileio_info->param_2 + 1,	/* len + trailing zero */
 				target->fileio_info->param_3,
 				target->fileio_info->param_4);
 	else if (strcmp(target->fileio_info->identifier, "close") == 0)
@@ -824,13 +826,13 @@ static void gdb_fileio_reply(struct target *target, struct connection *connectio
 	else if (strcmp(target->fileio_info->identifier, "rename") == 0)
 		sprintf(fileio_command, "F%s,%" PRIx64 "/%" PRIx64 ",%" PRIx64 "/%" PRIx64, target->fileio_info->identifier,
 				target->fileio_info->param_1,
-				target->fileio_info->param_2,
+				target->fileio_info->param_2 + 1,	/* len + trailing zero */
 				target->fileio_info->param_3,
-				target->fileio_info->param_4);
+				target->fileio_info->param_4 + 1);	/* len + trailing zero */
 	else if (strcmp(target->fileio_info->identifier, "unlink") == 0)
 		sprintf(fileio_command, "F%s,%" PRIx64 "/%" PRIx64, target->fileio_info->identifier,
 				target->fileio_info->param_1,
-				target->fileio_info->param_2);
+				target->fileio_info->param_2 + 1);	/* len + trailing zero */
 	else if (strcmp(target->fileio_info->identifier, "stat") == 0)
 		sprintf(fileio_command, "F%s,%" PRIx64 "/%" PRIx64 ",%" PRIx64, target->fileio_info->identifier,
 				target->fileio_info->param_1,
@@ -850,7 +852,7 @@ static void gdb_fileio_reply(struct target *target, struct connection *connectio
 	else if (strcmp(target->fileio_info->identifier, "system") == 0)
 		sprintf(fileio_command, "F%s,%" PRIx64 "/%" PRIx64, target->fileio_info->identifier,
 				target->fileio_info->param_1,
-				target->fileio_info->param_2);
+				target->fileio_info->param_2 + 1);	/* len + trailing zero */
 	else if (strcmp(target->fileio_info->identifier, "exit") == 0) {
 		/* If target hits exit syscall, report to GDB the program is terminated.
 		 * In addition, let target run its own exit syscall handler. */
@@ -949,6 +951,7 @@ static int gdb_new_connection(struct connection *connection)
 	gdb_connection->sync = false;
 	gdb_connection->mem_write_error = false;
 	gdb_connection->attached = true;
+	gdb_connection->extended_protocol = false;
 	gdb_connection->target_desc.tdesc = NULL;
 	gdb_connection->target_desc.tdesc_length = 0;
 	gdb_connection->thread_list = NULL;
@@ -3248,7 +3251,6 @@ static int gdb_input_inner(struct connection *connection)
 	int packet_size;
 	int retval;
 	struct gdb_connection *gdb_con = connection->priv;
-	static int extended_protocol;
 
 	target = get_target_from_connection(connection);
 
@@ -3400,7 +3402,6 @@ static int gdb_input_inner(struct connection *connection)
 					break;
 				case 'D':
 					retval = gdb_detach(connection);
-					extended_protocol = 0;
 					break;
 				case 'X':
 					retval = gdb_write_memory_binary_packet(connection, packet, packet_size);
@@ -3408,7 +3409,7 @@ static int gdb_input_inner(struct connection *connection)
 						return retval;
 					break;
 				case 'k':
-					if (extended_protocol != 0) {
+					if (gdb_con->extended_protocol) {
 						gdb_con->attached = false;
 						break;
 					}
@@ -3416,7 +3417,7 @@ static int gdb_input_inner(struct connection *connection)
 					return ERROR_SERVER_REMOTE_CLOSED;
 				case '!':
 					/* handle extended remote protocol */
-					extended_protocol = 1;
+					gdb_con->extended_protocol = true;
 					gdb_put_packet(connection, "OK", 2);
 					break;
 				case 'R':

@@ -126,10 +126,10 @@ static int rclk_fallback_speed_khz;
 static enum {CLOCK_MODE_UNSELECTED, CLOCK_MODE_KHZ, CLOCK_MODE_RCLK} clock_mode;
 static int jtag_speed;
 
-static struct jtag_interface *jtag;
+/* FIXME: change name to this variable, it is not anymore JTAG only */
+static struct adapter_driver *jtag;
 
-/* configuration */
-struct jtag_interface *jtag_interface;
+extern struct adapter_driver *adapter_driver;
 
 void jtag_set_flush_queue_sleep(int ms)
 {
@@ -503,7 +503,7 @@ int jtag_add_tms_seq(unsigned nbits, const uint8_t *seq, enum tap_state state)
 {
 	int retval;
 
-	if (!(jtag->supported & DEBUG_CAP_TMS_SEQ))
+	if (!(jtag->jtag_ops->supported & DEBUG_CAP_TMS_SEQ))
 		return ERROR_JTAG_NOT_IMPLEMENTED;
 
 	jtag_checks();
@@ -611,53 +611,42 @@ void jtag_add_clocks(int num_cycles)
 	}
 }
 
-void swd_add_reset(int req_srst)
+static int adapter_system_reset(int req_srst)
 {
+	int retval;
+
 	if (req_srst) {
 		if (!(jtag_reset_config & RESET_HAS_SRST)) {
 			LOG_ERROR("BUG: can't assert SRST");
-			jtag_set_error(ERROR_FAIL);
-			return;
+			return ERROR_FAIL;
 		}
 		req_srst = 1;
 	}
 
 	/* Maybe change SRST signal state */
 	if (jtag_srst != req_srst) {
-		int retval;
-
-		retval = interface_jtag_add_reset(0, req_srst);
-		if (retval != ERROR_OK)
-			jtag_set_error(retval);
-		else
-			retval = jtag_execute_queue();
-
+		retval = jtag->reset(0, req_srst);
 		if (retval != ERROR_OK) {
-			LOG_ERROR("TRST/SRST error");
-			return;
+			LOG_ERROR("SRST error");
+			return ERROR_FAIL;
 		}
-
-		/* SRST resets everything hooked up to that signal */
 		jtag_srst = req_srst;
-		if (jtag_srst) {
+
+		if (req_srst) {
 			LOG_DEBUG("SRST line asserted");
 			if (adapter_nsrst_assert_width)
-				jtag_add_sleep(adapter_nsrst_assert_width * 1000);
+				jtag_sleep(adapter_nsrst_assert_width * 1000);
 		} else {
 			LOG_DEBUG("SRST line released");
 			if (adapter_nsrst_delay)
-				jtag_add_sleep(adapter_nsrst_delay * 1000);
-		}
-
-		retval = jtag_execute_queue();
-		if (retval != ERROR_OK) {
-			LOG_ERROR("SRST timings error");
-			return;
+				jtag_sleep(adapter_nsrst_delay * 1000);
 		}
 	}
+
+	return ERROR_OK;
 }
 
-void jtag_add_reset(int req_tlr_or_trst, int req_srst)
+static void legacy_jtag_add_reset(int req_tlr_or_trst, int req_srst)
 {
 	int trst_with_tlr = 0;
 	int new_srst = 0;
@@ -713,6 +702,118 @@ void jtag_add_reset(int req_tlr_or_trst, int req_srst)
 			retval = jtag_execute_queue();
 
 		if (retval != ERROR_OK) {
+			LOG_ERROR("TRST/SRST error");
+			return;
+		}
+	}
+
+	/* SRST resets everything hooked up to that signal */
+	if (jtag_srst != new_srst) {
+		jtag_srst = new_srst;
+		if (jtag_srst) {
+			LOG_DEBUG("SRST line asserted");
+			if (adapter_nsrst_assert_width)
+				jtag_add_sleep(adapter_nsrst_assert_width * 1000);
+		} else {
+			LOG_DEBUG("SRST line released");
+			if (adapter_nsrst_delay)
+				jtag_add_sleep(adapter_nsrst_delay * 1000);
+		}
+	}
+
+	/* Maybe enter the JTAG TAP_RESET state ...
+	 *  - using only TMS, TCK, and the JTAG state machine
+	 *  - or else more directly, using TRST
+	 *
+	 * TAP_RESET should be invisible to non-debug parts of the system.
+	 */
+	if (trst_with_tlr) {
+		LOG_DEBUG("JTAG reset with TLR instead of TRST");
+		jtag_add_tlr();
+
+	} else if (jtag_trst != new_trst) {
+		jtag_trst = new_trst;
+		if (jtag_trst) {
+			LOG_DEBUG("TRST line asserted");
+			tap_set_state(TAP_RESET);
+			if (jtag_ntrst_assert_width)
+				jtag_add_sleep(jtag_ntrst_assert_width * 1000);
+		} else {
+			LOG_DEBUG("TRST line released");
+			if (jtag_ntrst_delay)
+				jtag_add_sleep(jtag_ntrst_delay * 1000);
+
+			/* We just asserted nTRST, so we're now in TAP_RESET.
+			 * Inform possible listeners about this, now that
+			 * JTAG instructions and data can be shifted.  This
+			 * sequence must match jtag_add_tlr().
+			 */
+			jtag_call_event_callbacks(JTAG_TRST_ASSERTED);
+			jtag_notify_event(JTAG_TRST_ASSERTED);
+		}
+	}
+}
+
+/* FIXME: name is misleading; we do not plan to "add" reset into jtag queue */
+void jtag_add_reset(int req_tlr_or_trst, int req_srst)
+{
+	int retval;
+	int trst_with_tlr = 0;
+	int new_srst = 0;
+	int new_trst = 0;
+
+	if (!jtag->reset) {
+		legacy_jtag_add_reset(req_tlr_or_trst, req_srst);
+		return;
+	}
+
+	/* Without SRST, we must use target-specific JTAG operations
+	 * on each target; callers should not be requesting SRST when
+	 * that signal doesn't exist.
+	 *
+	 * RESET_SRST_PULLS_TRST is a board or chip level quirk, which
+	 * can kick in even if the JTAG adapter can't drive TRST.
+	 */
+	if (req_srst) {
+		if (!(jtag_reset_config & RESET_HAS_SRST)) {
+			LOG_ERROR("BUG: can't assert SRST");
+			jtag_set_error(ERROR_FAIL);
+			return;
+		}
+		if ((jtag_reset_config & RESET_SRST_PULLS_TRST) != 0
+				&& !req_tlr_or_trst) {
+			LOG_ERROR("BUG: can't assert only SRST");
+			jtag_set_error(ERROR_FAIL);
+			return;
+		}
+		new_srst = 1;
+	}
+
+	/* JTAG reset (entry to TAP_RESET state) can always be achieved
+	 * using TCK and TMS; that may go through a TAP_{IR,DR}UPDATE
+	 * state first.  TRST accelerates it, and bypasses those states.
+	 *
+	 * RESET_TRST_PULLS_SRST is a board or chip level quirk, which
+	 * can kick in even if the JTAG adapter can't drive SRST.
+	 */
+	if (req_tlr_or_trst) {
+		if (!(jtag_reset_config & RESET_HAS_TRST))
+			trst_with_tlr = 1;
+		else if ((jtag_reset_config & RESET_TRST_PULLS_SRST) != 0
+			 && !req_srst)
+			trst_with_tlr = 1;
+		else
+			new_trst = 1;
+	}
+
+	/* Maybe change TRST and/or SRST signal state */
+	if (jtag_srst != new_srst || jtag_trst != new_trst) {
+		/* guarantee jtag queue empty before changing reset status */
+		jtag_execute_queue();
+
+		retval = jtag->reset(new_trst, new_srst);
+		if (retval != ERROR_OK) {
+			jtag_set_error(retval);
 			LOG_ERROR("TRST/SRST error");
 			return;
 		}
@@ -836,7 +937,20 @@ int default_interface_jtag_execute_queue(void)
 		return ERROR_FAIL;
 	}
 
-	int result = jtag->execute_queue();
+	if (!transport_is_jtag()) {
+		/*
+		 * FIXME: This should not happen!
+		 * There could be old code that queues jtag commands with non jtag interfaces so, for
+		 * the moment simply highlight it by log an error and return on empty execute_queue.
+		 * We should fix it quitting with assert(0) because it is an internal error.
+		 * The fix can be applied immediately after next release (v0.11.0 ?)
+		 */
+		LOG_ERROR("JTAG API jtag_execute_queue() called on non JTAG interface");
+		if (!jtag->jtag_ops || !jtag->jtag_ops->execute_queue)
+			return ERROR_OK;
+	}
+
+	int result = jtag->jtag_ops->execute_queue();
 
 #if !BUILD_ZY1000
 	/* Only build this if we use a regular driver with a command queue.
@@ -1404,7 +1518,7 @@ int adapter_init(struct command_context *cmd_ctx)
 	if (jtag)
 		return ERROR_OK;
 
-	if (!jtag_interface) {
+	if (!adapter_driver) {
 		/* nothing was previously specified by "interface" command */
 		LOG_ERROR("Debug Adapter has to be specified, "
 			"see \"interface\" command");
@@ -1412,10 +1526,10 @@ int adapter_init(struct command_context *cmd_ctx)
 	}
 
 	int retval;
-	retval = jtag_interface->init();
+	retval = adapter_driver->init();
 	if (retval != ERROR_OK)
 		return retval;
-	jtag = jtag_interface;
+	jtag = adapter_driver;
 
 	if (jtag->speed == NULL) {
 		LOG_INFO("This adapter doesn't support configurable speed");
@@ -1555,17 +1669,19 @@ int adapter_quit(void)
 
 int swd_init_reset(struct command_context *cmd_ctx)
 {
-	int retval = adapter_init(cmd_ctx);
+	int retval, retval1;
+
+	retval = adapter_init(cmd_ctx);
 	if (retval != ERROR_OK)
 		return retval;
 
 	LOG_DEBUG("Initializing with hard SRST reset");
 
 	if (jtag_reset_config & RESET_HAS_SRST)
-		swd_add_reset(1);
-	swd_add_reset(0);
-	retval = jtag_execute_queue();
-	return retval;
+		retval = adapter_system_reset(1);
+	retval1 = adapter_system_reset(0);
+
+	return (retval == ERROR_OK) ? retval1 : retval;
 }
 
 int jtag_init_reset(struct command_context *cmd_ctx)
@@ -1888,42 +2004,89 @@ bool transport_is_jtag(void)
 	return get_current_transport() == &jtag_transport;
 }
 
-void adapter_assert_reset(void)
+int adapter_resets(int trst, int srst)
+{
+	if (get_current_transport() == NULL) {
+		LOG_ERROR("transport is not selected");
+		return ERROR_FAIL;
+	}
+
+	if (transport_is_jtag()) {
+		if (srst == SRST_ASSERT && !(jtag_reset_config & RESET_HAS_SRST)) {
+			LOG_ERROR("adapter has no srst signal");
+			return ERROR_FAIL;
+		}
+
+		/* adapters without trst signal will eventually use tlr sequence */
+		jtag_add_reset(trst, srst);
+		return ERROR_OK;
+	} else if (transport_is_swd() || transport_is_hla()) {
+		if (trst == TRST_ASSERT) {
+			LOG_ERROR("transport %s has no trst signal",
+				get_current_transport()->name);
+			return ERROR_FAIL;
+		}
+
+		if (srst == SRST_ASSERT && !(jtag_reset_config & RESET_HAS_SRST)) {
+			LOG_ERROR("adapter has no srst signal");
+			return ERROR_FAIL;
+		}
+		adapter_system_reset(srst);
+		return ERROR_OK;
+	}
+
+	if (trst == TRST_DEASSERT && srst == SRST_DEASSERT)
+		return ERROR_OK;
+
+	LOG_ERROR("reset is not supported on transport %s",
+		get_current_transport()->name);
+
+	return ERROR_FAIL;
+}
+
+int adapter_assert_reset(void)
 {
 	if (transport_is_jtag()) {
 		if (jtag_reset_config & RESET_SRST_PULLS_TRST)
 			jtag_add_reset(1, 1);
 		else
 			jtag_add_reset(0, 1);
-	} else if (transport_is_swd())
-		swd_add_reset(1);
+		return ERROR_OK;
+	} else if (transport_is_swd() || transport_is_hla() ||
+			   transport_is_dapdirect_jtag() || transport_is_dapdirect_swd())
+		return adapter_system_reset(1);
 	else if (get_current_transport() != NULL)
 		LOG_ERROR("reset is not supported on %s",
 			get_current_transport()->name);
 	else
 		LOG_ERROR("transport is not selected");
+	return ERROR_FAIL;
 }
 
-void adapter_deassert_reset(void)
+int adapter_deassert_reset(void)
 {
-	if (transport_is_jtag())
+	if (transport_is_jtag()) {
 		jtag_add_reset(0, 0);
-	else if (transport_is_swd())
-		swd_add_reset(0);
+		return ERROR_OK;
+	} else if (transport_is_swd() || transport_is_hla() ||
+			 transport_is_dapdirect_jtag() || transport_is_dapdirect_swd())
+		return adapter_system_reset(0);
 	else if (get_current_transport() != NULL)
 		LOG_ERROR("reset is not supported on %s",
 			get_current_transport()->name);
 	else
 		LOG_ERROR("transport is not selected");
+	return ERROR_FAIL;
 }
 
 int adapter_config_trace(bool enabled, enum tpiu_pin_protocol pin_protocol,
-			 uint32_t port_size, unsigned int *trace_freq)
+		uint32_t port_size, unsigned int *trace_freq,
+		unsigned int traceclkin_freq, uint16_t *prescaler)
 {
-	if (jtag->config_trace)
-		return jtag->config_trace(enabled, pin_protocol, port_size,
-					  trace_freq);
-	else if (enabled) {
+	if (jtag->config_trace) {
+		return jtag->config_trace(enabled, pin_protocol, port_size, trace_freq,
+			traceclkin_freq, prescaler);
+	} else if (enabled) {
 		LOG_ERROR("The selected interface does not support tracing");
 		return ERROR_FAIL;
 	}

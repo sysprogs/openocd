@@ -98,6 +98,7 @@ add_library(target
 	esirisc_trace.c
 	mips_mips64.c
 	mips64.c
-	mips64_pracc.c)
+	mips64_pracc.c
+	adi_v5_dapdirect.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

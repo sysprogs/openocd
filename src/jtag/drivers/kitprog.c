@@ -819,11 +819,16 @@ static void kitprog_swd_queue_cmd(uint8_t cmd, uint32_t *dst, uint32_t data)
 
 /*************** jtag lowlevel functions ********************/
 
-static void kitprog_execute_reset(struct jtag_command *cmd)
+static int kitprog_reset(int trst, int srst)
 {
 	int retval = ERROR_OK;
 
-	if (cmd->cmd.reset->srst == 1) {
+	if (trst == 1) {
+		LOG_ERROR("KitProg: Interface has no TRST");
+		return ERROR_FAIL;
+	}
+
+	if (srst == 1) {
 		retval = kitprog_reset_target();
 		/* Since the previous command also disables SWCLK output, we need to send an
 		 * SWD bus reset command to re-enable it. For some reason, running
@@ -836,38 +841,7 @@ static void kitprog_execute_reset(struct jtag_command *cmd)
 
 	if (retval != ERROR_OK)
 		LOG_ERROR("KitProg: Interface reset failed");
-}
-
-static void kitprog_execute_sleep(struct jtag_command *cmd)
-{
-	jtag_sleep(cmd->cmd.sleep->us);
-}
-
-static void kitprog_execute_command(struct jtag_command *cmd)
-{
-	switch (cmd->type) {
-		case JTAG_RESET:
-			kitprog_execute_reset(cmd);
-			break;
-		case JTAG_SLEEP:
-			kitprog_execute_sleep(cmd);
-			break;
-		default:
-			LOG_ERROR("BUG: unknown JTAG command type encountered");
-			exit(-1);
-	}
-}
-
-static int kitprog_execute_queue(void)
-{
-	struct jtag_command *cmd = jtag_command_queue;
-
-	while (cmd != NULL) {
-		kitprog_execute_command(cmd);
-		cmd = cmd->next;
-	}
-
-	return ERROR_OK;
+	return retval;
 }
 
 COMMAND_HANDLER(kitprog_handle_info_command)
@@ -961,12 +935,14 @@ static const struct swd_driver kitprog_swd = {
 
 static const char * const kitprog_transports[] = { "swd", NULL };
 
-struct jtag_interface kitprog_interface = {
+struct adapter_driver kitprog_adapter_driver = {
 	.name = "kitprog",
-	.commands = kitprog_command_handlers,
 	.transports = kitprog_transports,
-	.swd = &kitprog_swd,
-	.execute_queue = kitprog_execute_queue,
+	.commands = kitprog_command_handlers,
+
 	.init = kitprog_init,
-	.quit = kitprog_quit
+	.quit = kitprog_quit,
+	.reset = kitprog_reset,
+
+	.swd_ops = &kitprog_swd,
 };
