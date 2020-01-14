@@ -91,7 +91,7 @@
 	<TargetDeviceFamily>
 		<ID>STM32L5</ID>
 		<Name>STM32L5xx</Name>
-		<MatchRegex>^STM3254.*</MatchRegex>
+		<MatchRegex>^STM32L5.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
 		<ScriptFile>target/stm32l5x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
