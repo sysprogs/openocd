@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<ArrayOfDebugTransport xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<DebugTransport>
+		<UserFriendlyName>SWD (HLA)</UserFriendlyName>
+		<Value>hla_swd</Value>
+	</DebugTransport>
+	<DebugTransport>
+		<UserFriendlyName>JTAG (HLA)</UserFriendlyName>
+		<Value>hla_jtag</Value>
+	</DebugTransport>
+	<DebugTransport>
+		<UserFriendlyName>St-Link SWIM</UserFriendlyName>
+		<Value>stlink_swim</Value>
+	</DebugTransport>
+	<DebugTransport>
+		<UserFriendlyName>SWD</UserFriendlyName>
+		<Value>swd</Value>
+	</DebugTransport>
+	<DebugTransport>
+		<UserFriendlyName>JTAG</UserFriendlyName>
+		<Value>jtag</Value>
+	</DebugTransport>
+</ArrayOfDebugTransport>

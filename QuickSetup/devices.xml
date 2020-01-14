@@ -1,0 +1,663 @@
+<?xml version="1.0"?>
+<ArrayOfTargetDeviceFamily xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<!-- ============================================ STM32 ============================================ -->
+	<TargetDeviceFamily>
+		<ID>STM32F0</ID>
+		<Name>STM32F0xxx</Name>
+		<MatchRegex>^STM32F0.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32f0x.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F1</ID>
+		<Name>STM32F1xxx</Name>
+		<MatchRegex>^STM32F1.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32f1x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F2</ID>
+		<Name>STM32F2xxx</Name>
+		<MatchRegex>^STM32F2.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32f2x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F3</ID>
+		<Name>STM32F3xxx</Name>
+		<MatchRegex>^STM32F3.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32f3x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F4</ID>
+		<Name>STM32F4xxx</Name>
+		<MatchRegex>^STM32F4.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32f4x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F7</ID>
+		<Name>STM32F7xxx</Name>
+		<MatchRegex>^STM32F7.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32f7x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L0</ID>
+		<Name>STM32L0xx (Single FLASH bank)</Name>
+		<MatchRegex>^STM32L0.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32l0.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L0_DUALBANK</ID>
+		<Name>STM32L0xx (Dual FLASH bank)</Name>
+		<MatchRegex>^STM32L0_NOAUTO.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32l0_dual_bank.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L1</ID>
+		<Name>STM32L1xx (Single FLASH bank)</Name>
+		<MatchRegex>^STM32L1.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32l1.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L1_DUALBANK</ID>
+		<Name>STM32L1xx (Dual FLASH bank)</Name>
+		<MatchRegex>^STM32L1_NOAUTO.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32l1x_dual_bank.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L4</ID>
+		<Name>STM32L4xx</Name>
+		<MatchRegex>^STM32L4.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32l4x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L5</ID>
+		<Name>STM32L5xx</Name>
+		<MatchRegex>^STM3254.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32l5x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32W108</ID>
+		<Name>STM32W108</Name>
+		<MatchRegex>^STM32W108.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32w108xx.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32H7_DUALCORE</ID>
+		<Name>STM32H7xx (Cortex M7 + M4)</Name>
+		<MatchRegex>^STM32H7.[57].*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32h7x_dual_core.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+		<DebuggedCores>
+			<string>Cortex-M7</string>
+			<string>Cortex-M4</string>
+		</DebuggedCores>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32H7_DUALBANK</ID>
+		<Name>STM32H7xx (Dual FLASH bank)</Name>
+		<MatchRegex>^STM32H7.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32h7x_dual_bank.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32H7</ID>
+		<Name>STM32H7xx (Single FLASH bank)</Name>
+		<MatchRegex>^STM32H7.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32h7x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32G0</ID>
+		<Name>STM32G0xx</Name>
+		<MatchRegex>^STM32G0.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32g0x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32G4</ID>
+		<Name>STM32G4xx</Name>
+		<MatchRegex>^STM32G4.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32g4x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32WB</ID>
+		<Name>STM32WBxx</Name>
+		<MatchRegex>^STM32WB.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32wb</BspID>
+		<ScriptFile>target/stm32wbx.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<!-- ============================================ AT91SAM7/9 ============================================ -->
+	<TargetDeviceFamily>
+		<ID>at91sam7s</ID>
+		<Name>AT91SAM7Sxxx</Name>
+		<MatchRegex>^AT91SAM7S[0-9].*</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam7sx.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>at91sam7se</ID>
+		<Name>AT91SAM7SExxx</Name>
+		<MatchRegex>^AT91SAM7SE.*</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam7se512.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>at91sam7x256</ID>
+		<Name>AT91SAM7X256</Name>
+		<MatchRegex>^AT91SAM7X256</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam7x256.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>at91sam7x512</ID>
+		<Name>AT91SAM7X512</Name>
+		<MatchRegex>^AT91SAM7X512</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam7x512.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>at91sam9260</ID>
+		<Name>AT91SAM9260</Name>
+		<MatchRegex>^AT91SAM9260</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam9260.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>at91sam9261</ID>
+		<Name>AT91SAM9261</Name>
+		<MatchRegex>^AT91SAM9261</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam9261.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>at91sam9263</ID>
+		<Name>AT91SAM9263</Name>
+		<MatchRegex>^AT91SAM9263</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam9263.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>at91sam9g20</ID>
+		<Name>AT91SAM9G20</Name>
+		<MatchRegex>^AT91SAM9G20</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam9g20.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>at91sam9rl</ID>
+		<Name>AT91SAM9RLxxx</Name>
+		<MatchRegex>^AT91SAM9RL.*</MatchRegex>
+		<BspID>com.sysprogs.arm.at91sam7s</BspID>
+		<ScriptFile>target/at91sam9rl.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<!-- ============================================ Freescale Kinetis ============================================ -->
+	<TargetDeviceFamily>
+		<ID>kinetis_32k</ID>
+		<Name>Freescale Kinetis (32KB FLASH)</Name>
+		<MatchRegex>^(M|P)KL?[0-9]+[A-Z]+32.*</MatchRegex>
+		<BspID>com.sysprogs.arm.freescale.kinetis</BspID>
+		<ScriptFile>target/kinetis_32k.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>kinetis_64k</ID>
+		<Name>Freescale Kinetis (64KB FLASH)</Name>
+		<MatchRegex>^(M|P)KL?[0-9]+[A-Z]+64.*</MatchRegex>
+		<BspID>com.sysprogs.arm.freescale.kinetis</BspID>
+		<ScriptFile>target/kinetis_64k.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>kinetis_128k</ID>
+		<Name>Freescale Kinetis (128KB FLASH)</Name>
+		<MatchRegex>^(M|P)KL?[0-9]+[A-Z]+128.*</MatchRegex>
+		<BspID>com.sysprogs.arm.freescale.kinetis</BspID>
+		<ScriptFile>target/kinetis_128k.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>kinetis_256k</ID>
+		<Name>Freescale Kinetis (256KB FLASH)</Name>
+		<MatchRegex>^(M|P)KL?[0-9]+[A-Z]+256.*</MatchRegex>
+		<BspID>com.sysprogs.arm.freescale.kinetis</BspID>
+		<ScriptFile>target/kinetis_256k.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>kinetis_512k</ID>
+		<Name>Freescale Kinetis (512KB FLASH)</Name>
+		<MatchRegex>^(M|P)KL?[0-9]+[A-Z]+512.*</MatchRegex>
+		<BspID>com.sysprogs.arm.freescale.kinetis</BspID>
+		<ScriptFile>target/kinetis_512k.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>kinetis_1m</ID>
+		<Name>Freescale Kinetis (1MB FLASH)</Name>
+		<MatchRegex>^(M|P)KL?[0-9]+[A-Z]+1M.*</MatchRegex>
+		<BspID>com.sysprogs.arm.freescale.kinetis</BspID>
+		<ScriptFile>target/kinetis_1m.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<!-- ============================================ TI ============================================ -->
+	<TargetDeviceFamily>
+		<ID>cc3200</ID>
+		<Name>Texas Instruments CC3200</Name>
+		<MatchRegex>^X*CC3200.*</MatchRegex>
+		<BspID>com.sysprogs.arm.ti.cc3200</BspID>
+		<ScriptFile>target/ti_cc32xx.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>cc3220sf</ID>
+		<Name>Texas Instruments CC3220SF</Name>
+		<MatchRegex>^CC3220SF$</MatchRegex>
+		<BspID>com.sysprogs.arm.ti.cc3220</BspID>
+		<ScriptFile>target/ti_cc3220sf.cfg</ScriptFile>
+		<SuggestedTransport>jtag</SuggestedTransport>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>cc26xx</ID>
+		<Name>Texas Instruments CC26xx</Name>
+		<MatchRegex>^X*CC26.*</MatchRegex>
+		<BspID>com.sysprogs.arm.ti.cc26xx</BspID>
+		<ScriptFile>target/ti_cc26x0.cfg</ScriptFile>
+		<AdditionalInitializationDelay>20000</AdditionalInitializationDelay>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>tiva</ID>
+		<Name>Texas Instruments Tiva</Name>
+		<MatchRegex>^TM4C[0-9]+.*</MatchRegex>
+		<BspID>com.sysprogs.arm.ti.tiva</BspID>
+		<ScriptFile>target/stellaris.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<!-- ============================================ TI MSP432 ============================================ -->
+	<TargetDeviceFamily>
+		<ID>msp432</ID>
+		<Name>Texas Instruments MSP432</Name>
+		<MatchRegex>^MSP432.*</MatchRegex>
+		<BspID>com.sysprogs.arm.ti.msp432</BspID>
+		<ScriptFile>target/ti_msp432.cfg</ScriptFile>
+		<AdditionalInitializationDelay>10000</AdditionalInitializationDelay>
+	</TargetDeviceFamily>
+	<!-- ============================================ ARM mbed ============================================ -->
+	<TargetDeviceFamily>
+		<ID>STM32F0</ID>
+		<Name>STM32F0xxx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_F0.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32f0x.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F1</ID>
+		<Name>STM32F1xxx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_F1.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32f1x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F2</ID>
+		<Name>STM32F2xxx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_F2.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32f2x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F3</ID>
+		<Name>STM32F3xxx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_F3.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32f3x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F4</ID>
+		<Name>STM32F4xxx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_F4.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32f4x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32F7</ID>
+		<Name>STM32F7xxx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_F7.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32f7x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L0</ID>
+		<Name>STM32L0xx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_L0.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32l0.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L1</ID>
+		<Name>STM32L1xx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_L1.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32l1.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L4</ID>
+		<Name>STM32L4xx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_L4.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32l4x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32L5</ID>
+		<Name>STM32L5xx (mbed)</Name>
+		<MatchRegex>^(DISCO|NUCLEO)_L5.*</MatchRegex>
+		<BspID>com.sysprogs.arm.mbed</BspID>
+		<ScriptFile>target/stm32l5x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<!-- ============================================ Infineon ============================================ -->
+	<TargetDeviceFamily>
+		<ID>XMC1xxx</ID>
+		<Name>Infineon XMC1xxx</Name>
+		<MatchRegex>^XMC1.*</MatchRegex>
+		<BspID>com.sysprogs.arm.infineon.xmc</BspID>
+		<ScriptFile>target/xmc1xxx.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>XMC4xxx</ID>
+		<Name>Infineon XMC4xxx</Name>
+		<MatchRegex>^XMC4.*</MatchRegex>
+		<BspID>com.sysprogs.arm.infineon.xmc</BspID>
+		<ScriptFile>target/xmc4xxx.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<!-- ============================================ Nordic ============================================ -->
+	<TargetDeviceFamily>
+		<ID>NRF51x</ID>
+		<Name>Nordic nRF51x</Name>
+		<MatchRegex>^nRF51.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nordic.nrf5x</BspID>
+		<ScriptFile>target/nrf51.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>NRF52x</ID>
+		<Name>Nordic nRF52x</Name>
+		<MatchRegex>^nRF52.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nordic.nrf5x</BspID>
+		<ScriptFile>target/nrf52.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<!-- ============================================ Atmel ============================================ -->
+	<TargetDeviceFamily>
+		<ID>sam4s</ID>
+		<Name>Atmel SAM4C/SAM4E/SAM4N/SAM4S</Name>
+		<MatchRegex>^ATSAM4[CENS].*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91sam4sXX.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>sam3u</ID>
+		<Name>Atmel SAM3U</Name>
+		<MatchRegex>^ATSAM3U.*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91sam3u1c.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>sam3n</ID>
+		<Name>Atmel SAM3N</Name>
+		<MatchRegex>^ATSAM3N.*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91sam3nXX.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>sam3s</ID>
+		<Name>Atmel SAM3S</Name>
+		<MatchRegex>^ATSAM3S.*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91sam3sXX.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>sam4l</ID>
+		<Name>Atmel SAM4L</Name>
+		<MatchRegex>^ATSAM4L.*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91sam4lXX.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>sam3x4</ID>
+		<Name>Atmel SAM3X4x</Name>
+		<MatchRegex>^ATSAM3X4.*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91sam3ax_4x.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>sam3x8</ID>
+		<Name>Atmel SAM3X8x</Name>
+		<MatchRegex>^ATSAM3X8.*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91sam3ax_8x.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>samd</ID>
+		<Name>Atmel SAMC/SAMD/SAML/SAMR</Name>
+		<MatchRegex>^ATSAM[CDLR].*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91samdXX.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>samv</ID>
+		<Name>Atmel SAME/SAMV</Name>
+		<MatchRegex>^ATSAM[EV].*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/atsamv.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>samvg</ID>
+		<Name>Atmel SAMG5</Name>
+		<MatchRegex>^ATSAMG5.*</MatchRegex>
+		<BspID>com.sysprogs.arm.atmel.sam-cortex</BspID>
+		<ScriptFile>target/at91samg5x.cfg</ScriptFile>
+		<SuppressResetInCommandLine>true</SuppressResetInCommandLine>
+	</TargetDeviceFamily>
+	<!-- ============================================ NXP ============================================ -->
+	<TargetDeviceFamily>
+		<ID>lpc11xx</ID>
+		<Name>NXP LPC11xx</Name>
+		<MatchRegex>^LPC11.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc11xx.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc11xx</ID>
+		<Name>NXP LPC12xx</Name>
+		<MatchRegex>^LPC12.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc12xx.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc13xx</ID>
+		<Name>NXP LPC13xx</Name>
+		<MatchRegex>^LPC13.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc13xx.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc17xx</ID>
+		<Name>NXP LPC17xx</Name>
+		<MatchRegex>^LPC17.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc17xx.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc18xx</ID>
+		<Name>NXP LPC18xx</Name>
+		<MatchRegex>^LPC18.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc1850.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2103</ID>
+		<Name>NXP lpc2103</Name>
+		<MatchRegex>^lpc2103.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2103.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2124</ID>
+		<Name>NXP lpc2124</Name>
+		<MatchRegex>^lpc2124.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2124.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2129</ID>
+		<Name>NXP lpc2129</Name>
+		<MatchRegex>^lpc2129.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2129.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2148</ID>
+		<Name>NXP lpc2148</Name>
+		<MatchRegex>^lpc2148.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2148.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2294</ID>
+		<Name>NXP lpc2294</Name>
+		<MatchRegex>^lpc2294.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2294.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2378</ID>
+		<Name>NXP lpc2378</Name>
+		<MatchRegex>^lpc2378.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2378.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2460</ID>
+		<Name>NXP lpc2460</Name>
+		<MatchRegex>^lpc2460.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2460.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2478</ID>
+		<Name>NXP lpc2478</Name>
+		<MatchRegex>^lpc2478.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2478.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc2900</ID>
+		<Name>NXP lpc2900</Name>
+		<MatchRegex>^lpc2900.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc2900.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc3131</ID>
+		<Name>NXP lpc3131</Name>
+		<MatchRegex>^lpc3131.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc3131.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc3250</ID>
+		<Name>NXP lpc3250</Name>
+		<MatchRegex>^lpc3250.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc3250.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc4350</ID>
+		<Name>NXP lpc4350</Name>
+		<MatchRegex>^lpc4350.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc4350.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc4357</ID>
+		<Name>NXP lpc4357</Name>
+		<MatchRegex>^lpc4357.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc4357.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc4370</ID>
+		<Name>NXP lpc4370</Name>
+		<MatchRegex>^lpc4370.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc4370.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>lpc8xx</ID>
+		<Name>NXP LPC8xxx</Name>
+		<MatchRegex>^LPC8.*</MatchRegex>
+		<BspID>com.sysprogs.arm.nxp_lpc</BspID>
+		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
+		<ScriptFile>target/lpc8xx.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	
+</ArrayOfTargetDeviceFamily>
