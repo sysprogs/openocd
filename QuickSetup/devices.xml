@@ -119,7 +119,7 @@
 	<TargetDeviceFamily>
 		<ID>STM32H7_DUALBANK</ID>
 		<Name>STM32H7xx (Dual FLASH bank)</Name>
-		<MatchRegex>^STM32H7.*</MatchRegex>
+		<MatchRegex>^STM32H7(.3|42).*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
 		<ScriptFile>target/stm32h7x_dual_bank.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
