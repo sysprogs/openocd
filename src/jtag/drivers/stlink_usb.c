@@ -390,14 +390,16 @@ static unsigned int stlink_usb_block(void *handle)
 static int stlink_usb_xfer_v1_get_status(void *handle)
 {
 	struct stlink_usb_handle_s *h = handle;
+	int tr, ret;
 
 	assert(handle != NULL);
 
 	/* read status */
 	memset(h->cmdbuf, 0, STLINK_SG_SIZE);
 
-	if (jtag_libusb_bulk_read(h->fd, h->rx_ep, (char *)h->cmdbuf,
-			13, STLINK_READ_TIMEOUT) != 13)
+	ret = jtag_libusb_bulk_read(h->fd, h->rx_ep, (char *)h->cmdbuf, 13,
+				    STLINK_READ_TIMEOUT, &tr);
+	if (ret || tr != 13)
 		return ERROR_FAIL;
 
 	uint32_t t1;
@@ -423,23 +425,26 @@ static int stlink_usb_xfer_v1_get_status(void *handle)
 static int stlink_usb_xfer_rw(void *handle, int cmdsize, const uint8_t *buf, int size)
 {
 	struct stlink_usb_handle_s *h = handle;
+	int tr, ret;
 
 	assert(handle != NULL);
 
-	if (jtag_libusb_bulk_write(h->fd, h->tx_ep, (char *)h->cmdbuf, cmdsize,
-			STLINK_WRITE_TIMEOUT) != cmdsize) {
+	ret = jtag_libusb_bulk_write(h->fd, h->tx_ep, (char *)h->cmdbuf,
+				     cmdsize, STLINK_WRITE_TIMEOUT, &tr);
+	if (ret || tr != cmdsize)
 		return ERROR_FAIL;
-	}
 
 	if (h->direction == h->tx_ep && size) {
-		if (jtag_libusb_bulk_write(h->fd, h->tx_ep, (char *)buf,
-				size, STLINK_WRITE_TIMEOUT) != size) {
+		ret = jtag_libusb_bulk_write(h->fd, h->tx_ep, (char *)buf,
+					     size, STLINK_WRITE_TIMEOUT, &tr);
+		if (ret || tr != size) {
 			LOG_DEBUG("bulk write failed");
 			return ERROR_FAIL;
 		}
 	} else if (h->direction == h->rx_ep && size) {
-		if (jtag_libusb_bulk_read(h->fd, h->rx_ep, (char *)buf,
-				size, STLINK_READ_TIMEOUT) != size) {
+		ret = jtag_libusb_bulk_read(h->fd, h->rx_ep, (char *)buf,
+					    size, STLINK_READ_TIMEOUT, &tr);
+		if (ret || tr != size) {
 			LOG_DEBUG("bulk read failed");
 			return ERROR_FAIL;
 		}
@@ -680,13 +685,14 @@ static int stlink_cmd_allow_retry(void *handle, const uint8_t *buf, int size)
 static int stlink_usb_read_trace(void *handle, const uint8_t *buf, int size)
 {
 	struct stlink_usb_handle_s *h = handle;
+	int tr, ret;
 
 	assert(handle != NULL);
+    assert(h->version.stlink >= 2);
 
-	assert(h->version.stlink >= 2);
-
-	if (jtag_libusb_bulk_read(h->fd, h->trace_ep, (char *)buf,
-			size, STLINK_READ_TIMEOUT) != size) {
+	ret = jtag_libusb_bulk_read(h->fd, h->trace_ep, (char *)buf, size,
+				    STLINK_READ_TIMEOUT, &tr);
+	if (ret || tr != size) {
 		LOG_ERROR("bulk trace read failed");
 		return ERROR_FAIL;
 	}

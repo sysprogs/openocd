@@ -58,7 +58,6 @@
         <GroupTargetsByPaths>true</GroupTargetsByPaths>
         <AutoRefreshProject>true</AutoRefreshProject>
         <SortTargetsByName>true</SortTargetsByName>
-        <UseCMakeUpToDateCheck>false</UseCMakeUpToDateCheck>
         <RedundantTargetMode>HideOuterProjectTargets</RedundantTargetMode>
         <SortSourcesByName>true</SortSourcesByName>
         <BuildAllTargetsInSubdir>false</BuildAllTargetsInSubdir>
@@ -68,7 +67,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/stlink.cfg -f target/stm32h7x_dual_core.cfg -c init -c "reset init"</Arguments>
+            <Arguments>-f interface/stlink.cfg -f target/stm32f4x.cfg -c init -c "reset init"</Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
@@ -85,6 +84,7 @@
       <VirtualFolders />
       <ConfigurationNameCase>Upper</ConfigurationNameCase>
       <DefaultHeaderDiscoveryMode>None</DefaultHeaderDiscoveryMode>
+      <EnableFastUpToDateCheck>true</EnableFastUpToDateCheck>
     </ProjectModeSettings>
   </Build>
   <CustomBuild>
@@ -161,5 +161,6 @@
       <ArgumentEscapingMode>Auto</ArgumentEscapingMode>
     </LaunchGDBSettings>
     <GenerateCtrlBreakInsteadOfCtrlC>false</GenerateCtrlBreakInsteadOfCtrlC>
+    <SuppressArgumentVariablesCheck>false</SuppressArgumentVariablesCheck>
   </Debug>
 </VisualGDBProjectSettings2>

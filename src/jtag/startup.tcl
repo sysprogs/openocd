@@ -34,16 +34,16 @@ proc init_reset { mode } {
 proc power_restore {} {
 	echo "Sensed power restore, running reset init and halting GDB."
 	reset init
-	
+
 	# Halt GDB so user can deal with a detected power restore.
 	#
 	# After GDB is halted, then output is no longer forwarded
 	# to the GDB console.
-	set targets [target names]	
+	set targets [target names]
 	foreach t $targets {
 		# New event script.
 		$t invoke-event arp_halt_gdb
-	}	
+	}
 }
 
 add_help_text power_restore "Overridable procedure run when power restore is detected. Runs 'reset init' by default."
@@ -65,11 +65,11 @@ proc srst_deasserted {} {
 	#
 	# After GDB is halted, then output is no longer forwarded
 	# to the GDB console.
-	set targets [target names]	
+	set targets [target names]
 	foreach t $targets {
 		# New event script.
 		$t invoke-event arp_halt_gdb
-	}		
+	}
 }
 
 add_help_text srst_deasserted "Overridable procedure run when srst deassert is detected. Runs 'reset init' by default."
@@ -120,22 +120,22 @@ proc jtag_ntrst_assert_width args {
 # FIXME phase these aids out after about April 2011
 #
 proc jtag_khz args {
-	echo "DEPRECATED! use 'adapter_khz' not 'jtag_khz'"
-	eval adapter_khz $args
+	echo "DEPRECATED! use 'adapter speed' not 'jtag_khz'"
+	eval adapter speed $args
 }
 
 proc jtag_nsrst_delay args {
-	echo "DEPRECATED! use 'adapter_nsrst_delay' not 'jtag_nsrst_delay'"
-	eval adapter_nsrst_delay $args
+	echo "DEPRECATED! use 'adapter srst delay' not 'jtag_nsrst_delay'"
+	eval adapter srst delay $args
 }
 
 proc jtag_nsrst_assert_width args {
-	echo "DEPRECATED! use 'adapter_nsrst_assert_width' not 'jtag_nsrst_assert_width'"
-	eval adapter_nsrst_assert_width $args
+	echo "DEPRECATED! use 'adapter srst pulse_width' not 'jtag_nsrst_assert_width'"
+	eval adapter srst pulse_width $args
 }
 
 proc jtag_reset args {
-	echo "DEPRECATED! use 'adapter [de]assert' not 'jtag_reset'"
+	echo "DEPRECATED! use 'adapter \[de\]assert' not 'jtag_reset'"
 	switch $args {
 		"0 0"
 			{eval adapter deassert trst deassert srst}
@@ -174,6 +174,46 @@ proc stlink_vid_pid args {
 proc stlink args {
 	echo "DEPRECATED! use 'hla' not 'stlink'"
 	eval hla $args
+}
+
+proc adapter_khz args {
+	echo "DEPRECATED! use 'adapter speed' not 'adapter_khz'"
+	eval adapter speed $args
+}
+
+proc adapter_name args {
+	echo "DEPRECATED! use 'adapter name' not 'adapter_name'"
+	eval adapter name $args
+}
+
+proc adapter_nsrst_delay args {
+	echo "DEPRECATED! use 'adapter srst delay' not 'adapter_nsrst_delay'"
+	eval adapter srst delay $args
+}
+
+proc adapter_nsrst_assert_width args {
+	echo "DEPRECATED! use 'adapter srst pulse_width' not 'adapter_nsrst_assert_width'"
+	eval adapter srst pulse_width $args
+}
+
+proc interface args {
+	echo "DEPRECATED! use 'adapter driver' not 'interface'"
+	eval adapter driver $args
+}
+
+proc  interface_transports args {
+	echo "DEPRECATED! use 'adapter transports' not 'interface_transports'"
+	eval adapter transports $args
+}
+
+proc  interface_list args {
+	echo "DEPRECATED! use 'adapter list' not 'interface_list'"
+	eval adapter list $args
+}
+
+proc ftdi_location args {
+	echo "DEPRECATED! use 'adapter usb location' not 'ftdi_location'"
+	eval adapter usb location $args
 }
 
 # END MIGRATION AIDS

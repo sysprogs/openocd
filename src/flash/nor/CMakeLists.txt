@@ -68,4 +68,6 @@ add_library(ocdflashnor
 	w600.c
 	stm32g0x.c
 	swm050.c
-	stm32l5x.c)
+	stm32l5x.c
+	renesas_rpchf.c
+	sh_qspi.c)

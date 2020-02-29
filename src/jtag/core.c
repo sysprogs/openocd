@@ -842,6 +842,7 @@ void jtag_add_reset(int req_tlr_or_trst, int req_srst)
 	if (trst_with_tlr) {
 		LOG_DEBUG("JTAG reset with TLR instead of TRST");
 		jtag_add_tlr();
+		jtag_execute_queue();
 
 	} else if (jtag_trst != new_trst) {
 		jtag_trst = new_trst;
@@ -1519,9 +1520,9 @@ int adapter_init(struct command_context *cmd_ctx)
 		return ERROR_OK;
 
 	if (!adapter_driver) {
-		/* nothing was previously specified by "interface" command */
+		/* nothing was previously specified by "adapter driver" command */
 		LOG_ERROR("Debug Adapter has to be specified, "
-			"see \"interface\" command");
+			"see \"adapter driver\" command");
 		return ERROR_JTAG_INVALID_INTERFACE;
 	}
 
@@ -1538,7 +1539,7 @@ int adapter_init(struct command_context *cmd_ctx)
 
 	if (CLOCK_MODE_UNSELECTED == clock_mode) {
 		LOG_ERROR("An adapter speed is not selected in the init script."
-			" Insert a call to adapter_khz or jtag_rclk to proceed.");
+			" Insert a call to \"adapter speed\" or \"jtag_rclk\" to proceed.");
 		return ERROR_JTAG_INIT_FAILED;
 	}
 

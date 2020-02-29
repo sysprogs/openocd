@@ -617,6 +617,9 @@ produced, PDF schematics are easily found and it is easy to make.
 @* A JTAG driver acting as a client for the JTAG VPI server interface.
 @* Link: @url{http://github.com/fjullien/jtag_vpi}
 
+@item @b{xlnx_pcie_xvc}
+@* A JTAG driver exposing Xilinx Virtual Cable over PCI Express to OpenOCD as JTAG interface.
+
 @end itemize
 
 @node About Jim-Tcl
@@ -1571,7 +1574,7 @@ solution just avoids using that instruction with JTAG debuggers.
 If both the chip and the board support adaptive clocking,
 use the @command{jtag_rclk}
 command, in case your board is used with JTAG adapter which
-also supports it. Otherwise use @command{adapter_khz}.
+also supports it. Otherwise use @command{adapter speed}.
 Set the slow rate at the beginning of the reset sequence,
 and the faster rate as soon as the clocks are at full speed.
 
@@ -1611,12 +1614,12 @@ proc init_board @{@} @{
     reset_config trst_and_srst trst_pulls_srst
 
     $_TARGETNAME configure -event reset-start @{
-        adapter_khz 100
+        adapter speed 100
     @}
 
     $_TARGETNAME configure -event reset-init @{
         enable_fast_clock
-        adapter_khz 10000
+        adapter speed 10000
     @}
 @}
 @end example
@@ -2335,28 +2338,28 @@ A few cases are so simple that you only need to say what driver to use:
 
 @example
 # jlink interface
-interface jlink
+adapter driver jlink
 @end example
 
 Most adapters need a bit more configuration than that.
 
 
-@section Interface Configuration
+@section Adapter Configuration
 
-The interface command tells OpenOCD what type of debug adapter you are
+The @command{adapter driver} command tells OpenOCD what type of debug adapter you are
 using. Depending on the type of adapter, you may need to use one or
 more additional commands to further identify or configure the adapter.
 
-@deffn {Config Command} {interface} name
-Use the interface driver @var{name} to connect to the
+@deffn {Config Command} {adapter driver} name
+Use the adapter driver @var{name} to connect to the
 target.
 @end deffn
 
-@deffn Command {interface_list}
+@deffn Command {adapter list}
 List the debug adapter drivers that have been built into
 the running copy of OpenOCD.
 @end deffn
-@deffn Command {interface transports} transport_name+
+@deffn Command {adapter transports} transport_name+
 Specifies the transports supported by this debug adapter.
 The adapter driver builds-in similar knowledge; use this only
 when external configuration (such as jumpering) changes what
@@ -2365,7 +2368,7 @@ the hardware can support.
 
 
 
-@deffn Command {adapter_name}
+@deffn Command {adapter name}
 Returns the name of the debug adapter driver being used.
 @end deffn
 
@@ -2716,7 +2719,7 @@ For example, to connect remotely via TCP to the host foobar you might have
 something like:
 
 @example
-interface remote_bitbang
+adapter driver remote_bitbang
 remote_bitbang_port 3335
 remote_bitbang_host foobar
 @end example
@@ -2725,7 +2728,7 @@ To connect to another process running locally via UNIX sockets with socket
 named mysocket:
 
 @example
-interface remote_bitbang
+adapter driver remote_bitbang
 remote_bitbang_port 0
 remote_bitbang_host mysocket
 @end example
@@ -2990,7 +2993,7 @@ you may encounter a problem.
 @deffn Command {parport_toggling_time} [nanoseconds]
 Displays how many nanoseconds the hardware needs to toggle TCK;
 the parport driver uses this value to obey the
-@command{adapter_khz} configuration.
+@command{adapter speed} configuration.
 When the optional @var{nanoseconds} parameter is given,
 that setting is changed before displaying the current value.
 
@@ -3001,7 +3004,7 @@ To measure the toggling time with a logic analyzer or a digital storage
 oscilloscope, follow the procedure below:
 @example
 > parport_toggling_time 1000
-> adapter_khz 500
+> adapter speed 500
 @end example
 This sets the maximum JTAG clock speed of the hardware, but
 the actual speed probably deviates from the requested 500 kHz.
@@ -3012,14 +3015,15 @@ Update the setting to match your measurement:
 @example
 > parport_toggling_time <measured nanoseconds>
 @end example
-Now the clock speed will be a better match for @command{adapter_khz rate}
-commands given in OpenOCD scripts and event handlers.
+Now the clock speed will be a better match for @command{adapter speed}
+command given in OpenOCD scripts and event handlers.
 
 You can do something similar with many digital multimeters, but note
 that you'll probably need to run the clock continuously for several
 seconds before it decides what clock rate to show. Adjust the
 toggling time up or down until the measured clock rate is a good
-match for the adapter_khz rate you specified; be conservative.
+match with the rate you specified in the @command{adapter speed} command;
+be conservative.
 @end quotation
 @end deffn
 
@@ -3032,7 +3036,7 @@ For example, the interface configuration file for a
 classic ``Wiggler'' cable on LPT2 might look something like this:
 
 @example
-interface parport
+adapter driver parport
 parport_port 0x278
 parport_cable wiggler
 @end example
@@ -3125,6 +3129,25 @@ opendous-jtag is a freely programmable USB adapter.
 
 @deffn {Interface Driver} {ulink}
 This is the Keil ULINK v1 JTAG debugger.
+@end deffn
+
+@deffn {Interface Driver} {xlnx_pcie_xvc}
+This driver supports the Xilinx Virtual Cable (XVC) over PCI Express.
+It is commonly found in Xilinx based PCI Express designs. It allows debugging
+fabric based JTAG devices such as Cortex-M1/M3 microcontrollers. Access to this is
+exposed via extended capability registers in the PCI Express configuration space.
+
+For more information see Xilinx PG245 (Section on From_PCIE_to_JTAG mode).
+
+@deffn {Config Command} {xlnx_pcie_xvc_config} device
+Specifies the PCI Express device via parameter @var{device} to use.
+
+The correct value for @var{device} can be obtained by looking at the output
+of lscpi -D (first column) for the corresponding device.
+
+The string will be of the format "DDDD:BB:SS.F" such as "0000:65:00.1".
+
+@end deffn
 @end deffn
 
 @deffn {Interface Driver} {ZY1000}
@@ -3307,10 +3330,10 @@ However, it introduces delays to synchronize clocks; so it
 may not be the fastest solution.
 
 @b{NOTE:} Script writers should consider using @command{jtag_rclk}
-instead of @command{adapter_khz}, but only for (ARM) cores and boards
+instead of @command{adapter speed}, but only for (ARM) cores and boards
 which support adaptive clocking.
 
-@deffn {Command} adapter_khz max_speed_kHz
+@deffn {Command} adapter speed max_speed_kHz
 A non-zero speed is in KHZ. Hence: 3000 is 3mhz.
 JTAG interfaces usually support a limited number of
 speeds. The speed actually used won't be faster
@@ -3440,7 +3463,7 @@ stops issuing the reset. For example, there may be chip or board
 requirements that all reset pulses last for at least a
 certain amount of time; and reset buttons commonly have
 hardware debouncing.
-Use the @command{adapter_nsrst_delay} and @command{jtag_ntrst_delay}
+Use the @command{adapter srst delay} and @command{jtag_ntrst_delay}
 commands to say when extra delays are needed.
 
 @item @emph{Drive type} ... Reset lines often have a pullup
@@ -3480,13 +3503,13 @@ needing to cope with both architecture and board specific constraints.
 
 @section Commands for Handling Resets
 
-@deffn {Command} adapter_nsrst_assert_width milliseconds
+@deffn {Command} adapter srst pulse_width milliseconds
 Minimum amount of time (in milliseconds) OpenOCD should wait
 after asserting nSRST (active-low system reset) before
 allowing it to be deasserted.
 @end deffn
 
-@deffn {Command} adapter_nsrst_delay milliseconds
+@deffn {Command} adapter srst delay milliseconds
 How long (in milliseconds) OpenOCD should wait after deasserting
 nSRST (active-low system reset) before starting new JTAG operations.
 When a board has a reset button connected to SRST line it will
@@ -4867,7 +4890,7 @@ the target clocks are fully set up.)
 before @command{reset-assert-pre} is called.
 
 This is the most robust place to use @command{jtag_rclk}
-or @command{adapter_khz} to switch to a low JTAG clock rate,
+or @command{adapter speed} to switch to a low JTAG clock rate,
 when reset disables PLLs needed to use a fast clock.
 @item @b{resume-start}
 @* Before any target is resumed
@@ -5051,10 +5074,11 @@ If @option{unlock} is specified, then the flash is unprotected
 before erase starts.
 @end deffn
 
-@deffn Command {flash fillw} address word length
+@deffn Command {flash filld} address double-word length
+@deffnx Command {flash fillw} address word length
 @deffnx Command {flash fillh} address halfword length
 @deffnx Command {flash fillb} address byte length
-Fills flash memory with the specified @var{word} (32 bits),
+Fills flash memory with the specified @var{double-word} (64 bits), @var{word} (32 bits),
 @var{halfword} (16 bits), or @var{byte} (8-bit) pattern,
 starting at @var{address} and continuing
 for @var{length} units (word/halfword/byte).
@@ -6858,7 +6882,7 @@ stm32h7x option_write 0 0x20 0x8000000 0x8000000
 @end deffn
 
 @deffn {Flash Driver} stm32lx
-All members of the STM32L microcontroller families from STMicroelectronics
+All members of the STM32L0 and STM32L1 microcontroller families from STMicroelectronics
 include internal flash and use ARM Cortex-M3 and Cortex-M0+ cores.
 The driver automatically recognizes a number of these chips using
 the chip identification register, and autoconfigures itself.
@@ -6898,7 +6922,7 @@ The @var{num} parameter is a value shown by @command{flash banks}.
 @end deffn
 
 @deffn {Flash Driver} stm32l4x
-All members of the STM32L4 microcontroller families from STMicroelectronics
+All members of the STM32L4 and STM32WB microcontroller families from STMicroelectronics
 include internal flash and use ARM Cortex-M4 cores.
 The driver automatically recognizes a number of these chips using
 the chip identification register, and autoconfigures itself.
@@ -6940,7 +6964,9 @@ is the register offset of the Option byte to read.
 For example to read the FLASH_OPTR register:
 @example
 stm32l4x option_read 0 0x20
-# Option Register: <0x40022020> = 0xffeff8aa
+# Option Register (for STM32L4x): <0x40022020> = 0xffeff8aa
+# Option Register (for STM32WBx): <0x58004020> = ...
+# The correct flash base address will be used automatically
 @end example
 
 The above example will read out the FLASH_OPTR register which contains the RDP
@@ -7794,9 +7820,9 @@ echo "Downloading kernel -- please wait"
 @end example
 @end deffn
 
-@deffn Command log_output [filename]
-Redirect logging to @var{filename};
-the initial log output channel is stderr.
+@deffn Command log_output [filename | "default"]
+Redirect logging to @var{filename} or set it back to default output;
+the default log output channel is stderr.
 @end deffn
 
 @deffn Command add_script_search_dir [directory]
@@ -10741,7 +10767,7 @@ To set the JTAG frequency use the command:
 
 @example
 # Example: 1.234MHz
-adapter_khz 1234
+adapter speed 1234
 @end example
 
 

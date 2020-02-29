@@ -111,6 +111,7 @@ extern struct target_type stm8_target;
 extern struct target_type riscv_target;
 extern struct target_type mem_ap_target;
 extern struct target_type esirisc_target;
+extern struct target_type arcv2_target;
 
 static struct target_type *target_types[] = {
 	&arm7tdmi_target,
@@ -146,6 +147,7 @@ static struct target_type *target_types[] = {
 	&riscv_target,
 	&mem_ap_target,
 	&esirisc_target,
+	&arcv2_target,
 #if BUILD_TARGET64
 	&aarch64_target,
 	&mips_mips64_target,
@@ -1692,7 +1694,7 @@ static int target_call_timer_callbacks_check_time(int checktime)
 	 * next item; initially, that's a standalone "root of the
 	 * list" variable. */
 	struct target_timer_callback **callback = &target_timer_callbacks;
-	while (*callback) {
+	while (callback && *callback) {
 		if ((*callback)->removed) {
 			struct target_timer_callback *p = *callback;
 			*callback = (*callback)->next;
@@ -2291,7 +2293,7 @@ static int target_read_buffer_default(struct target *target, target_addr_t addre
 	return ERROR_OK;
 }
 
-int target_checksum_memory(struct target *target, target_addr_t address, uint32_t size, uint32_t* crc)
+int target_checksum_memory(struct target *target, target_addr_t address, uint32_t size, uint32_t *crc)
 {
 	uint8_t *buffer;
 	int retval;
