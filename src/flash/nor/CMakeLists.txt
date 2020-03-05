@@ -67,6 +67,7 @@ add_library(ocdflashnor
 	fespi.c
 	w600.c
 	stm32g0x.c
+	stm32g4x.c
 	swm050.c
 	stm32l5x.c
 	renesas_rpchf.c
