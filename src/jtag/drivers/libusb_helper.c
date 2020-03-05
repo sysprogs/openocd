@@ -21,7 +21,7 @@
 #include "config.h"
 #endif
 #include <jtag/drivers/jtag_usb_common.h>
-#include "libusb1_common.h"
+#include "libusb_helper.h"
 #include "log.h"
 
 /*
@@ -132,12 +132,12 @@ struct matched_dev
 
 int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
 		const char *serial,
-		struct jtag_libusb_device_handle **out)
+		struct libusb_device_handle **out)
 {
 	int cnt, idx, errCode;
 	int retval = ERROR_FAIL;
 	bool serial_mismatch = false;
-	struct jtag_libusb_device_handle *libusb_handle = NULL;
+	struct libusb_device_handle *libusb_handle = NULL;
 
 	errCode = libusb_init(&jtag_libusb_context);
 	if (errCode < 0)
@@ -237,7 +237,7 @@ int jtag_libusb_open(const uint16_t vids[], const uint16_t pids[],
 	return retval;
 }
 
-void jtag_libusb_close(jtag_libusb_device_handle *dev)
+void jtag_libusb_close(struct libusb_device_handle *dev)
 {
 	/* Close device */
 	libusb_close(dev);
@@ -245,7 +245,7 @@ void jtag_libusb_close(jtag_libusb_device_handle *dev)
 	libusb_exit(jtag_libusb_context);
 }
 
-int jtag_libusb_control_transfer(jtag_libusb_device_handle *dev, uint8_t requestType,
+int jtag_libusb_control_transfer(struct libusb_device_handle *dev, uint8_t requestType,
 		uint8_t request, uint16_t wValue, uint16_t wIndex, char *bytes,
 		uint16_t size, unsigned int timeout)
 {
@@ -260,7 +260,7 @@ int jtag_libusb_control_transfer(jtag_libusb_device_handle *dev, uint8_t request
 	return transferred;
 }
 
-int jtag_libusb_bulk_write(jtag_libusb_device_handle *dev, int ep, char *bytes,
+int jtag_libusb_bulk_write(struct libusb_device_handle *dev, int ep, char *bytes,
 			   int size, int timeout, int *transferred)
 {
 	int ret;
@@ -277,7 +277,7 @@ int jtag_libusb_bulk_write(jtag_libusb_device_handle *dev, int ep, char *bytes,
 	return ERROR_OK;
 }
 
-int jtag_libusb_bulk_read(jtag_libusb_device_handle *dev, int ep, char *bytes,
+int jtag_libusb_bulk_read(struct libusb_device_handle *dev, int ep, char *bytes,
 			  int size, int timeout, int *transferred)
 {
 	int ret;
@@ -294,10 +294,10 @@ int jtag_libusb_bulk_read(jtag_libusb_device_handle *dev, int ep, char *bytes,
 	return ERROR_OK;
 }
 
-int jtag_libusb_set_configuration(jtag_libusb_device_handle *devh,
+int jtag_libusb_set_configuration(struct libusb_device_handle *devh,
 		int configuration)
 {
-	struct jtag_libusb_device *udev = jtag_libusb_get_device(devh);
+	struct libusb_device *udev = libusb_get_device(devh);
 	int retCode = -99;
 
 	struct libusb_config_descriptor *config = NULL;
@@ -322,12 +322,12 @@ int jtag_libusb_set_configuration(jtag_libusb_device_handle *devh,
 	return retCode;
 }
 
-int jtag_libusb_choose_interface(struct jtag_libusb_device_handle *devh,
+int jtag_libusb_choose_interface(struct libusb_device_handle *devh,
 		unsigned int *usb_read_ep,
 		unsigned int *usb_write_ep,
 		int bclass, int subclass, int protocol, int trans_type)
 {
-	struct jtag_libusb_device *udev = jtag_libusb_get_device(devh);
+	struct libusb_device *udev = libusb_get_device(devh);
 	const struct libusb_interface *inter;
 	const struct libusb_interface_descriptor *interdesc;
 	const struct libusb_endpoint_descriptor *epdesc;
@@ -374,7 +374,7 @@ int jtag_libusb_choose_interface(struct jtag_libusb_device_handle *devh,
 	return ERROR_FAIL;
 }
 
-int jtag_libusb_get_pid(struct jtag_libusb_device *dev, uint16_t *pid)
+int jtag_libusb_get_pid(struct libusb_device *dev, uint16_t *pid)
 {
 	struct libusb_device_descriptor dev_desc;
 
