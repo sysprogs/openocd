@@ -466,6 +466,13 @@ COMMAND_HANDLER(handle_flash_write_image_command)
 		command_print(CMD, "wrote %" PRIu32 " bytes from file %s "
 			"in %fs (%0.3f KiB/s)", written, CMD_ARGV[0],
 			duration_elapsed(&bench), duration_kbps(&bench, written));
+		LOG_USER(
+			"wrote %" PRIu32 " bytes from file %s "
+	"in %fs (%0.3f KiB/s)",
+			written,
+			CMD_ARGV[0],
+			duration_elapsed(&bench),
+			duration_kbps(&bench, written));
 	}
 
 	image_close(&image);
