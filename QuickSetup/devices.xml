@@ -141,11 +141,27 @@
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
 	<TargetDeviceFamily>
+		<ID>STM32G0_ALT</ID>
+		<Name>STM32G0xx (alternative)</Name>
+		<MatchRegex>^STM32G0.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32g0x_alt.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
 		<ID>STM32G4</ID>
 		<Name>STM32G4xx</Name>
 		<MatchRegex>^STM32G4.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
 		<ScriptFile>target/stm32g4x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32G4_ALT</ID>
+		<Name>STM32G4xx (alternative)</Name>
+		<MatchRegex>^STM32G4.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32g4x_alt.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
 	<TargetDeviceFamily>
