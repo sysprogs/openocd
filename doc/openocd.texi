@@ -5859,7 +5859,7 @@ The AVR 8-bit microcontrollers from Atmel integrate flash memory.
 @end deffn
 
 @deffn {Flash Driver} bluenrg-x
-STMicroelectronics BlueNRG-1 and BlueNRG-2 Bluetooth low energy wireless system-on-chip. They include ARM Cortex-M0 core and internal flash memory.
+STMicroelectronics BlueNRG-1, BlueNRG-2 and BlueNRG-LP Bluetooth low energy wireless system-on-chip. They include ARM Cortex-M0/M0+ core and internal flash memory.
 The driver automatically recognizes these chips using
 the chip identification registers, and autoconfigures itself.
 
@@ -5871,11 +5871,7 @@ Note that when users ask to erase all the sectors of the flash, a mass erase com
 each single sector one by one.
 
 @example
-flash erase_sector 0 0 79 # It will perform a mass erase on BlueNRG-1
-@end example
-
-@example
-flash erase_sector 0 0 127 # It will perform a mass erase on BlueNRG-2
+flash erase_sector 0 0 last # It will perform a mass erase
 @end example
 
 Triggering a mass erase is also useful when users want to disable readout protection.
@@ -6332,14 +6328,14 @@ if @{ [info exists IMEMORY] && [string equal $IMEMORY true] @} @{
 All versions of the SimpleLink MSP432 microcontrollers from Texas
 Instruments include internal flash. The msp432 flash driver automatically
 recognizes the specific version's flash parameters and autoconfigures itself.
-Main program flash (starting at address 0) is flash bank 0. Information flash
-region on MSP432P4 versions (starting at address 0x200000) is flash bank 1.
+Main program flash starts at address 0. The information flash region on
+MSP432P4 versions starts at address 0x200000.
 
 @example
 flash bank $_FLASHNAME msp432 0 0 0 0 $_TARGETNAME
 @end example
 
-@deffn Command {msp432 mass_erase} [main|all]
+@deffn Command {msp432 mass_erase} bank_id [main|all]
 Performs a complete erase of flash. By default, @command{mass_erase} will erase
 only the main program flash.
 
@@ -6348,7 +6344,7 @@ main program and information flash regions. To also erase the BSL in information
 flash, the user must first use the @command{bsl} command.
 @end deffn
 
-@deffn Command {msp432 bsl} [unlock|lock]
+@deffn Command {msp432 bsl} bank_id [unlock|lock]
 On MSP432P4 versions, @command{bsl} unlocks and locks the bootstrap loader (BSL)
 region in information flash so that flash commands can erase or write the BSL.
 Leave the BSL locked to prevent accidentally corrupting the bootstrap loader.
