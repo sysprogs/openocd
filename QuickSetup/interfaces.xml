@@ -3,6 +3,7 @@
 	<ProgrammingInterface>
 		<ID>stlink-v1</ID>
 		<Name>ST-Link v1</Name>
+		<ClassID>stlink</ClassID>
 		<ScriptFile>interface/stlink-v1.cfg</ScriptFile>
 		<UsbIdentities>
 			<UsbIdentity>
@@ -17,6 +18,7 @@
 	</ProgrammingInterface>
 	<ProgrammingInterface>
 		<ID>stlink-v2</ID>
+		<ClassID>stlink</ClassID>
 		<Name>ST-Link v2</Name>
 		<ScriptFile>interface/stlink-v2.cfg</ScriptFile>
 		<UsbIdentities>
@@ -32,6 +34,7 @@
 	</ProgrammingInterface>
 	<ProgrammingInterface>
 		<ID>stlink-v2-1</ID>
+		<ClassID>stlink</ClassID>
 		<Name>ST-Link v2.1</Name>
 		<ScriptFile>interface/stlink-v2-1.cfg</ScriptFile>
 		<UsbIdentities>
@@ -48,6 +51,7 @@
 	</ProgrammingInterface>
 	<ProgrammingInterface>
 		<ID>stlink-v3</ID>
+		<ClassID>stlink</ClassID>
 		<Name>ST-Link v3</Name>
 		<ScriptFile>interface/stlink.cfg</ScriptFile>
 		<UsbIdentities>
