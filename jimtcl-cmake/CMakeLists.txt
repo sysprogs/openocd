@@ -53,6 +53,8 @@ add_library(jim STATIC ${jimtcl_generated_sources}
 	../jimtcl/jim-readdir.c
 	../jimtcl/jim-regexp.c
 	../jimtcl/jim-tclprefix.c
+	../jimtcl/jim-nosignal.c
+	../jimtcl/jimiocompat.c
 	_load-static-exts.c)
 	
 add_executable(jimsh ../jimtcl/jimsh.c initjimsh.c)

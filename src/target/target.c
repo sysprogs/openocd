@@ -219,6 +219,7 @@ static const Jim_Nvp nvp_target_event[] = {
 	{ .value = TARGET_EVENT_RESET_END,           .name = "reset-end" },
 
 	{ .value = TARGET_EVENT_EXAMINE_START, .name = "examine-start" },
+	{ .value = TARGET_EVENT_EXAMINE_FAIL, .name = "examine-fail" },
 	{ .value = TARGET_EVENT_EXAMINE_END, .name = "examine-end" },
 
 	{ .value = TARGET_EVENT_DEBUG_HALTED, .name = "debug-halted" },
@@ -708,13 +709,17 @@ static int default_check_reset(struct target *target)
 	return ERROR_OK;
 }
 
+/* Equvivalent Tcl code arp_examine_one is in src/target/startup.tcl
+ * Keep in sync */
 int target_examine_one(struct target *target)
 {
 	target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_START);
 
 	int retval = target->type->examine(target);
-	if (retval != ERROR_OK)
+	if (retval != ERROR_OK) {
+		target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_FAIL);
 		return retval;
+	}
 
 	target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_END);
 
@@ -2053,6 +2058,8 @@ static void target_destroy(struct target *target)
 		}
 		target->smp = 0;
 	}
+
+	rtos_destroy(target);
 
 	free(target->gdb_port_override);
 	free(target->type);
@@ -3836,11 +3843,16 @@ COMMAND_HANDLER(handle_rbp_command)
 	if (CMD_ARGC != 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	target_addr_t addr;
-	COMMAND_PARSE_ADDRESS(CMD_ARGV[0], addr);
-
 	struct target *target = get_current_target(CMD_CTX);
-	breakpoint_remove(target, addr);
+
+	if (!strcmp(CMD_ARGV[0], "all")) {
+		breakpoint_remove_all(target);
+	} else {
+		target_addr_t addr;
+		COMMAND_PARSE_ADDRESS(CMD_ARGV[0], addr);
+
+		breakpoint_remove(target, addr);
+	}
 
 	return ERROR_OK;
 }
@@ -5177,7 +5189,6 @@ static int jim_target_wait_state(Jim_Interp *interp, int argc, Jim_Obj *const *a
 				"target: %s wait %s fails (%#s) %s",
 				target_name(target), n->name,
 				eObj, target_strerror_safe(e));
-		Jim_FreeNewObj(interp, eObj);
 		return JIM_ERR;
 	}
 	return JIM_OK;
@@ -6457,7 +6468,7 @@ static const struct command_registration target_exec_command_handlers[] = {
 		.handler = handle_rbp_command,
 		.mode = COMMAND_EXEC,
 		.help = "remove breakpoint",
-		.usage = "address",
+		.usage = "'all' | address",
 	},
 	{
 		.name = "wp",

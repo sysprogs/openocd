@@ -537,15 +537,25 @@ debuggers to ARM Cortex based targets @url{http://www.keil.com/support/man/docs/
 
 @item @b{TI XDS110 Debug Probe}
 @* The XDS110 is included as the embedded debug probe on many Texas Instruments
-LaunchPad evaluation boards.
-@* The XDS110 is also available as a stand-alone USB debug probe. The XDS110
-stand-alone probe has the additional ability to supply voltage to the target
-board via its AUX FUNCTIONS port. Use the
-@command{xds110_supply_voltage <millivolts>} command to set the voltage. 0 turns
-off the supply. Otherwise, the supply can be set to any value in the range 1800
-to 3600 millivolts.
-@* Link: @url{http://processors.wiki.ti.com/index.php/XDS110}
-@* Link: @url{http://processors.wiki.ti.com/index.php/XDS_Emulation_Software_Package#XDS110_Support_Utilities}
+LaunchPad evaluation boards. The XDS110 is also available as a stand-alone USB
+debug probe with the added capability to supply power to the target board. The
+following commands are supported by the XDS110 driver:
+@*@deffn {Config Command} {xds110 serial} serial_string
+Specifies the serial number of which XDS110 probe to use. Otherwise, the first
+XDS110 found will be used.
+@end deffn
+@*@deffn {Config Command} {xds110 supply} voltage_in_millivolts
+Available only on the XDS110 stand-alone probe. Sets the voltage level of the
+XDS110 power supply. A value of 0 leaves the supply off. Otherwise, the supply
+can be set to any value in the range 1800 to 3600 millivolts.
+@end deffn
+@*@deffn {Command} {xds110 info}
+Displays information about the connected XDS110 debug probe (e.g. firmware
+version).
+@end deffn
+@* Further information can be found at the following sites:
+@* Link: @url{https://software-dl.ti.com/ccs/esd/documents/xdsdebugprobes/emu_xds110.html}
+@* Link: @url{https://software-dl.ti.com/ccs/esd/documents/xdsdebugprobes/emu_xds_software_package_download.html#xds110-support-utilities}
 @end itemize
 
 @section IBM PC Parallel Printer Port Based
@@ -4400,34 +4410,41 @@ Lists all supported target types.
 At this writing, the supported CPU types are:
 
 @itemize @bullet
-@item @code{arm11} -- this is a generation of ARMv6 cores
-@item @code{arm720t} -- this is an ARMv4 core with an MMU
-@item @code{arm7tdmi} -- this is an ARMv4 core
-@item @code{arm920t} -- this is an ARMv4 core with an MMU
-@item @code{arm926ejs} -- this is an ARMv5 core with an MMU
-@item @code{arm966e} -- this is an ARMv5 core
-@item @code{arm9tdmi} -- this is an ARMv4 core
+@item @code{aarch64} -- this is an ARMv8-A core with an MMU.
+@item @code{arm11} -- this is a generation of ARMv6 cores.
+@item @code{arm720t} -- this is an ARMv4 core with an MMU.
+@item @code{arm7tdmi} -- this is an ARMv4 core.
+@item @code{arm920t} -- this is an ARMv4 core with an MMU.
+@item @code{arm926ejs} -- this is an ARMv5 core with an MMU.
+@item @code{arm946e} -- this is an ARMv5 core with an MMU.
+@item @code{arm966e} -- this is an ARMv5 core.
+@item @code{arm9tdmi} -- this is an ARMv4 core.
 @item @code{avr} -- implements Atmel's 8-bit AVR instruction set.
 (Support for this is preliminary and incomplete.)
-@item @code{cortex_a} -- this is an ARMv7 core with an MMU
-@item @code{cortex_m} -- this is an ARMv7 core, supporting only the
-compact Thumb2 instruction set.
-@item @code{aarch64} -- this is an ARMv8-A core with an MMU
-@item @code{dragonite} -- resembles arm966e
+@item @code{avr32_ap7k} -- this an AVR32 core.
+@item @code{cortex_a} -- this is an ARMv7-A core with an MMU.
+@item @code{cortex_m} -- this is an ARMv7-M core, supporting only the
+compact Thumb2 instruction set. Supports also ARMv6-M and ARMv8-M cores
+@item @code{cortex_r4} -- this is an ARMv7-R core.
+@item @code{dragonite} -- resembles arm966e.
 @item @code{dsp563xx} -- implements Freescale's 24-bit DSP.
 (Support for this is still incomplete.)
+@item @code{dsp5680xx} -- implements Freescale's 5680x DSP.
 @item @code{esirisc} -- this is an EnSilica eSi-RISC core.
 The current implementation supports eSi-32xx cores.
-@item @code{fa526} -- resembles arm920 (w/o Thumb)
-@item @code{feroceon} -- resembles arm926
-@item @code{mem_ap} -- this is an ARM debug infrastructure Access Port without a CPU, through which bus read and write cycles can be generated; it may be useful for working with non-CPU hardware behind an AP or during development of support for new CPUs.
-@item @code{mips_m4k} -- a MIPS core
-@item @code{xscale} -- this is actually an architecture,
-not a CPU type. It is based on the ARMv5 architecture.
-@item @code{openrisc} -- this is an OpenRISC 1000 core.
-The current implementation supports three JTAG TAP cores:
+@item @code{fa526} -- resembles arm920 (w/o Thumb).
+@item @code{feroceon} -- resembles arm926.
+@item @code{hla_target} -- a Cortex-M alternative to work with HL adapters like ST-Link.
 @item @code{ls1_sap} -- this is the SAP on NXP LS102x CPUs,
 allowing access to physical memory addresses independently of CPU cores.
+@item @code{mem_ap} -- this is an ARM debug infrastructure Access Port without a CPU, through which bus read and write cycles can be generated; it may be useful for working with non-CPU hardware behind an AP or during development of support for new CPUs.
+@item @code{mips_m4k} -- a MIPS core.
+@item @code{mips_mips64} -- a MIPS64 core.
+@item @code{nds32_v2} -- this is an Andes NDS32 v2 core.
+@item @code{nds32_v3} -- this is an Andes NDS32 v3 core.
+@item @code{nds32_v3m} -- this is an Andes NDS32 v3m core.
+@item @code{or1k} -- this is an OpenRISC 1000 core.
+The current implementation supports three JTAG TAP cores:
 @itemize @minus
 @item @code{OpenCores TAP} (See: @url{http://opencores.org/project@comma{}jtag})
 @item @code{Altera Virtual JTAG TAP} (See: @url{http://www.altera.com/literature/ug/ug_virtualjtag.pdf})
@@ -4438,6 +4455,13 @@ And two debug interfaces cores:
 @item @code{Advanced debug interface} (See: @url{http://opencores.org/project@comma{}adv_debug_sys})
 @item @code{SoC Debug Interface} (See: @url{http://opencores.org/project@comma{}dbg_interface})
 @end itemize
+@item @code{quark_d20xx} -- an Intel Quark D20xx core.
+@item @code{quark_x10xx} -- an Intel Quark X10xx core.
+@item @code{riscv} -- a RISC-V core.
+@item @code{stm8} -- implements an STM8 core.
+@item @code{testee} -- a dummy target for cases without a real CPU, e.g. CPLD.
+@item @code{xscale} -- this is actually an architecture,
+not a CPU type. It is based on the ARMv5 architecture.
 @end itemize
 @end deffn
 
@@ -4820,6 +4844,8 @@ The following target events are defined:
 @* Before target examine is called.
 @item @b{examine-end}
 @* After target examine is called with no errors.
+@item @b{examine-fail}
+@* After target examine fails.
 @item @b{gdb-attach}
 @* When GDB connects. Issued before any GDB communication with the target
 starts. GDB expects the target is halted during attachment.
@@ -6020,7 +6046,8 @@ Used in kinetis 'fcf_source protection' mode only.
 @end deffn
 
 @deffn Command {kinetis mdm check_security}
-Checks status of device security lock. Used internally in examine-end event.
+Checks status of device security lock. Used internally in examine-end
+and examine-fail event.
 @end deffn
 
 @deffn Command {kinetis mdm halt}
@@ -8189,8 +8216,8 @@ in which case it will be a hardware breakpoint.
 for similar mechanisms that do not consume hardware breakpoints.)
 @end deffn
 
-@deffn Command {rbp} address
-Remove the breakpoint at @var{address}.
+@deffn Command {rbp} @option{all} | address
+Remove the breakpoint at @var{address} or all breakpoints.
 @end deffn
 
 @deffn Command {rwp} address

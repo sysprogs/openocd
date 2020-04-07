@@ -109,7 +109,7 @@ COMMAND_HANDLER(handle_flash_info_command)
 				return retval;
 		}
 		if (retval == ERROR_FLASH_OPER_UNSUPPORTED)
-			LOG_WARNING("Flash protection check is not implemented.");
+			LOG_INFO("Flash protection check is not implemented.");
 
 		command_print(CMD,
 			"#%d : %s at " TARGET_ADDR_FMT ", size 0x%8.8" PRIx32
@@ -510,6 +510,11 @@ COMMAND_HANDLER(handle_flash_fill_command)
 			break;
 		default:
 			return ERROR_COMMAND_SYNTAX_ERROR;
+	}
+
+	if ((wordsize < sizeof(pattern)) && (pattern >> (8 * wordsize) != 0)) {
+		command_print(CMD, "Fill pattern 0x%" PRIx64 " does not fit within %" PRIu32 "-byte word", pattern, wordsize);
+		return ERROR_FAIL;
 	}
 
 	if (count == 0)

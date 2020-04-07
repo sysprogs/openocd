@@ -48,6 +48,7 @@ enum {
 	ARMV4_5_SPSR_ABT = 35,
 	ARMV4_5_SPSR_UND = 36,
 	ARM_SPSR_MON = 41,
+	ARM_SPSR_HYP = 43,
 };
 
 static const uint8_t arm_usr_indices[17] = {
@@ -76,6 +77,10 @@ static const uint8_t arm_und_indices[3] = {
 
 static const uint8_t arm_mon_indices[3] = {
 	39, 40, ARM_SPSR_MON,
+};
+
+static const uint8_t arm_hyp_indices[2] = {
+	42, ARM_SPSR_HYP,
 };
 
 static const struct {
@@ -163,6 +168,14 @@ static const struct {
 		.name = "Handler",
 		.psr = ARM_MODE_HANDLER,
 	},
+
+	/* armv7-a with virtualization extension */
+	{
+		.name = "Hypervisor",
+		.psr = ARM_MODE_HYP,
+		.n_indices = ARRAY_SIZE(arm_hyp_indices),
+		.indices = arm_hyp_indices,
+	},
 };
 
 /** Map PSR mode bits to the name of an ARM processor operating mode. */
@@ -209,6 +222,8 @@ int arm_mode_to_number(enum arm_mode mode)
 		case ARM_MODE_MON:
 		case ARM_MODE_1176_MON:
 			return 7;
+		case ARM_MODE_HYP:
+			return 8;
 		default:
 			LOG_ERROR("invalid mode value encountered %d", mode);
 			return -1;
@@ -235,6 +250,8 @@ enum arm_mode armv4_5_number_to_mode(int number)
 			return ARM_MODE_SYS;
 		case 7:
 			return ARM_MODE_MON;
+		case 8:
+			return ARM_MODE_HYP;
 		default:
 			LOG_ERROR("mode index out of bounds %d", number);
 			return ARM_MODE_ANY;
@@ -342,6 +359,9 @@ static const struct {
 	[40] = { .name = "lr_mon", .cookie = 14, .mode = ARM_MODE_MON, .gdb_index = 49, },
 	[41] = { .name = "spsr_mon", .cookie = 16, .mode = ARM_MODE_MON, .gdb_index = 50, },
 
+	/* These exist only when the Virtualization Extensions is present */
+	[42] = { .name = "sp_hyp", .cookie = 13, .mode = ARM_MODE_HYP, .gdb_index = 51, },
+	[43] = { .name = "spsr_hyp", .cookie = 16, .mode = ARM_MODE_HYP, .gdb_index = 52, },
 };
 
 static const struct {
@@ -391,7 +411,7 @@ static const struct {
 /* map core mode (USR, FIQ, ...) and register number to
  * indices into the register cache
  */
-const int armv4_5_core_reg_map[8][17] = {
+const int armv4_5_core_reg_map[9][17] = {
 	{	/* USR */
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31
 	},
@@ -414,7 +434,10 @@ const int armv4_5_core_reg_map[8][17] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 31
 	},
 	{	/* MON */
-		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 37, 38, 15, 39,
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 39, 40, 15, 41,
+	},
+	{	/* HYP */
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 42, 14, 15, 43,
 	}
 };
 
@@ -658,7 +681,11 @@ struct reg_cache *arm_build_reg_cache(struct target *target, struct arm *arm)
 	for (i = 0; i < num_core_regs; i++) {
 		/* Skip registers this core doesn't expose */
 		if (arm_core_regs[i].mode == ARM_MODE_MON
-			&& arm->core_type != ARM_MODE_MON)
+			&& arm->core_type != ARM_CORE_TYPE_SEC_EXT
+			&& arm->core_type != ARM_CORE_TYPE_VIRT_EXT)
+			continue;
+		if (arm_core_regs[i].mode == ARM_MODE_HYP
+			&& arm->core_type != ARM_CORE_TYPE_VIRT_EXT)
 			continue;
 
 		/* REVISIT handle Cortex-M, which only shadows R13/SP */
@@ -768,9 +795,6 @@ int arm_arch_state(struct target *target)
 	return ERROR_OK;
 }
 
-#define ARMV4_5_CORE_REG_MODENUM(cache, mode, num) \
-	(cache->reg_list[armv4_5_core_reg_map[mode][num]])
-
 COMMAND_HANDLER(handle_armv4_5_reg_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
@@ -787,7 +811,7 @@ COMMAND_HANDLER(handle_armv4_5_reg_command)
 		return ERROR_FAIL;
 	}
 
-	if (arm->core_type != ARM_MODE_ANY) {
+	if (arm->core_type != ARM_CORE_TYPE_STD) {
 		command_print(CMD,
 			"Microcontroller Profile not supported - use standard reg cmd");
 		return ERROR_OK;
@@ -819,8 +843,13 @@ COMMAND_HANDLER(handle_armv4_5_reg_command)
 				name = "System and User";
 				sep = "";
 				break;
+			case ARM_MODE_HYP:
+				if (arm->core_type != ARM_CORE_TYPE_VIRT_EXT)
+					continue;
+			/* FALLTHROUGH */
 			case ARM_MODE_MON:
-				if (arm->core_type != ARM_MODE_MON)
+				if (arm->core_type != ARM_CORE_TYPE_SEC_EXT
+					&& arm->core_type != ARM_CORE_TYPE_VIRT_EXT)
 					continue;
 			/* FALLTHROUGH */
 			default:
@@ -872,7 +901,7 @@ COMMAND_HANDLER(handle_armv4_5_core_state_command)
 		return ERROR_FAIL;
 	}
 
-	if (arm->core_type == ARM_MODE_THREAD) {
+	if (arm->core_type == ARM_CORE_TYPE_M_PROFILE) {
 		/* armv7m not supported */
 		command_print(CMD, "Unsupported Command");
 		return ERROR_OK;
@@ -910,7 +939,7 @@ COMMAND_HANDLER(handle_arm_disassemble_command)
 		return ERROR_FAIL;
 	}
 
-	if (arm->core_type == ARM_MODE_THREAD) {
+	if (arm->core_type == ARM_CORE_TYPE_M_PROFILE) {
 		/* armv7m is always thumb mode */
 		thumb = 1;
 	}
@@ -1098,10 +1127,7 @@ static int jim_mcrmrc(Jim_Interp *interp, int argc, Jim_Obj * const *argv)
 	return JIM_OK;
 }
 
-extern __COMMAND_HANDLER(handle_common_semihosting_command);
-extern __COMMAND_HANDLER(handle_common_semihosting_fileio_command);
-extern __COMMAND_HANDLER(handle_common_semihosting_resumable_exit_command);
-extern __COMMAND_HANDLER(handle_common_semihosting_cmdline);
+extern const struct command_registration semihosting_common_handlers[];
 
 static const struct command_registration arm_exec_command_handlers[] = {
 	{
@@ -1140,32 +1166,7 @@ static const struct command_registration arm_exec_command_handlers[] = {
 		.usage = "cpnum op1 CRn CRm op2",
 	},
 	{
-		.name = "semihosting",
-		.handler = handle_common_semihosting_command,
-		.mode = COMMAND_EXEC,
-		.usage = "['enable'|'disable']",
-		.help = "activate support for semihosting operations",
-	},
-	{
-		.name = "semihosting_cmdline",
-		.handler = handle_common_semihosting_cmdline,
-		.mode = COMMAND_EXEC,
-		.usage = "arguments",
-		.help = "command line arguments to be passed to program",
-	},
-	{
-		.name = "semihosting_fileio",
-		.handler = handle_common_semihosting_fileio_command,
-		.mode = COMMAND_EXEC,
-		.usage = "['enable'|'disable']",
-		.help = "activate support for semihosting fileio operations",
-	},
-	{
-		.name = "semihosting_resexit",
-		.handler = handle_common_semihosting_resumable_exit_command,
-		.mode = COMMAND_EXEC,
-		.usage = "['enable'|'disable']",
-		.help = "activate support for semihosting resumable exit",
+		.chain = semihosting_common_handlers,
 	},
 	COMMAND_REGISTRATION_DONE
 };
@@ -1225,7 +1226,16 @@ int arm_get_gdb_reg_list(struct target *target,
 		break;
 
 	case REG_CLASS_ALL:
-		*reg_list_size = (arm->core_type != ARM_MODE_MON ? 48 : 51);
+		switch (arm->core_type) {
+			case ARM_CORE_TYPE_SEC_EXT:
+				*reg_list_size = 51;
+				break;
+			case ARM_CORE_TYPE_VIRT_EXT:
+				*reg_list_size = 53;
+				break;
+			default:
+				*reg_list_size = 48;
+		}
 		unsigned int list_size_core = *reg_list_size;
 		if (arm->arm_vfp_version == ARM_VFP_V3)
 			*reg_list_size += 33;
@@ -1237,9 +1247,15 @@ int arm_get_gdb_reg_list(struct target *target,
 
 		for (i = 13; i < ARRAY_SIZE(arm_core_regs); i++) {
 				int reg_index = arm->core_cache->reg_list[i].number;
-				if (!(arm_core_regs[i].mode == ARM_MODE_MON
-						&& arm->core_type != ARM_MODE_MON))
-					(*reg_list)[reg_index] = &(arm->core_cache->reg_list[i]);
+
+				if (arm_core_regs[i].mode == ARM_MODE_MON
+					&& arm->core_type != ARM_CORE_TYPE_SEC_EXT
+					&& arm->core_type != ARM_CORE_TYPE_VIRT_EXT)
+					continue;
+				if (arm_core_regs[i].mode == ARM_MODE_HYP
+					&& arm->core_type != ARM_CORE_TYPE_VIRT_EXT)
+					continue;
+				(*reg_list)[reg_index] = &(arm->core_cache->reg_list[i]);
 		}
 
 		/* When we supply the target description, there is no need for fake FPA */
@@ -1701,8 +1717,8 @@ int arm_init_arch_info(struct target *target, struct arm *arm)
 	arm->common_magic = ARM_COMMON_MAGIC;
 
 	/* core_type may be overridden by subtype logic */
-	if (arm->core_type != ARM_MODE_THREAD) {
-		arm->core_type = ARM_MODE_ANY;
+	if (arm->core_type != ARM_CORE_TYPE_M_PROFILE) {
+		arm->core_type = ARM_CORE_TYPE_STD;
 		arm_set_cpsr(arm, ARM_MODE_USR);
 	}
 
