@@ -3390,6 +3390,99 @@ COMMAND_HANDLER(handle_mw_command)
 	return target_fill_mem(target, address, fn, wordsize, value, count);
 }
 
+COMMAND_HANDLER(handle_mbatch_command)
+{
+    if (CMD_ARGC < 2)
+        return ERROR_COMMAND_SYNTAX_ERROR;
+    
+    /*General syntax:
+		<Unique ID> <Subcommands>
+     
+      Sub-command syntax:
+		w:<address>:<access size>:<count>:<hex-encoded data> - write data
+		r:<address>:<access size>:<count> - read data
+		
+	  Reply syntax for each subcommand:
+		<status>:<optional data>
+	*/
+    
+    struct target *target = get_current_target(CMD_CTX);
+    command_print_sameline(cmd, "mbatch(%s):", CMD_ARGV[0]);
+    
+    for (int i = 1; i < CMD_ARGC; i++)
+    {
+        const char *pCmd = CMD_ARGV[i];
+        const char *p = strchr(pCmd, ':');
+        
+        int status = ERROR_OK;
+        uint8_t *data = NULL;
+        int printData = 0;
+        uint64_t args[3] = { 0, };	//address, size, count
+        
+        if (!p)
+            status = -ERROR_BAD_ARGUMENTS;
+        
+        for (int j = 0; j < sizeof(args) / sizeof(args[0]); j++)
+        {
+            if (p)
+            {
+                p++;
+                char *end = NULL;
+                args[j] = strtoull(p, &end, 0);
+                if (end == p || !end)
+                    status = -ERROR_BAD_ARGUMENTS;
+                else if (*end != ':' && *end != 0)
+                    status = -ERROR_BAD_ARGUMENTS;
+                
+                p = end;
+            }
+        }
+        
+        int bufferSize = (int)(args[1] * args[2]);
+        
+        if (status == ERROR_OK)
+        {
+            data = (uint8_t *)malloc(bufferSize);
+            
+            if (pCmd[0] == 'w')
+            {
+                if (!p)
+                    status = -ERROR_BAD_ARGUMENTS;
+                else
+                {
+                    int done = unhexify(data, p + 1, args[1] * args[2]);
+                    if (done != (args[1] * args[2]))
+                        status = -ERROR_INSUFFICIENT_BUFFER;
+                    else
+						status = target_write_memory(target, args[0], args[1], args[2], data);
+                }
+            }
+            else if (pCmd[0] == 'r')
+            {
+                status = target_read_memory(target, args[0], args[1], args[2], data);
+                printData = true;
+			}
+            else
+                status = -ERROR_BAD_ARGUMENTS;
+        }
+        
+        command_print_sameline(cmd, " %d", status);
+        if (status >= 0 && printData && data)
+        {
+            char *formattedData = malloc(bufferSize * 2 + 2);
+            hexify(formattedData, data, bufferSize, bufferSize * 2 + 2);
+            command_print_sameline(cmd, ":%s", formattedData);
+            free(formattedData);
+        }
+        
+        if (data)
+            free(data);        
+    }
+    
+    command_print(cmd, "");
+    return ERROR_OK;
+}
+
 static COMMAND_HELPER(parse_load_image_command_CMD_ARGV, struct image *image,
 		target_addr_t *min_address, target_addr_t *max_address)
 {
@@ -5318,7 +5411,7 @@ static const struct command_registration target_instance_command_handlers[] = {
 		.usage = "address [count]",
 	},
 	{
-		.name = "array2mem",
+    	.name = "array2mem",
 		.mode = COMMAND_EXEC,
 		.jim_handler = jim_target_array2mem,
 		.help = "Writes Tcl array of 8/16/32 bit numbers "
@@ -6455,6 +6548,13 @@ static const struct command_registration target_exec_command_handlers[] = {
 		.mode = COMMAND_EXEC,
 		.help = "write memory byte",
 		.usage = "['phys'] address value [count]",
+	},
+	{
+		.name = "mbatch",
+		.handler = handle_mbatch_command,
+		.mode = COMMAND_EXEC,
+		.help = "execute a batch of memory commands",
+		.usage = "[unique ID] [list of memory read/write requests]",
 	},
 	{
 		.name = "bp",
