@@ -30,7 +30,7 @@
 #define TELNET_BUFFER_SIZE (10*1024)
 
 #define TELNET_LINE_HISTORY_SIZE (128)
-#define TELNET_LINE_MAX_SIZE (10*256)
+#define TELNET_LINE_MAX_SIZE (1024 * 1024)  //Required by the 'mbatch' command to write large data blocks
 
 enum telnet_states {
 	TELNET_STATE_DATA,
