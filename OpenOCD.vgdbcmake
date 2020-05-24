@@ -57,6 +57,7 @@
         <GroupSourcesByPaths>true</GroupSourcesByPaths>
         <GroupTargetsByPaths>true</GroupTargetsByPaths>
         <AutoRefreshProject>true</AutoRefreshProject>
+        <AlwaysConsiderOutdated>false</AlwaysConsiderOutdated>
         <SortTargetsByName>true</SortTargetsByName>
         <RedundantTargetMode>HideOuterProjectTargets</RedundantTargetMode>
         <SortSourcesByName>true</SortSourcesByName>
@@ -67,7 +68,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/stlink.cfg -f target/stm32f4x.cfg -c init -c "reset init" -c "echo VisualGDB_OpenOCD_Ready"</Arguments>
+            <Arguments>-f interface/cmsis-dap.cfg -c "adapter speed 3000" -f target/rs14100.cfg -c init -c "reset init" -c "echo VisualGDB_OpenOCD_Ready"</Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
@@ -85,6 +86,7 @@
       <ConfigurationNameCase>Upper</ConfigurationNameCase>
       <DefaultHeaderDiscoveryMode>None</DefaultHeaderDiscoveryMode>
       <EnableFastUpToDateCheck>true</EnableFastUpToDateCheck>
+      <StartupTarget>openocd</StartupTarget>
     </ProjectModeSettings>
   </Build>
   <CustomBuild>
