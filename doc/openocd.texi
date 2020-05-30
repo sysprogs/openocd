@@ -536,24 +536,6 @@ debuggers to ARM Cortex based targets @url{http://www.keil.com/support/man/docs/
 @* Link: @url{http://www.keil.com/ulink1/}
 
 @item @b{TI XDS110 Debug Probe}
-@* The XDS110 is included as the embedded debug probe on many Texas Instruments
-LaunchPad evaluation boards. The XDS110 is also available as a stand-alone USB
-debug probe with the added capability to supply power to the target board. The
-following commands are supported by the XDS110 driver:
-@*@deffn {Config Command} {xds110 serial} serial_string
-Specifies the serial number of which XDS110 probe to use. Otherwise, the first
-XDS110 found will be used.
-@end deffn
-@*@deffn {Config Command} {xds110 supply} voltage_in_millivolts
-Available only on the XDS110 stand-alone probe. Sets the voltage level of the
-XDS110 power supply. A value of 0 leaves the supply off. Otherwise, the supply
-can be set to any value in the range 1800 to 3600 millivolts.
-@end deffn
-@*@deffn {Command} {xds110 info}
-Displays information about the connected XDS110 debug probe (e.g. firmware
-version).
-@end deffn
-@* Further information can be found at the following sites:
 @* Link: @url{https://software-dl.ti.com/ccs/esd/documents/xdsdebugprobes/emu_xds110.html}
 @* Link: @url{https://software-dl.ti.com/ccs/esd/documents/xdsdebugprobes/emu_xds_software_package_download.html#xds110-support-utilities}
 @end itemize
@@ -1492,7 +1474,7 @@ While the default is normally provided by the chip manufacturer,
 board files may need to distinguish between instances of a chip.
 @item @code{ENDIAN} ...
 By default @option{little} - although chips may hard-wire @option{big}.
-Chips that can't change endianess don't need to use this variable.
+Chips that can't change endianness don't need to use this variable.
 @item @code{CPUTAPID} ...
 When OpenOCD examines the JTAG chain, it can be told verify the
 chips against the JTAG IDCODE register.
@@ -3139,6 +3121,29 @@ opendous-jtag is a freely programmable USB adapter.
 
 @deffn {Interface Driver} {ulink}
 This is the Keil ULINK v1 JTAG debugger.
+@end deffn
+
+@deffn {Interface Driver} {xds110}
+The XDS110 is included as the embedded debug probe on many Texas Instruments
+LaunchPad evaluation boards. The XDS110 is also available as a stand-alone USB
+debug probe with the added capability to supply power to the target board. The
+following commands are supported by the XDS110 driver:
+
+@deffn {Config Command} {xds110 serial} serial_string
+Specifies the serial number of which XDS110 probe to use. Otherwise, the first
+XDS110 found will be used.
+@end deffn
+
+@deffn {Config Command} {xds110 supply} voltage_in_millivolts
+Available only on the XDS110 stand-alone probe. Sets the voltage level of the
+XDS110 power supply. A value of 0 leaves the supply off. Otherwise, the supply
+can be set to any value in the range 1800 to 3600 millivolts.
+@end deffn
+
+@deffn {Command} {xds110 info}
+Displays information about the connected XDS110 debug probe (e.g. firmware
+version).
+@end deffn
 @end deffn
 
 @deffn {Interface Driver} {xlnx_pcie_xvc}
@@ -4924,6 +4929,10 @@ when reset disables PLLs needed to use a fast clock.
 @* After all targets have resumed
 @item @b{resumed}
 @* Target has resumed
+@item @b{step-start}
+@* Before a target is single-stepped
+@item @b{step-end}
+@* After single-step has completed
 @item @b{trace-config}
 @* After target hardware trace configuration was changed
 @end itemize
@@ -5116,6 +5125,19 @@ The flash bank to use is inferred from the @var{address} of
 each block, and the specified length must stay within that bank.
 @end deffn
 @comment no current checks for errors if fill blocks touch multiple banks!
+
+@deffn Command {flash mdw} addr [count]
+@deffnx Command {flash mdh} addr [count]
+@deffnx Command {flash mdb} addr [count]
+Display contents of address @var{addr}, as
+32-bit words (@command{mdw}), 16-bit halfwords (@command{mdh}),
+or 8-bit bytes (@command{mdb}).
+If @var{count} is specified, displays that many units.
+Reads from flash using the flash driver, therefore it enables reading
+from a bank not mapped in target address space.
+The flash bank to use is inferred from the @var{address} of
+each block, and the specified length must stay within that bank.
+@end deffn
 
 @deffn Command {flash write_bank} num filename [offset]
 Write the binary @file{filename} to flash bank @var{num},
@@ -6466,7 +6488,7 @@ code.
 @end deffn
 
 @deffn Command {nrf5 info}
-Decodes and shows informations from FICR and UICR registers.
+Decodes and shows information from FICR and UICR registers.
 @end deffn
 
 @end deffn
@@ -9709,6 +9731,135 @@ Perform a 32-bit DMI read at address, returning the value.
 @deffn Command {riscv dmi_write} address value
 Perform a 32-bit DMI write of value at address.
 @end deffn
+
+@section ARC Architecture
+@cindex ARC
+
+Synopsys DesignWare ARC Processors are a family of 32-bit CPUs that SoC
+designers can optimize for a wide range of uses, from deeply embedded to
+high-performance host applications in a variety of market segments. See more
+at: http://www.synopsys.com/IP/ProcessorIP/ARCProcessors/Pages/default.aspx.
+OpenOCD currently supports ARC EM processors.
+There is a set ARC-specific OpenOCD commands that allow low-level
+access to the core and provide necessary support for ARC extensibility and
+configurability capabilities. ARC processors has much more configuration
+capabilities than most of the other processors and in addition there is an
+extension interface that allows SoC designers to add custom registers and
+instructions. For the OpenOCD that mostly means that set of core and AUX
+registers in target will vary and is not fixed for a particular processor
+model. To enable extensibility several TCL commands are provided that allow to
+describe those optional registers in OpenOCD configuration files. Moreover
+those commands allow for a dynamic target features discovery.
+
+
+@subsection General ARC commands
+
+@deffn {Config Command} {arc add-reg} configparams
+
+Add a new register to processor target. By default newly created register is
+marked as not existing. @var{configparams} must have following required
+arguments:
+
+@itemize @bullet
+
+@item @code{-name} name
+@*Name of a register.
+
+@item @code{-num} number
+@*Architectural register number: core register number or AUX register number.
+
+@item @code{-feature} XML_feature
+@*Name of GDB XML target description feature.
+
+@end itemize
+
+@var{configparams} may have following optional arguments:
+
+@itemize @bullet
+
+@item @code{-gdbnum} number
+@*GDB register number. It is recommended to not assign GDB register number
+manually, because there would be a risk that two register will have same
+number. When register GDB number is not set with this option, then register
+will get a previous register number + 1. This option is required only for those
+registers that must be at particular address expected by GDB.
+
+@item @code{-core}
+@*This option specifies that register is a core registers. If not - this is an
+AUX register. AUX registers and core registers reside in different address
+spaces.
+
+@item @code{-bcr}
+@*This options specifies that register is a BCR register. BCR means Build
+Configuration Registers - this is a special type of AUX registers that are read
+only and non-volatile, that is - they never change their value. Therefore OpenOCD
+never invalidates values of those registers in internal caches. Because BCR is a
+type of AUX registers, this option cannot be used with @code{-core}.
+
+@item @code{-type} type_name
+@*Name of type of this register. This can be either one of the basic GDB types,
+or a custom types described with @command{arc add-reg-type-[flags|struct]}.
+
+@item @code{-g}
+@* If specified then this is a "general" register. General registers are always
+read by OpenOCD on context save (when core has just been halted) and is always
+transferred to GDB client in a response to g-packet. Contrary to this,
+non-general registers are read and sent to GDB client on-demand. In general it
+is not recommended to apply this option to custom registers.
+
+@end itemize
+
+@end deffn
+
+@deffn {Config Command} {arc add-reg-type-flags} -name name flags...
+Adds new register type of ``flags'' class. ``Flags'' types can contain only
+one-bit fields. Each flag definition looks like @code{-flag name bit-position}.
+@end deffn
+
+@anchor{add-reg-type-struct}
+@deffn {Config Command} {arc add-reg-type-struct} -name name structs...
+Adds new register type of ``struct'' class. ``Struct'' types can contain either
+bit-fields or fields of other types, however at the moment only bit fields are
+supported. Structure bit field definition looks like @code{-bitfield name
+startbit endbit}.
+@end deffn
+
+@deffn {Command} {arc get-reg-field} reg-name field-name
+Returns value of bit-field in a register. Register must be ``struct'' register
+type, @xref{add-reg-type-struct} command definition.
+@end deffn
+
+@deffn {Command} {arc set-reg-exists} reg-names...
+Specify that some register exists. Any amount of names can be passed
+as an argument for a single command invocation.
+@end deffn
+
+@subsection ARC JTAG commands
+
+@deffn {Command} {arc jtag set-aux-reg} regnum value
+This command writes value to AUX register via its number. This command access
+register in target directly via JTAG, bypassing any OpenOCD internal caches,
+therefore it is unsafe to use if that register can be operated by other means.
+
+@end deffn
+
+@deffn {Command} {arc jtag set-core-reg} regnum value
+This command is similar to @command{arc jtag set-aux-reg} but is for core
+registers.
+@end deffn
+
+@deffn {Command} {arc jtag get-aux-reg} regnum
+This command returns the value storded in AUX register via its number. This commands access
+register in target directly via JTAG, bypassing any OpenOCD internal caches,
+therefore it is unsafe to use if that register can be operated by other means.
+
+@end deffn
+
+@deffn {Command} {arc jtag get-core-reg} regnum
+This command is similar to @command{arc jtag get-aux-reg} but is for core
+registers.
+@end deffn
+
 
 @anchor{softwaredebugmessagesandtracing}
 @section Software Debug Messages and Tracing

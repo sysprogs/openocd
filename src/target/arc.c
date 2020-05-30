@@ -928,8 +928,10 @@ static int arc_poll(struct target *target)
 		CHECK_RETVAL(arc_get_register_value(target, "status32", &value));
 		if (value & AUX_STATUS32_REG_HALT_BIT) {
 			LOG_DEBUG("ARC core in halt or reset state.");
+			/* Save context if target was not in reset state */
+			if (target->state == TARGET_RUNNING)
+				CHECK_RETVAL(arc_debug_entry(target));
 			target->state = TARGET_HALTED;
-			CHECK_RETVAL(arc_debug_entry(target));
 			CHECK_RETVAL(target_call_event_callbacks(target, TARGET_EVENT_HALTED));
 		} else {
 		LOG_DEBUG("Discrepancy of STATUS32[0] HALT bit and ARC_JTAG_STAT_RU, "
@@ -1283,6 +1285,317 @@ static int arc_target_create(struct target *target, Jim_Interp *interp)
 	return ERROR_OK;
 }
 
+/**
+ * Write 4-byte instruction to memory. This is like target_write_u32, however
+ * in case of little endian ARC instructions are in middle endian format, not
+ * little endian, so different type of conversion should be done.
+ * Middle endinan: instruction "aabbccdd", stored as "bbaaddcc"
+ */
+int arc_write_instruction_u32(struct target *target, uint32_t address,
+	uint32_t instr)
+{
+	uint8_t value_buf[4];
+	if (!target_was_examined(target)) {
+		LOG_ERROR("Target not examined yet");
+		return ERROR_FAIL;
+	}
+
+	LOG_DEBUG("Address: 0x%08" PRIx32 ", value: 0x%08" PRIx32, address,
+		instr);
+
+	if (target->endianness == TARGET_LITTLE_ENDIAN)
+		arc_h_u32_to_me(value_buf, instr);
+	else
+		h_u32_to_be(value_buf, instr);
+
+	CHECK_RETVAL(target_write_buffer(target, address, 4, value_buf));
+
+	return ERROR_OK;
+}
+
+/**
+ * Read 32-bit instruction from memory. It is like target_read_u32, however in
+ * case of little endian ARC instructions are in middle endian format, so
+ * different type of conversion should be done.
+ */
+int arc_read_instruction_u32(struct target *target, uint32_t address,
+		uint32_t *value)
+{
+	uint8_t value_buf[4];
+
+	if (!target_was_examined(target)) {
+		LOG_ERROR("Target not examined yet");
+		return ERROR_FAIL;
+	}
+
+	*value = 0;
+	CHECK_RETVAL(target_read_buffer(target, address, 4, value_buf));
+
+	if (target->endianness == TARGET_LITTLE_ENDIAN)
+		*value = arc_me_to_h_u32(value_buf);
+	else
+		*value = be_to_h_u32(value_buf);
+
+	LOG_DEBUG("Address: 0x%08" PRIx32 ", value: 0x%08" PRIx32, address,
+		*value);
+
+	return ERROR_OK;
+}
+
+static int arc_set_breakpoint(struct target *target,
+		struct breakpoint *breakpoint)
+{
+
+	if (breakpoint->set) {
+		LOG_WARNING("breakpoint already set");
+		return ERROR_OK;
+	}
+
+	if (breakpoint->type == BKPT_SOFT) {
+		LOG_DEBUG("bpid: %" PRIu32, breakpoint->unique_id);
+
+		if (breakpoint->length == 4) {
+			uint32_t verify = 0xffffffff;
+
+			CHECK_RETVAL(target_read_buffer(target, breakpoint->address, breakpoint->length,
+					breakpoint->orig_instr));
+
+			CHECK_RETVAL(arc_write_instruction_u32(target, breakpoint->address,
+					ARC_SDBBP_32));
+
+			CHECK_RETVAL(arc_read_instruction_u32(target, breakpoint->address, &verify));
+
+			if (verify != ARC_SDBBP_32) {
+				LOG_ERROR("Unable to set 32bit breakpoint at address @0x%" TARGET_PRIxADDR
+						" - check that memory is read/writable", breakpoint->address);
+				return ERROR_FAIL;
+			}
+		} else if (breakpoint->length == 2) {
+			uint16_t verify = 0xffff;
+
+			CHECK_RETVAL(target_read_buffer(target, breakpoint->address, breakpoint->length,
+					breakpoint->orig_instr));
+			CHECK_RETVAL(target_write_u16(target, breakpoint->address, ARC_SDBBP_16));
+
+			CHECK_RETVAL(target_read_u16(target, breakpoint->address, &verify));
+			if (verify != ARC_SDBBP_16) {
+				LOG_ERROR("Unable to set 16bit breakpoint at address @0x%" TARGET_PRIxADDR
+						" - check that memory is read/writable", breakpoint->address);
+				return ERROR_FAIL;
+			}
+		} else {
+			LOG_ERROR("Invalid breakpoint length: target supports only 2 or 4");
+			return ERROR_COMMAND_ARGUMENT_INVALID;
+		}
+
+		breakpoint->set = 64; /* Any nice value but 0 */
+	} else if (breakpoint->type == BKPT_HARD) {
+		LOG_DEBUG("Hardware breakpoints are not supported yet!");
+		return ERROR_FAIL;
+	} else {
+		LOG_DEBUG("ERROR: setting unknown breakpoint type");
+		return ERROR_FAIL;
+	}
+	/* core instruction cache is now invalid,
+	 * TODO: add cache invalidation function here (when implemented). */
+
+	return ERROR_OK;
+}
+
+static int arc_unset_breakpoint(struct target *target,
+		struct breakpoint *breakpoint)
+{
+	int retval = ERROR_OK;
+
+	if (!breakpoint->set) {
+		LOG_WARNING("breakpoint not set");
+		return ERROR_OK;
+	}
+
+	if (breakpoint->type == BKPT_SOFT) {
+		/* restore original instruction (kept in target endianness) */
+		LOG_DEBUG("bpid: %" PRIu32, breakpoint->unique_id);
+		if (breakpoint->length == 4) {
+			uint32_t current_instr;
+
+			/* check that user program has not modified breakpoint instruction */
+			CHECK_RETVAL(arc_read_instruction_u32(target, breakpoint->address, &current_instr));
+
+			if (current_instr == ARC_SDBBP_32) {
+				retval = target_write_buffer(target, breakpoint->address,
+					breakpoint->length, breakpoint->orig_instr);
+				if (retval != ERROR_OK)
+					return retval;
+			} else {
+				LOG_WARNING("Software breakpoint @0x%" TARGET_PRIxADDR
+					" has been overwritten outside of debugger."
+					"Expected: @0x%" PRIx32 ", got: @0x%" PRIx32,
+					breakpoint->address, ARC_SDBBP_32, current_instr);
+			}
+		} else if (breakpoint->length == 2) {
+			uint16_t current_instr;
+
+			/* check that user program has not modified breakpoint instruction */
+			CHECK_RETVAL(target_read_u16(target, breakpoint->address, &current_instr));
+			if (current_instr == ARC_SDBBP_16) {
+				retval = target_write_buffer(target, breakpoint->address,
+					breakpoint->length, breakpoint->orig_instr);
+				if (retval != ERROR_OK)
+					return retval;
+			} else {
+				LOG_WARNING("Software breakpoint @0x%" TARGET_PRIxADDR
+					" has been overwritten outside of debugger. "
+					"Expected: 0x%04x, got: 0x%04" PRIx16,
+					breakpoint->address, ARC_SDBBP_16, current_instr);
+			}
+		} else {
+			LOG_ERROR("Invalid breakpoint length: target supports only 2 or 4");
+			return ERROR_COMMAND_ARGUMENT_INVALID;
+		}
+		breakpoint->set = 0;
+
+	}	else if (breakpoint->type == BKPT_HARD) {
+			LOG_WARNING("Hardware breakpoints are not supported yet!");
+			return ERROR_FAIL;
+	} else {
+			LOG_DEBUG("ERROR: unsetting unknown breakpoint type");
+			return ERROR_FAIL;
+	}
+
+	/* core instruction cache is now invalid.
+	 * TODO: Add cache invalidation function */
+
+	return retval;
+}
+
+
+static int arc_add_breakpoint(struct target *target, struct breakpoint *breakpoint)
+{
+	if (target->state == TARGET_HALTED) {
+		return arc_set_breakpoint(target, breakpoint);
+
+	} else {
+		LOG_WARNING(" > core was not halted, please try again.");
+		return ERROR_TARGET_NOT_HALTED;
+	}
+}
+
+static int arc_remove_breakpoint(struct target *target,
+	struct breakpoint *breakpoint)
+{
+	if (target->state == TARGET_HALTED) {
+		if (breakpoint->set)
+			CHECK_RETVAL(arc_unset_breakpoint(target, breakpoint));
+	} else {
+		LOG_WARNING("target not halted");
+		return ERROR_TARGET_NOT_HALTED;
+	}
+
+	return ERROR_OK;
+}
+
+/* Helper function which swiches core to single_step mode by
+ * doing aux r/w operations.  */
+int arc_config_step(struct target *target, int enable_step)
+{
+	uint32_t value;
+
+	struct arc_common *arc = target_to_arc(target);
+
+	/* enable core debug step mode */
+	if (enable_step) {
+		CHECK_RETVAL(arc_jtag_read_aux_reg_one(&arc->jtag_info, AUX_STATUS32_REG,
+			&value));
+		value &= ~SET_CORE_AE_BIT; /* clear the AE bit */
+		CHECK_RETVAL(arc_jtag_write_aux_reg_one(&arc->jtag_info, AUX_STATUS32_REG,
+			value));
+		LOG_DEBUG(" [status32:0x%08" PRIx32 "]", value);
+
+		/* Doing read-modify-write, because DEBUG might contain manually set
+		 * bits like UB or ED, which should be preserved.  */
+		CHECK_RETVAL(arc_jtag_read_aux_reg_one(&arc->jtag_info,
+					AUX_DEBUG_REG, &value));
+		value |= SET_CORE_SINGLE_INSTR_STEP; /* set the IS bit */
+		CHECK_RETVAL(arc_jtag_write_aux_reg_one(&arc->jtag_info, AUX_DEBUG_REG,
+			value));
+		LOG_DEBUG("core debug step mode enabled [debug-reg:0x%08" PRIx32 "]", value);
+
+	} else {	/* disable core debug step mode */
+		CHECK_RETVAL(arc_jtag_read_aux_reg_one(&arc->jtag_info, AUX_DEBUG_REG,
+			&value));
+		value &= ~SET_CORE_SINGLE_INSTR_STEP; /* clear the IS bit */
+		CHECK_RETVAL(arc_jtag_write_aux_reg_one(&arc->jtag_info, AUX_DEBUG_REG,
+			value));
+		LOG_DEBUG("core debug step mode disabled");
+	}
+
+	return ERROR_OK;
+}
+
+int arc_step(struct target *target, int current, target_addr_t address,
+	int handle_breakpoints)
+{
+	/* get pointers to arch-specific information */
+	struct arc_common *arc = target_to_arc(target);
+	struct breakpoint *breakpoint = NULL;
+	struct reg *pc = &(arc->core_and_aux_cache->reg_list[arc->pc_index_in_cache]);
+
+	if (target->state != TARGET_HALTED) {
+		LOG_WARNING("target not halted");
+		return ERROR_TARGET_NOT_HALTED;
+	}
+
+	/* current = 1: continue on current pc, otherwise continue at <address> */
+	if (!current) {
+		buf_set_u32(pc->value, 0, 32, address);
+		pc->dirty = 1;
+		pc->valid = 1;
+	}
+
+	LOG_DEBUG("Target steps one instruction from PC=0x%" PRIx32,
+		buf_get_u32(pc->value, 0, 32));
+
+	/* the front-end may request us not to handle breakpoints */
+	if (handle_breakpoints) {
+		breakpoint = breakpoint_find(target, buf_get_u32(pc->value, 0, 32));
+		if (breakpoint)
+			CHECK_RETVAL(arc_unset_breakpoint(target, breakpoint));
+	}
+
+	/* restore context */
+	CHECK_RETVAL(arc_restore_context(target));
+
+	target->debug_reason = DBG_REASON_SINGLESTEP;
+
+	CHECK_RETVAL(target_call_event_callbacks(target, TARGET_EVENT_RESUMED));
+
+	/* disable interrupts while stepping */
+	CHECK_RETVAL(arc_enable_interrupts(target, 0));
+
+	/* do a single step */
+	CHECK_RETVAL(arc_config_step(target, 1));
+
+	/* make sure we done our step */
+	alive_sleep(1);
+
+	/* registers are now invalid */
+	register_cache_invalidate(arc->core_and_aux_cache);
+
+	if (breakpoint)
+		CHECK_RETVAL(arc_set_breakpoint(target, breakpoint));
+
+	LOG_DEBUG("target stepped ");
+
+	target->state = TARGET_HALTED;
+
+	/* Saving context */
+	CHECK_RETVAL(arc_debug_entry(target));
+	CHECK_RETVAL(target_call_event_callbacks(target, TARGET_EVENT_HALTED));
+
+	return ERROR_OK;
+}
+
+
 
 /* ARC v2 target */
 struct target_type arcv2_target = {
@@ -1298,7 +1611,7 @@ struct target_type arcv2_target = {
 
 	.halt = arc_halt,
 	.resume = arc_resume,
-	.step = NULL,
+	.step = arc_step,
 
 	.assert_reset = arc_assert_reset,
 	.deassert_reset = arc_deassert_reset,
@@ -1313,10 +1626,10 @@ struct target_type arcv2_target = {
 	.checksum_memory = NULL,
 	.blank_check_memory = NULL,
 
-	.add_breakpoint = NULL,
+	.add_breakpoint = arc_add_breakpoint,
 	.add_context_breakpoint = NULL,
 	.add_hybrid_breakpoint = NULL,
-	.remove_breakpoint = NULL,
+	.remove_breakpoint = arc_remove_breakpoint,
 	.add_watchpoint = NULL,
 	.remove_watchpoint = NULL,
 	.hit_watchpoint = NULL,

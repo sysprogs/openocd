@@ -5,7 +5,7 @@
  *   Copyright (C) 2012 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
  *                                                                         *
- *   2017 by Rémi PRUD'HOMME stlink v3 support                             *
+ *   2017 by RÃ©mi PRUD'HOMME stlink v3 support                             *
  *   remi.prudhomme@st.com                                                 *
  *                                                                         *
  *   SWIM contributions by Ake Rehnman                                     *
@@ -55,7 +55,6 @@
 #define STLINK_WRITE_TIMEOUT 1000
 #define STLINK_READ_TIMEOUT 1000
 
-#define STLINK_NULL_EP        0
 #define STLINK_RX_EP          (1|ENDPOINT_IN)
 #define STLINK_TX_EP          (2|ENDPOINT_OUT)
 #define STLINK_TRACE_EP       (3|ENDPOINT_IN)
@@ -676,7 +675,9 @@ static int stlink_cmd_allow_retry(void *handle, const uint8_t *buf, int size)
 
 		res = stlink_usb_error_check(handle);
 		if (res == ERROR_WAIT && retries < MAX_WAIT_RETRIES) {
-			usleep((1<<retries++) * 1000);
+			unsigned int delay_us = (1<<retries++) * 1000;
+			LOG_DEBUG("stlink_cmd_allow_retry ERROR_WAIT, retry %d, delaying %u microseconds", retries, delay_us);
+			usleep(delay_us);
 			continue;
 		}
 		return res;
@@ -1047,9 +1048,8 @@ static int stlink_usb_mode_enter(void *handle, enum stlink_mode type)
 		case STLINK_MODE_DEBUG_SWIM:
 			h->cmdbuf[h->cmdidx++] = STLINK_SWIM_COMMAND;
 			h->cmdbuf[h->cmdidx++] = STLINK_SWIM_ENTER;
-			/* no answer for this function... */
-			rx_size = 0;
-			break;
+			/* swim enter does not return any response or status */
+			return stlink_usb_xfer_noerrcheck(handle, h->databuf, 0);
 		case STLINK_MODE_DFU:
 		case STLINK_MODE_MASS:
 		default:
@@ -1067,7 +1067,8 @@ static int stlink_usb_mode_leave(void *handle, enum stlink_mode type)
 
 	assert(handle != NULL);
 
-	stlink_usb_init_buffer(handle, STLINK_NULL_EP, 0);
+	/* command with no reply, use a valid endpoint but zero size */
+	stlink_usb_init_buffer(handle, h->rx_ep, 0);
 
 	switch (type) {
 		case STLINK_MODE_DEBUG_JTAG:
@@ -1088,7 +1089,7 @@ static int stlink_usb_mode_leave(void *handle, enum stlink_mode type)
 			return ERROR_FAIL;
 	}
 
-	res = stlink_usb_xfer(handle, 0, 0);
+	res = stlink_usb_xfer_noerrcheck(handle, h->databuf, 0);
 
 	if (res != ERROR_OK)
 		return res;
@@ -2105,7 +2106,7 @@ static int stlink_usb_read_mem(void *handle, uint32_t addr, uint32_t size,
 
 	while (count) {
 
-		bytes_remaining = (size == 4) ? \
+		bytes_remaining = (size != 1) ?
 				stlink_max_block_size(h->max_mem_packet, addr) : stlink_usb_block(h);
 
 		if (count < bytes_remaining)
@@ -2180,7 +2181,7 @@ static int stlink_usb_write_mem(void *handle, uint32_t addr, uint32_t size,
 
 	while (count) {
 
-		bytes_remaining = (size == 4) ? \
+		bytes_remaining = (size != 1) ?
 				stlink_max_block_size(h->max_mem_packet, addr) : stlink_usb_block(h);
 
 		if (count < bytes_remaining)
@@ -2375,7 +2376,7 @@ static int stlink_speed_v3(void *handle, unsigned int *freq, unsigned int khz, b
 		match = false;
 
 	if (!match) {
-		LOG_INFO("Unable to match requested speed %d kHz, using %d kHz", \
+		LOG_INFO("Unable to match requested speed %d kHz, using %d kHz",
 				khz, freq[speed_index]);
 	}
 
@@ -2501,43 +2502,45 @@ static int stlink_speed_v2(void *handle, int khz, bool query)
 /** */
 static int stlink_speed(void *handle, int khz, bool query)
 {
-	int ret = khz;
-	struct stlink_usb_handle_s *h = handle;
+    int ret = khz;
+    struct stlink_usb_handle_s *h = handle;
 
-	if (h && (h->transport == HL_TRANSPORT_SWIM)) {
-		/*
-			we dont care what the khz rate is
-			we only have low and high speed...
-			before changing speed the SWIM_CSR HS bit
-			must be updated
-		 */
-		if (khz == 0)
-			stlink_swim_speed(handle, 0);
-		else
-			stlink_swim_speed(handle, 1);
-		return khz;
-	}
+    if (h && (h->transport == HL_TRANSPORT_SWIM)) {
+        /*
+        	we dont care what the khz rate is
+        	we only have low and high speed...
+        	before changing speed the SWIM_CSR HS bit
+        	must be updated
+         */
+        if (khz == 0)
+            stlink_swim_speed(handle, 0);
+        else
+            stlink_swim_speed(handle, 1);
+        return khz;
+    }
 
-	if (h && (h->version.stlink == 3)) {
-		/* Need to communicate with Stlink v3 to get dynamic freq table */
-		if (!query || h->debug_mode_entered) {
-			unsigned int freq_map[STLINK_V3_MAX_FREQ_NB];
-			unsigned char protocol = 0;
+    if (h && (h->version.stlink == 3)) {
+        /* Need to communicate with Stlink v3 to get dynamic freq table */
+        if (!query || h->debug_mode_entered) {
+            unsigned int freq_map[STLINK_V3_MAX_FREQ_NB];
+            unsigned char protocol = 0;
 
-			if (h->transport == HL_TRANSPORT_SWD)
-				protocol = 0;
-			else if (h->transport == HL_TRANSPORT_JTAG)
-				protocol = 1;
+            if (h->transport == HL_TRANSPORT_SWD)
+                protocol = 0;
+            else if (h->transport == HL_TRANSPORT_JTAG)
+                protocol = 1;
 
-			stlink_get_com_freq(h, protocol, freq_map);
+            stlink_get_com_freq(h, protocol, freq_map);
 
-			ret = stlink_speed_v3(h, freq_map, khz, query);
-		} else
-			return khz;
-	} else
-		ret = stlink_speed_v2(h, khz, query);
+            ret = stlink_speed_v3(h, freq_map, khz, query);
+        }
+        else
+            return khz;
+    }
+    else
+        ret = stlink_speed_v2(h, khz, query);
 
-	return ret;
+    return ret;
 }
 
 /** */
@@ -3026,7 +3029,7 @@ struct hl_layout_api_s stlink_usb_layout_api = {
 	data phase.
 	Ignore the (eventual) error code in the received packet.
 */
-static int stlink_usb_xfer_noerrcheck(void *handle, const uint8_t *buf, int size)
+int stlink_usb_xfer_noerrcheck(void *handle, const uint8_t *buf, int size)
 {
 	int err, cmdsize = STLINK_CMD_SIZE_V2;
 	struct stlink_usb_handle_s *h = handle;

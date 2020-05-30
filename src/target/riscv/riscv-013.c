@@ -666,10 +666,8 @@ uint32_t abstract_register_size(unsigned width)
 			return set_field(0, AC_ACCESS_REGISTER_SIZE, 2);
 		case 64:
 			return set_field(0, AC_ACCESS_REGISTER_SIZE, 3);
-			break;
 		case 128:
 			return set_field(0, AC_ACCESS_REGISTER_SIZE, 4);
-			break;
 		default:
 			LOG_ERROR("Unsupported register width: %d", width);
 			return 0;
@@ -1892,11 +1890,9 @@ static target_addr_t sb_read_address(struct target *target)
 	target_addr_t address = 0;
 	uint32_t v;
 	if (sbasize > 32) {
-#if BUILD_TARGET64
 		dmi_read(target, &v, DMI_SBADDRESS1);
 		address |= v;
 		address <<= 32;
-#endif
 	}
 	dmi_read(target, &v, DMI_SBADDRESS0);
 	address |= v;
@@ -1913,11 +1909,7 @@ static int sb_write_address(struct target *target, target_addr_t address)
 	if (sbasize > 64)
 		dmi_write(target, DMI_SBADDRESS2, 0);
 	if (sbasize > 32)
-#if BUILD_TARGET64
 		dmi_write(target, DMI_SBADDRESS1, address >> 32);
-#else
-		dmi_write(target, DMI_SBADDRESS1, 0);
-#endif
 	return dmi_write(target, DMI_SBADDRESS0, address);
 }
 
@@ -3720,13 +3712,13 @@ int riscv013_test_compliance(struct target *target)
 	But at any rate, this is not legal and should cause an error. */
 	COMPLIANCE_WRITE(target, DMI_COMMAND, 0xAAAAAAAA);
 	COMPLIANCE_READ(target, &testvar_read, DMI_ABSTRACTCS);
-	COMPLIANCE_TEST(get_field(testvar_read, DMI_ABSTRACTCS_CMDERR) == CMDERR_NOT_SUPPORTED, \
+	COMPLIANCE_TEST(get_field(testvar_read, DMI_ABSTRACTCS_CMDERR) == CMDERR_NOT_SUPPORTED,
 			"Illegal COMMAND should result in UNSUPPORTED");
 	COMPLIANCE_WRITE(target, DMI_ABSTRACTCS, DMI_ABSTRACTCS_CMDERR);
 
 	COMPLIANCE_WRITE(target, DMI_COMMAND, 0x55555555);
 	COMPLIANCE_READ(target, &testvar_read, DMI_ABSTRACTCS);
-	COMPLIANCE_TEST(get_field(testvar_read, DMI_ABSTRACTCS_CMDERR) == CMDERR_NOT_SUPPORTED, \
+	COMPLIANCE_TEST(get_field(testvar_read, DMI_ABSTRACTCS_CMDERR) == CMDERR_NOT_SUPPORTED,
 			"Illegal COMMAND should result in UNSUPPORTED");
 	COMPLIANCE_WRITE(target, DMI_ABSTRACTCS, DMI_ABSTRACTCS_CMDERR);
 

@@ -1269,7 +1269,7 @@ static int jtag_examine_chain(void)
 			 * REVISIT create a jtag_alloc(chip, tap) routine, and
 			 * share it with jim_newtap_cmd().
 			 */
-			tap = calloc(1, sizeof *tap);
+			tap = calloc(1, sizeof(*tap));
 			if (!tap) {
 				retval = ERROR_FAIL;
 				goto out;
@@ -1406,7 +1406,7 @@ static int jtag_validate_ircapture(void)
 					&& tap->ir_length < JTAG_IRLEN_MAX) {
 				tap->ir_length++;
 			}
-			LOG_WARNING("AUTO %s - use \"jtag newtap " "%s %s -irlen %d "
+			LOG_WARNING("AUTO %s - use \"jtag newtap %s %s -irlen %d "
 					"-expected-id 0x%08" PRIx32 "\"",
 					tap->dotted_name, tap->chip, tap->tapname, tap->ir_length, tap->idcode);
 		}
@@ -1872,7 +1872,7 @@ void jtag_set_verify(bool enable)
 	jtag_verify = enable;
 }
 
-bool jtag_will_verify()
+bool jtag_will_verify(void)
 {
 	return jtag_verify;
 }
@@ -1882,7 +1882,7 @@ void jtag_set_verify_capture_ir(bool enable)
 	jtag_verify_capture_ir = enable;
 }
 
-bool jtag_will_verify_capture_ir()
+bool jtag_will_verify_capture_ir(void)
 {
 	return jtag_verify_capture_ir;
 }
@@ -2020,6 +2020,11 @@ int adapter_resets(int trst, int srst)
 
 		/* adapters without trst signal will eventually use tlr sequence */
 		jtag_add_reset(trst, srst);
+		/*
+		 * The jtag queue is still used for reset by some adapter. Flush it!
+		 * FIXME: To be removed when all adapter drivers will be updated!
+		 */
+		jtag_execute_queue();
 		return ERROR_OK;
 	} else if (transport_is_swd() || transport_is_hla() ||
 			   transport_is_dapdirect_swd() || transport_is_dapdirect_jtag()) {

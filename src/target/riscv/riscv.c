@@ -772,12 +772,9 @@ static int oldriscv_step(struct target *target, int current, uint32_t address,
 	return tt->step(target, current, address, handle_breakpoints);
 }
 
-static int old_or_new_riscv_step(
-		struct target *target,
-		int current,
-		target_addr_t address,
-		int handle_breakpoints
-){
+static int old_or_new_riscv_step(struct target *target, int current,
+		target_addr_t address, int handle_breakpoints)
+{
 	RISCV_INFO(r);
 	LOG_DEBUG("handle_breakpoints=%d", handle_breakpoints);
 	if (r->is_halted == NULL)
@@ -862,13 +859,9 @@ static int oldriscv_resume(struct target *target, int current, uint32_t address,
 			debug_execution);
 }
 
-static int old_or_new_riscv_resume(
-		struct target *target,
-		int current,
-		target_addr_t address,
-		int handle_breakpoints,
-		int debug_execution
-){
+static int old_or_new_riscv_resume(struct target *target, int current,
+		target_addr_t address, int handle_breakpoints, int debug_execution)
+{
 	LOG_DEBUG("handle_breakpoints=%d", handle_breakpoints);
 	if (target->smp) {
 		struct target_list *targets = target->head;
@@ -1413,12 +1406,9 @@ int riscv_openocd_resume(
 	return out;
 }
 
-int riscv_openocd_step(
-		struct target *target,
-		int current,
-		target_addr_t address,
-		int handle_breakpoints
-) {
+int riscv_openocd_step(struct target *target, int current,
+		target_addr_t address, int handle_breakpoints)
+{
 	LOG_DEBUG("stepping rtos hart");
 
 	if (!current)
@@ -1858,13 +1848,13 @@ static const struct command_registration riscv_exec_command_handlers[] = {
 		.name = "test_sba_config_reg",
 		.handler = riscv_test_sba_config_reg,
 		.mode = COMMAND_ANY,
-		.usage = "riscv test_sba_config_reg legal_address num_words"
+		.usage = "riscv test_sba_config_reg legal_address num_words "
 			"illegal_address run_sbbusyerror_test[on/off]",
-		.help = "Perform a series of tests on the SBCS register."
-			"Inputs are a legal, 128-byte aligned address and a number of words to"
-			"read/write starting at that address (i.e., address range [legal address,"
-			"legal_address+word_size*num_words) must be legally readable/writable)"
-			", an illegal, 128-byte aligned address for error flag/handling cases,"
+		.help = "Perform a series of tests on the SBCS register. "
+			"Inputs are a legal, 128-byte aligned address and a number of words to "
+			"read/write starting at that address (i.e., address range [legal address, "
+			"legal_address+word_size*num_words) must be legally readable/writable), "
+			"an illegal, 128-byte aligned address for error flag/handling cases, "
 			"and whether sbbusyerror test should be run."
 	},
 	{

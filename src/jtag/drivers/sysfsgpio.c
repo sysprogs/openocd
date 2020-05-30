@@ -61,7 +61,7 @@
  *
  * Assume here that there will be less than 10000 gpios on a system
  */
-static int is_gpio_valid(int gpio)
+static bool is_gpio_valid(int gpio)
 {
 	return gpio >= 0 && gpio < 10000;
 }
@@ -98,8 +98,6 @@ static void unexport_sysfs_gpio(int gpio)
 	snprintf(gpiostr, sizeof(gpiostr), "%d", gpio);
 	if (open_write_close("/sys/class/gpio/unexport", gpiostr) < 0)
 		LOG_ERROR("Couldn't unexport gpio %d", gpio);
-
-	return;
 }
 
 /*
@@ -603,23 +601,23 @@ static void cleanup_all_fds(void)
 static bool sysfsgpio_jtag_mode_possible(void)
 {
 	if (!is_gpio_valid(tck_gpio))
-		return 0;
+		return false;
 	if (!is_gpio_valid(tms_gpio))
-		return 0;
+		return false;
 	if (!is_gpio_valid(tdi_gpio))
-		return 0;
+		return false;
 	if (!is_gpio_valid(tdo_gpio))
-		return 0;
-	return 1;
+		return false;
+	return true;
 }
 
 static bool sysfsgpio_swd_mode_possible(void)
 {
 	if (!is_gpio_valid(swclk_gpio))
-		return 0;
+		return false;
 	if (!is_gpio_valid(swdio_gpio))
-		return 0;
-	return 1;
+		return false;
+	return true;
 }
 
 static int sysfsgpio_init(void)
@@ -715,4 +713,3 @@ static int sysfsgpio_quit(void)
 	cleanup_all_fds();
 	return ERROR_OK;
 }
-
