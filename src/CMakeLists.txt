@@ -22,6 +22,11 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc COMMAND ${
 string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d")
 
 add_executable(openocd openocd.c main.c hello.c ${CMAKE_CURRENT_BINARY_DIR}/startup_tcl.inc)
+
+if (HLA_MULTICORE)
+set_target_properties(openocd PROPERTIES OUTPUT_NAME "openocd_hla_multicore")
+endif()
+
 target_link_libraries(openocd 
 	xsvf
 	svf

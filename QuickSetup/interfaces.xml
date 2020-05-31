@@ -209,6 +209,7 @@
 		<ID>olimex-arm-usb-ocd</ID>
 		<Name>Olimex ARM-USB-OCD</Name>
 		<ScriptFile>interface/ftdi/olimex-arm-usb-ocd.cfg</ScriptFile>
+		<SWDScriptFile>transport/olimex-arm-jtag-swd.cfg</SWDScriptFile>
 		<UsbIdentities>
 			<UsbIdentity>
 				<VID>15ba</VID>
@@ -222,6 +223,7 @@
 		<ID>olimex-arm-usb-ocd-h</ID>
 		<Name>Olimex ARM-USB-OCD-H</Name>
 		<ScriptFile>interface/ftdi/olimex-arm-usb-ocd-h.cfg</ScriptFile>
+		<SWDScriptFile>transport/olimex-arm-jtag-swd.cfg</SWDScriptFile>
 		<UsbIdentities>
 			<UsbIdentity>
 				<VID>15ba</VID>
@@ -236,6 +238,7 @@
 		<ID>olimex-arm-usb-tiny-h</ID>
 		<Name>Olimex ARM-USB-OCD-Tiny</Name>
 		<ScriptFile>interface/ftdi/olimex-arm-usb-tiny-h.cfg</ScriptFile>
+		<SWDScriptFile>transport/olimex-arm-jtag-swd.cfg</SWDScriptFile>
 		<UsbIdentities>
 			<UsbIdentity>
 				<VID>15ba</VID>
@@ -250,6 +253,7 @@
 		<ID>olimex-jtag-tiny</ID>
 		<Name>Olimex JTAG-Tiny</Name>
 		<ScriptFile>interface/ftdi/olimex-jtag-tiny.cfg</ScriptFile>
+		<SWDScriptFile>transport/olimex-arm-jtag-swd.cfg</SWDScriptFile>
 		<UsbIdentities>
 			<UsbIdentity>
 				<VID>15ba</VID>

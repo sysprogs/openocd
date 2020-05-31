@@ -675,5 +675,13 @@
 		<SecondBspID>com.sysprogs.arm.mbed</SecondBspID>
 		<ScriptFile>target/lpc8xx.cfg</ScriptFile>
 	</TargetDeviceFamily>
-	
+	<!-- ============================================ Other ============================================ -->
+	<TargetDeviceFamily>
+		<ID>rs14100</ID>
+		<Name>Redpine RS14100</Name>
+		<MatchRegex>^RS14100.*</MatchRegex>
+		<BspID>com.sysprogs.arm.rs14100</BspID>
+		<ScriptFile>target/rs14100.cfg</ScriptFile>
+		<RequiresResetAfterLoad>true</RequiresResetAfterLoad>
+	</TargetDeviceFamily>
 </ArrayOfTargetDeviceFamily>

@@ -22,7 +22,6 @@
 #ifndef OPENOCD_JTAG_HLA_HLA_LAYOUT_H
 #define OPENOCD_JTAG_HLA_HLA_LAYOUT_H
 
-#define tpio_pin_protocol tpiu_pin_protocol
 #include <target/armv7m_trace.h>
 
 /** */
@@ -96,8 +95,10 @@ struct hl_layout_api_s {
 	 * its maximum supported rate there
 	 * @returns ERROR_OK on success, an error code on failure.
 	 */
-	int (*config_trace)(void *handle, bool enabled, enum tpio_pin_protocol pin_protocol,
-			    uint32_t port_size, unsigned int *trace_freq);
+	int (*config_trace)(void *handle, bool enabled,
+				enum tpiu_pin_protocol pin_protocol, uint32_t port_size,
+				unsigned int *trace_freq, unsigned int traceclkin_freq,
+				uint16_t *prescaler);
 	/**
 	 * Poll for new trace data
 	 *

@@ -236,8 +236,8 @@ static void hl_constructor(void)
 
 bool transport_is_hla(void)
 {
-    struct transport *t;
-    t = get_current_transport();
-    return t == &hl_swd_transport || t == &hl_jtag_transport
-    	   || t == &stlink_swim_transport;
+	struct transport *t;
+	t = get_current_transport();
+	return t == &hl_swd_transport || t == &hl_jtag_transport
+		   || t == &stlink_swim_transport;
 }

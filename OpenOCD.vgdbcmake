@@ -67,7 +67,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/cmsis-dap.cfg -c "transport select swd" -c "adapter speed 3000" -f target/rs14100.cfg -c init -c "reset init" -c "echo VisualGDB_OpenOCD_Ready"</Arguments>
+            <Arguments>-c "set CHIPNAME STM32H747XIxx" -f interface/stlink.cfg -f target/stm32h7x_dual_core.cfg -c "init" -c "reset init"</Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>

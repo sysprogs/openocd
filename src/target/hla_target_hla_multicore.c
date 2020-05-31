@@ -25,6 +25,7 @@
 #include "config.h"
 #endif
 
+#include "jtag/interface.h"
 #include "jtag/jtag.h"
 #include "jtag/hla/hla_transport.h"
 #include "jtag/hla/hla_interface.h"
@@ -351,11 +352,19 @@ static int adapter_target_create(struct target *target,
 {
 	LOG_DEBUG("%s", __func__);
 
+	struct adiv5_private_config *pc = target->private_config;
+	if (pc != NULL && pc->ap_num > 0) {
+		LOG_ERROR("hla_target: invalid parameter -ap-num (> 0)");
+		return ERROR_COMMAND_SYNTAX_ERROR;
+	}
+
 	struct cortex_m_common *cortex_m = calloc(1, sizeof(struct cortex_m_common));
 
-	if (!cortex_m)
-		return ERROR_COMMAND_SYNTAX_ERROR;
-
+	if (cortex_m == NULL) {
+		LOG_ERROR("No memory creating target");
+		return ERROR_FAIL;
+	}
+	
 	adapter_init_arch_info(target, cortex_m, target->tap);
 
 	return ERROR_OK;
@@ -475,7 +484,7 @@ static int adapter_poll(struct target *target)
 	return ERROR_OK;
 }
 
-static int adapter_assert_reset(struct target *target)
+static int hl_assert_reset(struct target *target)
 {
 	int res = ERROR_OK;
 	struct hl_interface_s *adapter = target_to_adapter(target);
@@ -490,8 +499,7 @@ static int adapter_assert_reset(struct target *target)
 
 	if ((jtag_reset_config & RESET_HAS_SRST) &&
 	    (jtag_reset_config & RESET_SRST_NO_GATING)) {
-		jtag_add_reset(0, 1);
-		res = adapter->layout->api->assert_srst(adapter->handle, 0);
+		res = adapter_assert_reset();
 		srst_asserted = true;
 	}
 
@@ -506,8 +514,7 @@ static int adapter_assert_reset(struct target *target)
 
 	if (jtag_reset_config & RESET_HAS_SRST) {
 		if (!srst_asserted) {
-			jtag_add_reset(0, 1);
-			res = adapter->layout->api->assert_srst(adapter->handle, 0);
+			res = adapter_assert_reset();
 		}
 		if (res == ERROR_COMMAND_NOTFOUND)
 			LOG_ERROR("Hardware srst not supported, falling back to software reset");
@@ -525,9 +532,6 @@ static int adapter_assert_reset(struct target *target)
 	if (!target->first_reset) {
 		target->first_reset = true;
 	}
-
-	uint32_t reg;
-	adapter->layout->api->read_debug_reg(adapter->handle, DCB_DHCSR, (uint32_t *)&reg, target);
 
 	res = adapter->layout->api->reset(adapter->handle);
 
@@ -547,21 +551,14 @@ static int adapter_assert_reset(struct target *target)
 	return ERROR_OK;
 }
 
-static int adapter_deassert_reset(struct target *target)
+static int hl_deassert_reset(struct target *target)
 {
-	struct hl_interface_s *adapter = target_to_adapter(target);
-
 	enum reset_types jtag_reset_config = jtag_get_reset_config();
 
 	LOG_DEBUG("%s", __func__);
 
 	if (jtag_reset_config & RESET_HAS_SRST)
-		adapter->layout->api->assert_srst(adapter->handle, 1);
-
-	/* virtual deassert reset, we need it for the internal
-	 * jtag state machine
-	 */
-	jtag_add_reset(0, 0);
+		adapter_deassert_reset();
 
 	target->savedDCRDR = 0;  /* clear both DCC busy bits on initial resume */
 
@@ -795,6 +792,7 @@ struct target_type hla_target = {
 	.init_target = adapter_init_target,
 	.deinit_target = cortex_m_deinit_target,
 	.target_create = adapter_target_create,
+	.target_jim_configure = adiv5_jim_configure,
 	.examine = cortex_m_examine,
 	.commands = adapter_command_handlers,
 
@@ -802,13 +800,14 @@ struct target_type hla_target = {
 	.arch_state = armv7m_arch_state,
 
 	.target_request_data = hl_target_request_data,
-	.assert_reset = adapter_assert_reset,
-	.deassert_reset = adapter_deassert_reset,
+	.assert_reset = hl_assert_reset,
+	.deassert_reset = hl_deassert_reset,
 
 	.halt = adapter_halt,
 	.resume = adapter_resume,
 	.step = adapter_step,
 
+	.get_gdb_arch = arm_get_gdb_arch,
 	.get_gdb_reg_list = armv7m_get_gdb_reg_list,
 
 	.read_memory = adapter_read_memory,

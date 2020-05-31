@@ -76,7 +76,7 @@ add_library(ocdjlink STATIC
 
 target_compile_definitions(ocdjlink PRIVATE HAVE_LIBUSB)
 	
-add_library(jtag STATIC adapter.c core.c interface.c interfaces.c tcl.c commands.c)
+add_library(jtag STATIC adapter.c core.c interface.c interfaces.c tcl.c commands.c swim.c)
 
 SET_TARGET_PROPERTIES(ocdjlink PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR}/jlink)
 

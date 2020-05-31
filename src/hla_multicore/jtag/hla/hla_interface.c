@@ -35,7 +35,7 @@
 
 #include <target/target.h>
 
-static struct hl_interface_s hl_if = { {0, 0, { 0 }, { 0 }, 0, HL_TRANSPORT_UNKNOWN, false, -1, 7184, 0}, 0, 0};
+static struct hl_interface_s hl_if = { {0, 0, { 0 }, { 0 }, HL_TRANSPORT_UNKNOWN, false, -1}, 0, 0 };
 
 int hl_interface_open(enum hl_transports tr)
 {
@@ -112,11 +112,6 @@ static int hl_interface_init(void)
 	return hl_layout_init(&hl_if);
 }
 
-static int hl_interface_reset(int req_trst, int req_srst)
-{
-    return hl_if.layout->api->assert_srst(hl_if.handle, req_srst ? 0 : 1);
-}
-
 static int hl_interface_quit(void)
 {
 	LOG_DEBUG("hl_interface_quit");
@@ -124,14 +119,17 @@ static int hl_interface_quit(void)
 	if (hl_if.layout->api->close)
 		hl_if.layout->api->close(hl_if.handle);
 
+	jtag_command_queue_reset();
+
+	free((void *)hl_if.param.device_desc);
+	free((void *)hl_if.param.serial);
+
 	return ERROR_OK;
 }
 
-static int hl_interface_execute_queue(void)
+static int hl_interface_reset(int req_trst, int req_srst)
 {
-	LOG_DEBUG("hl_interface_execute_queue: ignored");
-
-	return ERROR_OK;
+	return hl_if.layout->api->assert_srst(hl_if.handle, req_srst ? 0 : 1);
 }
 
 int hl_interface_init_reset(void)
@@ -139,10 +137,9 @@ int hl_interface_init_reset(void)
 	/* in case the adapter has not already handled asserting srst
 	 * we will attempt it again */
 	if (hl_if.param.connect_under_reset) {
-		jtag_add_reset(0, 1);
-		hl_if.layout->api->assert_srst(hl_if.handle, 0);
+		adapter_assert_reset();
 	} else {
-		jtag_add_reset(0, 0);
+		adapter_deassert_reset();
 	}
 
 	return ERROR_OK;
@@ -191,16 +188,13 @@ int hl_interface_override_target(const char **targetname)
 	return ERROR_FAIL;
 }
 
-int hl_interface_config_trace(bool enabled,
-    enum tpiu_pin_protocol pin_protocol,
-    uint32_t port_size,
-    unsigned int *trace_freq,
-    unsigned int traceclkin_freq,
-    uint16_t *prescaler)
+int hl_interface_config_trace(bool enabled, enum tpiu_pin_protocol pin_protocol,
+		uint32_t port_size, unsigned int *trace_freq,
+		unsigned int traceclkin_freq, uint16_t *prescaler)
 {
 	if (hl_if.layout->api->config_trace)
-		return hl_if.layout->api->config_trace(hl_if.handle, enabled, pin_protocol,
-						       port_size, trace_freq);
+		return hl_if.layout->api->config_trace(hl_if.handle, enabled,
+			pin_protocol, port_size, trace_freq, traceclkin_freq, prescaler);
 	else if (enabled) {
 		LOG_ERROR("The selected interface does not support tracing");
 		return ERROR_FAIL;
@@ -422,18 +416,18 @@ static const struct command_registration hl_interface_command_handlers[] = {
 };
 
 struct adapter_driver hl_adapter_driver = {
-    .name = "hla",
-    .transports = hl_transports,
-    .commands = hl_interface_command_handlers,
+	.name = "hla",
+	.transports = hl_transports,
+	.commands = hl_interface_command_handlers,
 
-    .init = hl_interface_init,
-    .quit = hl_interface_quit,
-    .reset = hl_interface_reset,
-    .speed = &hl_interface_speed,
-    .khz = &hl_interface_khz,
-    .speed_div = &hl_interface_speed_div,
-    .config_trace = &hl_interface_config_trace,
-    .poll_trace = &hl_interface_poll_trace,
+	.init = hl_interface_init,
+	.quit = hl_interface_quit,
+	.reset = hl_interface_reset,
+	.speed = &hl_interface_speed,
+	.khz = &hl_interface_khz,
+	.speed_div = &hl_interface_speed_div,
+	.config_trace = &hl_interface_config_trace,
+	.poll_trace = &hl_interface_poll_trace,
 
-    /* no ops for HLA, targets hla_target and stm8 intercept them all */
+	/* no ops for HLA, targets hla_target and stm8 intercept them all */
 };
