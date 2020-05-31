@@ -1,26 +1,26 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26730.16
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29728.190
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{803FD0C6-D64E-4E16-9DC3-1DAEC859A3D2}") = "OpenOCD", "OpenOCD.vgdbcmake", "{282DF7A5-CC88-4FB2-9904-FACB153CA898}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|VisualGDB = Debug|VisualGDB
-		MinSizeRel|VisualGDB = MinSizeRel|VisualGDB
-		Release|VisualGDB = Release|VisualGDB
-		RelWithDebInfo|VisualGDB = RelWithDebInfo|VisualGDB
+		Debug|Mainstream = Debug|Mainstream
+		Release|Mainstream = Release|Mainstream
+		Debug|HLA_Multicore = Debug|HLA_Multicore
+		Release|HLA_Multicore = Release|HLA_Multicore
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Debug|VisualGDB.ActiveCfg = Debug|VisualGDB
-		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Debug|VisualGDB.Build.0 = Debug|VisualGDB
-		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.MinSizeRel|VisualGDB.ActiveCfg = MinSizeRel|VisualGDB
-		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.MinSizeRel|VisualGDB.Build.0 = MinSizeRel|VisualGDB
-		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Release|VisualGDB.ActiveCfg = Release|VisualGDB
-		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Release|VisualGDB.Build.0 = Release|VisualGDB
-		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.RelWithDebInfo|VisualGDB.ActiveCfg = RelWithDebInfo|VisualGDB
-		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.RelWithDebInfo|VisualGDB.Build.0 = RelWithDebInfo|VisualGDB
+		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Debug|Mainstream.ActiveCfg = Debug|Mainstream
+		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Debug|Mainstream.Build.0 = Debug|Mainstream
+		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Release|Mainstream.ActiveCfg = Release|Mainstream
+		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Release|Mainstream.Build.0 = Release|Mainstream
+		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Debug|HLA_Multicore.ActiveCfg = Debug|HLA_Multicore
+		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Debug|HLA_Multicore.Build.0 = Debug|HLA_Multicore
+		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Release|HLA_Multicore.ActiveCfg = Release|HLA_Multicore
+		{282DF7A5-CC88-4FB2-9904-FACB153CA898}.Release|HLA_Multicore.Build.0 = Release|HLA_Multicore
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

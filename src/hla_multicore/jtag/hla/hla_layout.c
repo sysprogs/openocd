@@ -19,50 +19,78 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
-#ifndef OPENOCD_JTAG_HLA_HLA_INTERFACE_H
-#define OPENOCD_JTAG_HLA_HLA_INTERFACE_H
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-/** */
-struct target;
-/** */
-enum e_hl_transports;
-/** */
-extern const char *hl_transports[];
+/* project specific includes */
+#include <jtag/interface.h>
+#include <transport/transport.h>
+#include <helper/time_support.h>
 
-#define HLA_MAX_USB_IDS 8
+#include <jtag/hla/hla_layout.h>
+#include <jtag/hla/hla_tcl.h>
+#include <jtag/hla/hla_transport.h>
+#include <jtag/hla/hla_interface.h>
 
-struct hl_interface_param_s {
-	/** */
-	const char *device_desc;
-	/** */
-	const char *serial;
-	/** List of recognised VIDs */
-	uint16_t vid[HLA_MAX_USB_IDS + 1];
-	/** List of recognised PIDs */
-	uint16_t pid[HLA_MAX_USB_IDS + 1];
-	/** */
-	enum hl_transports transport;
-	/** */
-	bool connect_under_reset;
-	/** Initial interface clock clock speed */
-	int initial_interface_speed;
+static int hl_layout_open(struct hl_interface_s *adapter)
+{
+	int res;
+
+	LOG_DEBUG("hl_layout_open");
+
+	adapter->handle = NULL;
+
+	res = adapter->layout->api->open(&adapter->param, &adapter->handle);
+
+	if (res != ERROR_OK) {
+		LOG_DEBUG("failed");
+		return res;
+	}
+
+	return ERROR_OK;
+}
+
+static int hl_layout_close(struct hl_interface_s *adapter)
+{
+	return ERROR_OK;
+}
+
+static const struct hl_layout hl_layouts[] = {
+	{
+	 .name = "stlink",
+	 .open = hl_layout_open,
+	 .close = hl_layout_close,
+	 .api = &stlink_usb_layout_api,
+	 },
+	/*{
+	 .name = "stlink-tcp",
+	 .open = hl_layout_open,
+	 .close = hl_layout_close,
+	 .api = &stlink_tcp_layout_api,
+	 },*/
+	{
+	 .name = "ti-icdi",
+	 .open = hl_layout_open,
+	 .close = hl_layout_close,
+	 .api = &icdi_usb_layout_api,
+	},
+	{.name = NULL, /* END OF TABLE */ },
 };
 
-struct hl_interface_s {
-	/** */
-	struct hl_interface_param_s param;
-	/** */
-	const struct hl_layout *layout;
-	/** */
-	void *handle;
-};
-
 /** */
-int hl_interface_open(enum hl_transports tr);
-/** */
+const struct hl_layout *hl_layout_get_list(void)
+{
+	return hl_layouts;
+}
 
-int hl_interface_init_target(struct target *t);
-int hl_interface_init_reset(void);
-int hl_interface_override_target(const char **targetname);
+int hl_layout_init(struct hl_interface_s *adapter)
+{
+	LOG_DEBUG("hl_layout_init");
 
-#endif /* OPENOCD_JTAG_HLA_HLA_INTERFACE_H */
+	if (adapter->layout == NULL) {
+		LOG_ERROR("no layout specified");
+		return ERROR_FAIL;
+	}
+	return ERROR_OK;
+}

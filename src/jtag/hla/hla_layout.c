@@ -63,12 +63,6 @@ static const struct hl_layout hl_layouts[] = {
 	 .close = hl_layout_close,
 	 .api = &stlink_usb_layout_api,
 	 },
-	/*{
-	 .name = "stlink-tcp",
-	 .open = hl_layout_open,
-	 .close = hl_layout_close,
-	 .api = &stlink_tcp_layout_api,
-	 },*/
 	{
 	 .name = "ti-icdi",
 	 .open = hl_layout_open,

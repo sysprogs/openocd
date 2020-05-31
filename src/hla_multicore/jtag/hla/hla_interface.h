@@ -22,6 +22,8 @@
 #ifndef OPENOCD_JTAG_HLA_HLA_INTERFACE_H
 #define OPENOCD_JTAG_HLA_HLA_INTERFACE_H
 
+#define tpio_pin_protocol tpiu_pin_protocol
+
 /** */
 struct target;
 /** */
@@ -41,11 +43,17 @@ struct hl_interface_param_s {
 	/** List of recognised PIDs */
 	uint16_t pid[HLA_MAX_USB_IDS + 1];
 	/** */
+	unsigned api;
+	/** */
 	enum hl_transports transport;
 	/** */
 	bool connect_under_reset;
 	/** Initial interface clock clock speed */
 	int initial_interface_speed;
+	/** */
+	unsigned long port;
+	/** */
+	unsigned long current_core;
 };
 
 struct hl_interface_s {

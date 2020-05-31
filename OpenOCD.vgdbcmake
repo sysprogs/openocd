@@ -1,6 +1,5 @@
 <?xml version="1.0"?>
 <VisualGDBProjectSettings2 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <ConfigurationName>Release</ConfigurationName>
   <Project xsi:type="com.visualgdb.project.windows">
     <CustomSourceDirectories>
       <Directories />
@@ -20,7 +19,7 @@
     </ToolchainID>
     <RelativeSourceDirectory />
     <ConfigurationType>DEBUG</ConfigurationType>
-    <BinaryDirectory>VisualGDB/$(ConfigurationName)</BinaryDirectory>
+    <BinaryDirectory>build/$(PlatformName)/$(ConfigurationName)</BinaryDirectory>
     <MainCMakeTarget>openocd</MainCMakeTarget>
     <MakeCommandTemplate>
       <SkipWhenRunningCommandList>false</SkipWhenRunningCommandList>
@@ -120,7 +119,25 @@
       <Enabled>false</Enabled>
     </CodeAnalyzerSettings>
   </CodeSense>
-  <Configurations />
+  <Configurations>
+    <VisualGDBConfiguration>
+      <PlatformName>Mainstream</PlatformName>
+    </VisualGDBConfiguration>
+    <VisualGDBConfiguration>
+      <PlatformName>HLA_Multicore</PlatformName>
+      <MergeableBuildSettingsExtension xsi:type="com.visualgdb.build.cmake.mergeable">
+        <AdditionalDefinitions>
+          <string>HLA_MULTICORE</string>
+        </AdditionalDefinitions>
+      </MergeableBuildSettingsExtension>
+    </VisualGDBConfiguration>
+    <VisualGDBConfiguration>
+      <Name>Debug</Name>
+    </VisualGDBConfiguration>
+    <VisualGDBConfiguration>
+      <Name>Release</Name>
+    </VisualGDBConfiguration>
+  </Configurations>
   <ProgramArgumentsSuggestions />
   <Debug xsi:type="com.visualgdb.debug.local">
     <AdditionalStartupCommands />

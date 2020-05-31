@@ -192,7 +192,7 @@ static int stm8_adapter_read_memory(struct target *target,
 	struct hl_interface_s *adapter = target_to_adapter(target);
 
 	ret = adapter->layout->api->read_mem(adapter->handle,
-		addr, size, count, buf);
+		addr, size, count, buf, target);
 	if (ret != ERROR_OK)
 		return ret;
 	return ERROR_OK;
@@ -205,7 +205,7 @@ static int stm8_adapter_write_memory(struct target *target,
 	struct hl_interface_s *adapter = target_to_adapter(target);
 
 	ret = adapter->layout->api->write_mem(adapter->handle,
-		addr, size, count, buf);
+		addr, size, count, buf, target);
 	if (ret != ERROR_OK)
 		return ret;
 	return ERROR_OK;
@@ -219,7 +219,7 @@ static int stm8_write_u8(struct target *target,
 	struct hl_interface_s *adapter = target_to_adapter(target);
 
 	buf[0] = val;
-	ret =  adapter->layout->api->write_mem(adapter->handle, addr, 1, 1, buf);
+	ret =  adapter->layout->api->write_mem(adapter->handle, addr, 1, 1, buf, target);
 	if (ret != ERROR_OK)
 		return ret;
 	return ERROR_OK;
@@ -231,7 +231,7 @@ static int stm8_read_u8(struct target *target,
 	int ret;
 	struct hl_interface_s *adapter = target_to_adapter(target);
 
-	ret =  adapter->layout->api->read_mem(adapter->handle, addr, 1, 1, val);
+	ret =  adapter->layout->api->read_mem(adapter->handle, addr, 1, 1, val, target);
 	if (ret != ERROR_OK)
 		return ret;
 	return ERROR_OK;
@@ -1723,7 +1723,7 @@ static int stm8_examine(struct target *target)
 		} else {
 			LOG_INFO("trying to reconnect");
 
-			retval = adapter->layout->api->state(adapter->handle);
+			retval = adapter->layout->api->state(adapter->handle, target);
 			if (retval != ERROR_OK) {
 				LOG_ERROR("reconnect failed");
 				return ERROR_FAIL;

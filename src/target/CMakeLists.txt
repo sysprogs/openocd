@@ -52,7 +52,7 @@ add_library(target
 	etm_dummy.c
 	fa526.c
 	feroceon.c
-	hla_target.c
+	hla_target${HLA_MULTICORE_SUFFIX}.c
 	image.c
 	lakemont.c
 	ls1_sap.c
@@ -82,7 +82,7 @@ add_library(target
 	x86_32_common.c
 	xscale.c
 	aarch64.c
-	stm8.c
+	stm8${HLA_MULTICORE_SUFFIX}.c
 	arm_dap.c
 	semihosting_common.c
 	riscv/batch.c
