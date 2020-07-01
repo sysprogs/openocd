@@ -4695,6 +4695,11 @@ void target_handle_event(struct target *target, enum target_event e)
 			else 
 				retval = Jim_EvalObj(teap->interp, teap->body);
 
+			cmd_ctx->current_target_override = saved_target_override;
+
+			if (retval == ERROR_COMMAND_CLOSE_CONNECTION)
+				return;
+
 			if (retval == JIM_RETURN)
 				retval = teap->interp->returnCode;
 
@@ -4707,8 +4712,6 @@ void target_handle_event(struct target *target, enum target_event e)
 				/* clean both error code and stacktrace before return */
 				Jim_Eval(teap->interp, "error \"\" \"\"");
 			}
-
-			cmd_ctx->current_target_override = saved_target_override;
 		}
 	}
 }
