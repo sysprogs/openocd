@@ -999,6 +999,41 @@ COMMAND_HANDLER(psoc6_handle_reset_halt)
 	return handle_reset_halt(target);
 }
 
+COMMAND_HANDLER(psoc6_handle_reset_to_entry)
+{
+	if (CMD_ARGC < 1)
+		return ERROR_COMMAND_SYNTAX_ERROR;
+    
+    unsigned long long addr = 0;
+    COMMAND_PARSE_ADDRESS(CMD_ARGV[0], addr);
+
+	struct target *target = get_current_target(CMD_CTX);
+    int hr = breakpoint_add(target, addr, 2, BKPT_HARD);
+    if (hr != ERROR_OK)
+        return hr;
+
+    const struct armv7m_common *cm = target_to_armv7m(target);
+
+    /* PSoC6 reboots immediatelly after issuing SYSRESETREQ / VECTRESET
+     * this disables SWD/JTAG pins momentarily and may break communication
+     * Ignoring return value of mem_ap_write_atomic_u32 seems to be ok here */
+    LOG_INFO("psoc6.cm0: bkpt @0x%08X, issuing SYSRESETREQ", addr);
+    mem_ap_write_atomic_u32(cm->debug_ap,
+        NVIC_AIRCR,
+        AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
+
+    /* Wait 100ms for bootcode and reinitialize DAP */
+    usleep(100000);
+    dap_dp_init(cm->debug_ap->dap);
+
+    target_wait_state(target, TARGET_HALTED, IPC_TIMEOUT_MS);
+
+    /* Remove the break point */
+    breakpoint_remove(target, addr);
+
+    return ERROR_OK;
+}
+
 FLASH_BANK_COMMAND_HANDLER(psoc6_flash_bank_command)
 {
 	struct psoc6_target_info *psoc6_info;
@@ -1026,8 +1061,15 @@ static const struct command_registration psoc6_exec_command_handlers[] = {
 		.name = "reset_halt",
 		.handler = psoc6_handle_reset_halt,
 		.mode = COMMAND_EXEC,
-		.usage = NULL,
+		.usage = "",
 		.help = "Tries to simulate broken Vector Catch",
+	},
+	{
+		.name = "reset_to_entry",
+		.handler = psoc6_handle_reset_to_entry,
+		.mode = COMMAND_EXEC,
+		.usage = "entry point address",
+		.help = "Resets the entire chip and waits for the current core to stop at the specified adderss",
 	},
 	COMMAND_REGISTRATION_DONE
 };
