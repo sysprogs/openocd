@@ -394,7 +394,7 @@ static const struct command_registration msp432p4_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-static int msp432p4_erase(struct flash_bank *bank, int first, int last)
+static int msp432p4_erase(struct flash_bank *bank, unsigned first, unsigned last)
 {
 	struct target *target = bank->target;
 	int retval = ERROR_OK, i;
@@ -421,7 +421,7 @@ static int msp432p4_erase(struct flash_bank *bank, int first, int last)
 	return retval;
 }
 
-static int msp432p4_protect(struct flash_bank *bank, int set, int first, int last)
+static int msp432p4_protect(struct flash_bank *bank, int set, unsigned first, unsigned last)
 {
 	/* Function not required. At startup all sectors are protected.
 	 * Value will be reset at power on. */

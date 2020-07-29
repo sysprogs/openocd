@@ -382,7 +382,7 @@ static int stm32x_protect_check(struct flash_bank *bank)
 	return ERROR_OK;
 }
 
-static int stm32gx_erase(struct flash_bank *bank, int first, int last)
+static int stm32gx_erase(struct flash_bank *bank, unsigned first, unsigned last)
 {
 	struct target *target = bank->target;
 
@@ -421,7 +421,7 @@ static int stm32gx_erase(struct flash_bank *bank, int first, int last)
 	return ERROR_OK;
 }
 
-static int stm32x_erase(struct flash_bank *bank, int first, int last)
+static int stm32x_erase(struct flash_bank *bank, unsigned first, unsigned last)
 {
 	if (bank->target->state != TARGET_HALTED) {
 		LOG_ERROR("Target not halted");
@@ -438,7 +438,7 @@ static int stm32x_erase(struct flash_bank *bank, int first, int last)
 	return ERROR_OK;
 }
 
-static int stm32x_protect(struct flash_bank *bank, int set, int first, int last)
+static int stm32x_protect(struct flash_bank *bank, int set, unsigned first, unsigned last)
 {
 	struct target *target = bank->target;
 	struct stm32g0x_flash_bank *stm32x_info = bank->driver_priv;

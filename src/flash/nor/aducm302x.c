@@ -230,7 +230,7 @@ static int aducm302x_mass_erase(struct flash_bank *bank)
 	return ERROR_OK;
 }
 
-static int aducm302x_erase(struct flash_bank *bank, int first, int last)
+static int aducm302x_erase(struct flash_bank *bank, unsigned first, unsigned last)
 {
 	struct aducm302x_flash_bank *aducm302x_info = bank->driver_priv;
 	struct target *target = bank->target;
@@ -270,7 +270,7 @@ static int aducm302x_erase(struct flash_bank *bank, int first, int last)
 	return ERROR_OK;
 }
 
-static int aducm302x_protect(struct flash_bank *bank, int set, int first, int last)
+static int aducm302x_protect(struct flash_bank *bank, int set, unsigned first, unsigned last)
 {
 	struct aducm302x_flash_bank *aducm302x_info = bank->driver_priv;
 	struct target *target = bank->target;

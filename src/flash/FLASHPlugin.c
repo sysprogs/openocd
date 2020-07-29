@@ -671,7 +671,7 @@ static int get_plugin_info(struct flash_bank *bank, char *buf, int buf_size)
 }
 
 
-static int plugin_erase(struct flash_bank *bank, int first, int last)
+static int plugin_erase(struct flash_bank *bank, unsigned first, unsigned last)
 {
     struct target *target = bank->target;
     struct plugin_flash_bank *plugin_info = bank->driver_priv;
@@ -703,7 +703,7 @@ static int plugin_erase(struct flash_bank *bank, int first, int last)
     return retval;
 }
 
-static int plugin_protect(struct flash_bank *bank, int set, int first, int last)
+static int plugin_protect(struct flash_bank *bank, int set, unsigned first, unsigned last)
 {
     struct target *target = bank->target;
     struct plugin_flash_bank *plugin_info = bank->driver_priv;

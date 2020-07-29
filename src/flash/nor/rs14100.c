@@ -178,7 +178,7 @@ static int rs14100_init(struct flash_bank *bank)
 	return retval;
 }
 
-static int rs14100_erase(struct flash_bank *bank, int first, int last)
+static int rs14100_erase(struct flash_bank *bank, unsigned first, unsigned last)
 {
 	struct target *target = bank->target;
 	struct rs14100_flash_bank *rs14100_info = bank->driver_priv;
@@ -565,7 +565,7 @@ static int rs14100_protect_check(struct flash_bank *bank)
   return ERROR_OK;
 }
 
-static int rs14100_protect(struct flash_bank *bank, int set, int first, int last)
+static int rs14100_protect(struct flash_bank *bank, int set, unsigned first, unsigned last)
 {
   return ERROR_OK;
 }

@@ -557,7 +557,7 @@ static int stm32l4_protect_check(struct flash_bank *bank)
 	return ERROR_OK;
 }
 
-static int stm32l4_erase(struct flash_bank *bank, int first, int last)
+static int stm32l4_erase(struct flash_bank *bank, unsigned first, unsigned last)
 {
 	struct stm32l4_flash_bank *stm32l4_info = bank->driver_priv;
 	struct stm32l4_part_info *part_info = stm32l4_info->part_info;
@@ -615,7 +615,7 @@ static int stm32l4_erase(struct flash_bank *bank, int first, int last)
 	return ERROR_OK;
 }
 
-static int stm32l4_protect(struct flash_bank *bank, int set, int first, int last)
+static int stm32l4_protect(struct flash_bank *bank, int set, unsigned first, unsigned last)
 {
 	struct target *target = bank->target;
 	struct stm32l4_flash_bank *stm32l4_info = bank->driver_priv;
