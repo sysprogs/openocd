@@ -18,11 +18,11 @@
 
 /* The specification for SVF is available here:
  * http://www.asset-intertech.com/support/svf.pdf
- * Below, this document is refered to as the "SVF spec".
+ * Below, this document is referred to as the "SVF spec".
  *
  * The specification for XSVF is available here:
  * http://www.xilinx.com/support/documentation/application_notes/xapp503.pdf
- * Below, this document is refered to as the "XSVF spec".
+ * Below, this document is referred to as the "XSVF spec".
  */
 
 #ifdef HAVE_CONFIG_H
@@ -226,12 +226,12 @@ static int svf_getline(char **lineptr, size_t *n, FILE *stream);
 
 #define SVF_MAX_BUFFER_SIZE_TO_COMMIT   (1024 * 1024)
 static uint8_t *svf_tdi_buffer, *svf_tdo_buffer, *svf_mask_buffer;
-static int svf_buffer_index, svf_buffer_size ;
+static int svf_buffer_index, svf_buffer_size;
 static int svf_quiet;
 static int svf_nil;
 static int svf_ignore_error;
 
-/* Targetting particular tap */
+/* Targeting particular tap */
 static int svf_tap_is_specified;
 static int svf_set_padding(struct svf_xxr_para *para, int len, unsigned char tdi);
 
@@ -246,7 +246,7 @@ static int svf_last_printed_percentage = -1;
  * DEBUG, INFO, ERROR, USER
  */
 #define SVF_BUF_LOG(_lvl, _buf, _nbits, _desc)							\
-	svf_hexbuf_print(LOG_LVL_##_lvl ,  __FILE__, __LINE__, __func__, _buf, _nbits, _desc)
+	svf_hexbuf_print(LOG_LVL_##_lvl,  __FILE__, __LINE__, __func__, _buf, _nbits, _desc)
 
 static void svf_hexbuf_print(int dbg_lvl, const char *file, unsigned line,
 							 const char *function, const uint8_t *buf,
@@ -854,7 +854,7 @@ static int svf_copy_hexstring_to_binary(char *str, uint8_t **bin, int orig_bit_l
 
 	/* check validity: we must have consumed everything */
 	if (str_len > 0 || (ch & ~((2 << ((bit_len - 1) % 4)) - 1)) != 0) {
-		LOG_ERROR("value execeeds length");
+		LOG_ERROR("value exceeds length");
 		return ERROR_FAIL;
 	}
 
@@ -1078,7 +1078,7 @@ XXR_common:
 					pbuffer_tmp = &xxr_para_tmp->smask;
 					xxr_para_tmp->data_mask |= XXR_SMASK;
 				} else {
-					LOG_ERROR("unknow parameter: %s", argus[i]);
+					LOG_ERROR("unknown parameter: %s", argus[i]);
 					return ERROR_FAIL;
 				}
 				if (ERROR_OK !=
@@ -1524,7 +1524,7 @@ XXR_common:
 				svf_para.trst_mode = i_tmp;
 				LOG_DEBUG("\ttrst_mode = %s", svf_trst_mode_name[svf_para.trst_mode]);
 			} else {
-				LOG_ERROR("can not accpet TRST command if trst_mode is ABSENT");
+				LOG_ERROR("can not accept TRST command if trst_mode is ABSENT");
 				return ERROR_FAIL;
 			}
 			break;

@@ -162,10 +162,10 @@ static void cfi_command(struct flash_bank *bank, uint8_t cmd, uint8_t *cmd_buf)
 		cmd_buf[i] = 0;
 
 	if (cfi_info->endianness == TARGET_LITTLE_ENDIAN) {
-		for (int i = bank->bus_width; i > 0; i--)
+		for (unsigned int i = bank->bus_width; i > 0; i--)
 			*cmd_buf++ = (i & (bank->chip_width - 1)) ? 0x0 : cmd;
 	} else {
-		for (int i = 1; i <= bank->bus_width; i++)
+		for (unsigned int i = 1; i <= bank->bus_width; i++)
 			*cmd_buf++ = (i & (bank->chip_width - 1)) ? 0x0 : cmd;
 	}
 }
@@ -217,13 +217,13 @@ static int cfi_get_u8(struct flash_bank *bank, int sector, uint32_t offset, uint
 		return retval;
 
 	if (cfi_info->endianness == TARGET_LITTLE_ENDIAN) {
-		for (int i = 0; i < bank->bus_width / bank->chip_width; i++)
+		for (unsigned int i = 0; i < bank->bus_width / bank->chip_width; i++)
 			data[0] |= data[i];
 
 		*val = data[0];
 	} else {
 		uint8_t value = 0;
-		for (int i = 0; i < bank->bus_width / bank->chip_width; i++)
+		for (unsigned int i = 0; i < bank->bus_width / bank->chip_width; i++)
 			value |= data[bank->bus_width - 1 - i];
 
 		*val = value;
@@ -814,7 +814,7 @@ static int cfi_intel_info(struct flash_bank *bank, char *buf, int buf_size)
 int cfi_flash_bank_cmd(struct flash_bank *bank, unsigned int argc, const char **argv)
 {
 	struct cfi_flash_bank *cfi_info;
-	int bus_swap = 0;
+	bool bus_swap = false;
 
 	if (argc < 6)
 		return ERROR_COMMAND_SYNTAX_ERROR;
@@ -841,20 +841,20 @@ int cfi_flash_bank_cmd(struct flash_bank *bank, unsigned int argc, const char **
 	cfi_info->pri_ext = NULL;
 	bank->driver_priv = cfi_info;
 
-	cfi_info->x16_as_x8 = 0;
-	cfi_info->jedec_probe = 0;
-	cfi_info->not_cfi = 0;
-	cfi_info->data_swap = 0;
+	cfi_info->x16_as_x8 = false;
+	cfi_info->jedec_probe = false;
+	cfi_info->not_cfi = false;
+	cfi_info->data_swap = false;
 
 	for (unsigned i = 6; i < argc; i++) {
 		if (strcmp(argv[i], "x16_as_x8") == 0)
-			cfi_info->x16_as_x8 = 1;
+			cfi_info->x16_as_x8 = true;
 		else if (strcmp(argv[i], "data_swap") == 0)
-			cfi_info->data_swap = 1;
+			cfi_info->data_swap = true;
 		else if (strcmp(argv[i], "bus_swap") == 0)
-			bus_swap = 1;
+			bus_swap = true;
 		else if (strcmp(argv[i], "jedec_probe") == 0)
-			cfi_info->jedec_probe = 1;
+			cfi_info->jedec_probe = true;
 	}
 
 	if (bus_swap)
@@ -877,14 +877,15 @@ FLASH_BANK_COMMAND_HANDLER(cfi_flash_bank_command)
 	return cfi_flash_bank_cmd(bank, CMD_ARGC, CMD_ARGV);
 }
 
-static int cfi_intel_erase(struct flash_bank *bank, int first, int last)
+static int cfi_intel_erase(struct flash_bank *bank, unsigned int first,
+		unsigned int last)
 {
 	int retval;
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
 
 	cfi_intel_clear_status_register(bank);
 
-	for (int i = first; i <= last; i++) {
+	for (unsigned int i = first; i <= last; i++) {
 		retval = cfi_send_command(bank, 0x20, cfi_flash_address(bank, i, 0x0));
 		if (retval != ERROR_OK)
 			return retval;
@@ -905,7 +906,7 @@ static int cfi_intel_erase(struct flash_bank *bank, int first, int last)
 			if (retval != ERROR_OK)
 				return retval;
 
-			LOG_ERROR("couldn't erase block %i of flash bank at base "
+			LOG_ERROR("couldn't erase block %u of flash bank at base "
 					TARGET_ADDR_FMT, i, bank->base);
 			return ERROR_FLASH_OPERATION_FAILED;
 		}
@@ -931,13 +932,14 @@ int cfi_spansion_unlock_seq(struct flash_bank *bank)
 	return ERROR_OK;
 }
 
-static int cfi_spansion_erase(struct flash_bank *bank, int first, int last)
+static int cfi_spansion_erase(struct flash_bank *bank, unsigned int first,
+		unsigned int last)
 {
 	int retval;
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
 	struct cfi_spansion_pri_ext *pri_ext = cfi_info->pri_ext;
 
-	for (int i = first; i <= last; i++) {
+	for (unsigned int i = first; i <= last; i++) {
 		retval = cfi_spansion_unlock_seq(bank);
 		if (retval != ERROR_OK)
 			return retval;
@@ -970,7 +972,8 @@ static int cfi_spansion_erase(struct flash_bank *bank, int first, int last)
 	return cfi_send_command(bank, 0xf0, cfi_flash_address(bank, 0, 0x0));
 }
 
-int cfi_erase(struct flash_bank *bank, int first, int last)
+int cfi_erase(struct flash_bank *bank, unsigned int first,
+		unsigned int last)
 {
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
 
@@ -979,7 +982,7 @@ int cfi_erase(struct flash_bank *bank, int first, int last)
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if ((first < 0) || (last < first) || (last >= bank->num_sectors))
+	if ((last < first) || (last >= bank->num_sectors))
 		return ERROR_FLASH_SECTOR_INVALID;
 
 	if (cfi_info->qry[0] != 'Q')
@@ -999,7 +1002,8 @@ int cfi_erase(struct flash_bank *bank, int first, int last)
 	return ERROR_OK;
 }
 
-static int cfi_intel_protect(struct flash_bank *bank, int set, int first, int last)
+static int cfi_intel_protect(struct flash_bank *bank, int set,
+		unsigned int first, unsigned int last)
 {
 	int retval;
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
@@ -1016,7 +1020,7 @@ static int cfi_intel_protect(struct flash_bank *bank, int set, int first, int la
 
 	cfi_intel_clear_status_register(bank);
 
-	for (int i = first; i <= last; i++) {
+	for (unsigned int i = first; i <= last; i++) {
 		retval = cfi_send_command(bank, 0x60, cfi_flash_address(bank, i, 0x0));
 		if (retval != ERROR_OK)
 			return retval;
@@ -1087,7 +1091,7 @@ static int cfi_intel_protect(struct flash_bank *bank, int set, int first, int la
 		 * 3. re-protect what should be protected.
 		 *
 		 */
-		for (int i = 0; i < bank->num_sectors; i++) {
+		for (unsigned int i = 0; i < bank->num_sectors; i++) {
 			if (bank->sectors[i].is_protected == 1) {
 				cfi_intel_clear_status_register(bank);
 
@@ -1110,7 +1114,8 @@ static int cfi_intel_protect(struct flash_bank *bank, int set, int first, int la
 	return cfi_send_command(bank, 0xff, cfi_flash_address(bank, 0, 0x0));
 }
 
-int cfi_protect(struct flash_bank *bank, int set, int first, int last)
+int cfi_protect(struct flash_bank *bank, int set, unsigned int first,
+		unsigned int last)
 {
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
 
@@ -1146,7 +1151,7 @@ static uint32_t cfi_command_val(struct flash_bank *bank, uint8_t cmd)
 		case 4:
 			return target_buffer_get_u32(target, buf);
 		default:
-			LOG_ERROR("Unsupported bank buswidth %d, can't do block memory writes",
+			LOG_ERROR("Unsupported bank buswidth %u, can't do block memory writes",
 					bank->bus_width);
 			return 0;
 	}
@@ -1173,7 +1178,7 @@ static int cfi_intel_write_block(struct flash_bank *bank, const uint8_t *buffer,
 	 * r6: error test pattern
 	 */
 
-	/* see contib/loaders/flash/armv4_5_cfi_intel_32.s for src */
+	/* see contrib/loaders/flash/armv4_5_cfi_intel_32.s for src */
 	static const uint32_t word_32_code[] = {
 		0xe4904004,	/* loop: ldr r4, [r0], #4 */
 		0xe5813000,	/*       str r3, [r1] */
@@ -1191,7 +1196,7 @@ static int cfi_intel_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		0xeafffffe	/* done: b -2 */
 	};
 
-	/* see contib/loaders/flash/armv4_5_cfi_intel_16.s for src */
+	/* see contrib/loaders/flash/armv4_5_cfi_intel_16.s for src */
 	static const uint32_t word_16_code[] = {
 		0xe0d040b2,	/* loop: ldrh r4, [r0], #2 */
 		0xe1c130b0,	/*       strh r3, [r1] */
@@ -1209,7 +1214,7 @@ static int cfi_intel_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		0xeafffffe	/* done:	b -2 */
 	};
 
-	/* see contib/loaders/flash/armv4_5_cfi_intel_8.s for src */
+	/* see contrib/loaders/flash/armv4_5_cfi_intel_8.s for src */
 	static const uint32_t word_8_code[] = {
 		0xe4d04001,	/* loop: ldrb r4, [r0], #1 */
 		0xe5c13000,	/*       strb r3, [r1] */
@@ -1244,7 +1249,7 @@ static int cfi_intel_write_block(struct flash_bank *bank, const uint8_t *buffer,
 
 	cfi_intel_clear_status_register(bank);
 
-	/* If we are setting up the write_algorith, we need target_code_src
+	/* If we are setting up the write_algorithm, we need target_code_src
 	 * if not we only need target_code_size. */
 
 	/* However, we don't want to create multiple code paths, so we
@@ -1266,7 +1271,7 @@ static int cfi_intel_write_block(struct flash_bank *bank, const uint8_t *buffer,
 			target_code_size = sizeof(word_32_code);
 			break;
 		default:
-			LOG_ERROR("Unsupported bank buswidth %d, can't do block memory writes",
+			LOG_ERROR("Unsupported bank buswidth %u, can't do block memory writes",
 					bank->bus_width);
 			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	}
@@ -1359,7 +1364,7 @@ static int cfi_intel_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		if (retval != ERROR_OK) {
 			cfi_intel_clear_status_register(bank);
 			LOG_ERROR(
-				"Execution of flash algorythm failed. Can't fall back. Please report.");
+				"Execution of flash algorithm failed. Can't fall back. Please report.");
 			retval = ERROR_FLASH_OPERATION_FAILED;
 			/* retval = ERROR_TARGET_RESOURCE_NOT_AVAILABLE; */
 			/* FIXME To allow fall back or recovery, we must save the actual status
@@ -1502,7 +1507,7 @@ static int cfi_spansion_write_block_mips(struct flash_bank *bank, const uint8_t 
 			}
 			break;
 		default:
-			LOG_ERROR("Unsupported bank buswidth %d, can't do block memory writes",
+			LOG_ERROR("Unsupported bank buswidth %u, can't do block memory writes",
 					bank->bus_width);
 			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	}
@@ -1648,7 +1653,7 @@ static int cfi_spansion_write_block(struct flash_bank *bank, const uint8_t *buff
 	 *  R10 = unlock2_addr
 	 *  R11 = unlock2_cmd */
 
-	/* see contib/loaders/flash/armv4_5_cfi_span_32.s for src */
+	/* see contrib/loaders/flash/armv4_5_cfi_span_32.s for src */
 	static const uint32_t armv4_5_word_32_code[] = {
 		/* 00008100 <sp_32_code>:		*/
 		0xe4905004,		/* ldr	r5, [r0], #4			*/
@@ -1680,7 +1685,7 @@ static int cfi_spansion_write_block(struct flash_bank *bank, const uint8_t *buff
 		0xeafffffe		/* b	8154 <sp_32_done>		*/
 	};
 
-	/* see contib/loaders/flash/armv4_5_cfi_span_16.s for src */
+	/* see contrib/loaders/flash/armv4_5_cfi_span_16.s for src */
 	static const uint32_t armv4_5_word_16_code[] = {
 		/* 00008158 <sp_16_code>:		*/
 		0xe0d050b2,		/* ldrh	r5, [r0], #2			*/
@@ -1881,7 +1886,7 @@ static int cfi_spansion_write_block(struct flash_bank *bank, const uint8_t *buff
 			target_code_size = sizeof(armv4_5_word_32_code);
 			break;
 		default:
-			LOG_ERROR("Unsupported bank buswidth %d, can't do block memory writes",
+			LOG_ERROR("Unsupported bank buswidth %u, can't do block memory writes",
 					bank->bus_width);
 			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	}
@@ -2286,7 +2291,7 @@ static int cfi_read(struct flash_bank *bank, uint8_t *buffer, uint32_t offset, u
 			return retval;
 
 		/* take only bytes we need */
-		for (int i = align; (i < bank->bus_width) && (count > 0); i++, count--)
+		for (unsigned int i = align; (i < bank->bus_width) && (count > 0); i++, count--)
 			*buffer++ = current_word[i];
 
 		read_p += bank->bus_width;
@@ -2312,7 +2317,7 @@ static int cfi_read(struct flash_bank *bank, uint8_t *buffer, uint32_t offset, u
 			return retval;
 
 		/* take only bytes we need */
-		for (int i = 0; (i < bank->bus_width) && (count > 0); i++, count--)
+		for (unsigned int i = 0; (i < bank->bus_width) && (count > 0); i++, count--)
 			*buffer++ = current_word[i];
 	}
 
@@ -2355,9 +2360,7 @@ static int cfi_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t of
 			return retval;
 
 		/* replace only bytes that must be written */
-		for (int i = align;
-		     (i < bank->bus_width) && (count > 0);
-		     i++, count--)
+		for (unsigned int i = align; (i < bank->bus_width) && (count > 0); i++, count--)
 			if (cfi_info->data_swap)
 				/* data bytes are swapped (reverse endianness) */
 				current_word[bank->bus_width - i] = *buffer++;
@@ -2403,7 +2406,7 @@ static int cfi_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t of
 			break;
 	}
 	if (retval == ERROR_OK) {
-		/* Increment pointers and decrease count on succesful block write */
+		/* Increment pointers and decrease count on successful block write */
 		buffer += blk_count;
 		write_p += blk_count;
 		count -= blk_count;
@@ -2440,7 +2443,7 @@ static int cfi_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t of
 				}
 				/* try the slow way? */
 				if (fallback) {
-					for (int i = 0; i < bank->bus_width; i++)
+					for (unsigned int i = 0; i < bank->bus_width; i++)
 						current_word[i] = *buffer++;
 
 					retval = cfi_write_word(bank, current_word, write_p);
@@ -2475,7 +2478,7 @@ static int cfi_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t of
 			return retval;
 
 		/* replace only bytes that must be written */
-		for (int i = 0; (i < bank->bus_width) && (count > 0); i++, count--)
+		for (unsigned int i = 0; (i < bank->bus_width) && (count > 0); i++, count--)
 			if (cfi_info->data_swap)
 				/* data bytes are swapped (reverse endianness) */
 				current_word[bank->bus_width - i] = *buffer++;
@@ -2576,7 +2579,7 @@ int cfi_probe(struct flash_bank *bank)
 {
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
 	struct target *target = bank->target;
-	int num_sectors = 0;
+	unsigned int num_sectors = 0;
 	int sector = 0;
 	uint32_t unlock1 = 0x555;
 	uint32_t unlock2 = 0x2aa;
@@ -2640,7 +2643,7 @@ int cfi_probe(struct flash_bank *bank)
 			cfi_info->device_id = target_buffer_get_u32(target, value_buf1);
 			break;
 		default:
-			LOG_ERROR("Unsupported bank chipwidth %d, can't probe memory",
+			LOG_ERROR("Unsupported bank chipwidth %u, can't probe memory",
 					bank->chip_width);
 			return ERROR_FLASH_OPERATION_FAILED;
 	}
@@ -2658,7 +2661,7 @@ int cfi_probe(struct flash_bank *bank)
 	/* query only if this is a CFI compatible flash,
 	 * otherwise the relevant info has already been filled in
 	 */
-	if (cfi_info->not_cfi == 0) {
+	if (!cfi_info->not_cfi) {
 		/* enter CFI query mode
 		 * according to JEDEC Standard No. 68.01,
 		 * a single bus sequence with address = 0x55, data = 0x98 should put
@@ -2792,7 +2795,7 @@ int cfi_probe(struct flash_bank *bank)
 												 *for
 												 *all
 												 *CFI
-												 *flashs
+												 *flashes
 												 **/
 				cfi_read_0002_pri_ext(bank);
 				break;
@@ -2928,7 +2931,7 @@ static int cfi_intel_protect_check(struct flash_bank *bank)
 	if (retval != ERROR_OK)
 		return retval;
 
-	for (int i = 0; i < bank->num_sectors; i++) {
+	for (unsigned int i = 0; i < bank->num_sectors; i++) {
 		uint8_t block_status;
 		retval = cfi_get_u8(bank, i, 0x2, &block_status);
 		if (retval != ERROR_OK)
@@ -2957,7 +2960,7 @@ static int cfi_spansion_protect_check(struct flash_bank *bank)
 	if (retval != ERROR_OK)
 		return retval;
 
-	for (int i = 0; i < bank->num_sectors; i++) {
+	for (unsigned int i = 0; i < bank->num_sectors; i++) {
 		uint8_t block_status;
 		retval = cfi_get_u8(bank, i, 0x2, &block_status);
 		if (retval != ERROR_OK)
@@ -3008,7 +3011,7 @@ int cfi_get_info(struct flash_bank *bank, char *buf, int buf_size)
 		return ERROR_OK;
 	}
 
-	if (cfi_info->not_cfi == 0)
+	if (!cfi_info->not_cfi)
 		printed = snprintf(buf, buf_size, "\nCFI flash: ");
 	else
 		printed = snprintf(buf, buf_size, "\nnon-CFI flash: ");

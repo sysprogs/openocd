@@ -226,7 +226,7 @@ static int mips32_write_core_reg(struct target *target, unsigned int num)
 
 	reg_value = buf_get_u32(mips32->core_cache->reg_list[num].value, 0, 32);
 	mips32->core_regs[num] = reg_value;
-	LOG_DEBUG("write core reg %i value 0x%" PRIx32 "", num , reg_value);
+	LOG_DEBUG("write core reg %i value 0x%" PRIx32 "", num, reg_value);
 	mips32->core_cache->reg_list[num].valid = true;
 	mips32->core_cache->reg_list[num].dirty = false;
 
@@ -723,7 +723,7 @@ int mips32_read_config_regs(struct target *target)
 				break;	/* no more config registers implemented */
 		}
 	else
-		return ERROR_OK;	/* already succesfully read */
+		return ERROR_OK;	/* already successfully read */
 
 	LOG_DEBUG("read  %"PRId32" config registers", ejtag_info->config_regs);
 

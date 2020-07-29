@@ -176,10 +176,10 @@ static const Jim_Nvp nvp_error_target[] = {
 	{ .value = ERROR_TARGET_TIMEOUT, .name = "err-timeout" },
 	{ .value = ERROR_TARGET_NOT_HALTED, .name = "err-not-halted" },
 	{ .value = ERROR_TARGET_FAILURE, .name = "err-failure" },
-	{ .value = ERROR_TARGET_UNALIGNED_ACCESS   , .name = "err-unaligned-access" },
-	{ .value = ERROR_TARGET_DATA_ABORT , .name = "err-data-abort" },
-	{ .value = ERROR_TARGET_RESOURCE_NOT_AVAILABLE , .name = "err-resource-not-available" },
-	{ .value = ERROR_TARGET_TRANSLATION_FAULT  , .name = "err-translation-fault" },
+	{ .value = ERROR_TARGET_UNALIGNED_ACCESS, .name = "err-unaligned-access" },
+	{ .value = ERROR_TARGET_DATA_ABORT, .name = "err-data-abort" },
+	{ .value = ERROR_TARGET_RESOURCE_NOT_AVAILABLE, .name = "err-resource-not-available" },
+	{ .value = ERROR_TARGET_TRANSLATION_FAULT, .name = "err-translation-fault" },
 	{ .value = ERROR_TARGET_NOT_RUNNING, .name = "err-not-running" },
 	{ .value = ERROR_TARGET_NOT_EXAMINED, .name = "err-not-examined" },
 	{ .value = -1, .name = NULL }
@@ -229,10 +229,10 @@ static const Jim_Nvp nvp_target_event[] = {
 	{ .value = TARGET_EVENT_GDB_DETACH, .name = "gdb-detach" },
 
 	{ .value = TARGET_EVENT_GDB_FLASH_WRITE_START, .name = "gdb-flash-write-start" },
-	{ .value = TARGET_EVENT_GDB_FLASH_WRITE_END  , .name = "gdb-flash-write-end"   },
+	{ .value = TARGET_EVENT_GDB_FLASH_WRITE_END,   .name = "gdb-flash-write-end"   },
 
 	{ .value = TARGET_EVENT_GDB_FLASH_ERASE_START, .name = "gdb-flash-erase-start" },
-	{ .value = TARGET_EVENT_GDB_FLASH_ERASE_END  , .name = "gdb-flash-erase-end" },
+	{ .value = TARGET_EVENT_GDB_FLASH_ERASE_END,   .name = "gdb-flash-erase-end" },
 
 	{ .value = TARGET_EVENT_TRACE_CONFIG, .name = "trace-config" },
 
@@ -249,15 +249,15 @@ static const Jim_Nvp nvp_target_state[] = {
 };
 
 static const Jim_Nvp nvp_target_debug_reason[] = {
-	{ .name = "debug-request"            , .value = DBG_REASON_DBGRQ },
-	{ .name = "breakpoint"               , .value = DBG_REASON_BREAKPOINT },
-	{ .name = "watchpoint"               , .value = DBG_REASON_WATCHPOINT },
+	{ .name = "debug-request",             .value = DBG_REASON_DBGRQ },
+	{ .name = "breakpoint",                .value = DBG_REASON_BREAKPOINT },
+	{ .name = "watchpoint",                .value = DBG_REASON_WATCHPOINT },
 	{ .name = "watchpoint-and-breakpoint", .value = DBG_REASON_WPTANDBKPT },
-	{ .name = "single-step"              , .value = DBG_REASON_SINGLESTEP },
-	{ .name = "target-not-halted"        , .value = DBG_REASON_NOTHALTED  },
-	{ .name = "program-exit"             , .value = DBG_REASON_EXIT },
-	{ .name = "exception-catch"          , .value = DBG_REASON_EXC_CATCH },
-	{ .name = "undefined"                , .value = DBG_REASON_UNDEFINED },
+	{ .name = "single-step",               .value = DBG_REASON_SINGLESTEP },
+	{ .name = "target-not-halted",         .value = DBG_REASON_NOTHALTED  },
+	{ .name = "program-exit",              .value = DBG_REASON_EXIT },
+	{ .name = "exception-catch",           .value = DBG_REASON_EXC_CATCH },
+	{ .name = "undefined",                 .value = DBG_REASON_UNDEFINED },
 	{ .name = NULL, .value = -1 },
 };
 
@@ -271,10 +271,10 @@ static const Jim_Nvp nvp_target_endian[] = {
 
 static const Jim_Nvp nvp_reset_modes[] = {
 	{ .name = "unknown", .value = RESET_UNKNOWN },
-	{ .name = "run"    , .value = RESET_RUN },
-	{ .name = "halt"   , .value = RESET_HALT },
-	{ .name = "init"   , .value = RESET_INIT },
-	{ .name = NULL     , .value = -1 },
+	{ .name = "run",     .value = RESET_RUN },
+	{ .name = "halt",    .value = RESET_HALT },
+	{ .name = "init",    .value = RESET_INIT },
+	{ .name = NULL,      .value = -1 },
 };
 
 const char *debug_reason_name(struct target *t)
@@ -593,7 +593,7 @@ int target_halt(struct target *target)
  * @param address Optionally used as the program counter.
  * @param handle_breakpoints True iff breakpoints at the resumption PC
  *	should be skipped.  (For example, maybe execution was stopped by
- *	such a breakpoint, in which case it would be counterprodutive to
+ *	such a breakpoint, in which case it would be counterproductive to
  *	let it re-trigger.
  * @param debug_execution False if all working areas allocated by OpenOCD
  *	should be released and/or restored to their original contents.
@@ -709,7 +709,7 @@ static int default_check_reset(struct target *target)
 	return ERROR_OK;
 }
 
-/* Equvivalent Tcl code arp_examine_one is in src/target/startup.tcl
+/* Equivalent Tcl code arp_examine_one is in src/target/startup.tcl
  * Keep in sync */
 int target_examine_one(struct target *target)
 {
@@ -2902,7 +2902,7 @@ COMMAND_HANDLER(handle_reg_command)
 				} else {
 					command_print(CMD, "(%i) %s (/%" PRIu32 ")",
 							  count, reg->name,
-							  reg->size) ;
+							  reg->size);
 				}
 			}
 			cache = cache->next;
@@ -3569,7 +3569,7 @@ COMMAND_HANDLER(handle_load_image_command)
 		uint32_t offset = 0;
 		uint32_t length = buf_cnt;
 
-		/* DANGER!!! beware of unsigned comparision here!!! */
+		/* DANGER!!! beware of unsigned comparison here!!! */
 
 		if ((image.sections[i].base_address + buf_cnt >= min_address) &&
 				(image.sections[i].base_address < max_address)) {
@@ -4753,7 +4753,7 @@ static Jim_Nvp nvp_config_opts[] = {
 	{ .name = "-work-area-phys",   .value = TCFG_WORK_AREA_PHYS },
 	{ .name = "-work-area-size",   .value = TCFG_WORK_AREA_SIZE },
 	{ .name = "-work-area-backup", .value = TCFG_WORK_AREA_BACKUP },
-	{ .name = "-endian" ,          .value = TCFG_ENDIAN },
+	{ .name = "-endian",           .value = TCFG_ENDIAN },
 	{ .name = "-coreid",           .value = TCFG_COREID },
 	{ .name = "-chain-position",   .value = TCFG_CHAIN_POSITION },
 	{ .name = "-dbgbase",          .value = TCFG_DBGBASE },
@@ -4796,7 +4796,7 @@ static int target_configure(Jim_GetOptInfo *goi, struct target *target)
 		}
 		switch (n->value) {
 		case TCFG_TYPE:
-			/* not setable */
+			/* not settable */
 			if (goi->isconfigure) {
 				Jim_SetResultFormatted(goi->interp,
 						"not settable: %s", n->name);
@@ -5784,7 +5784,7 @@ static int jim_target_smp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	retval = 0;
 	LOG_DEBUG("%d", argc);
 	/* argv[1] = target to associate in smp
-	 * argv[2] = target to assoicate in smp
+	 * argv[2] = target to associate in smp
 	 * argv[3] ...
 	 */
 
@@ -6019,7 +6019,7 @@ COMMAND_HANDLER(handle_fast_load_image_command)
 		uint32_t offset = 0;
 		uint32_t length = buf_cnt;
 
-		/* DANGER!!! beware of unsigned comparision here!!! */
+		/* DANGER!!! beware of unsigned comparison here!!! */
 
 		if ((image.sections[i].base_address + buf_cnt >= min_address) &&
 				(image.sections[i].base_address < max_address)) {

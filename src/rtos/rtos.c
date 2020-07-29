@@ -39,6 +39,7 @@ extern struct rtos_type uCOS_III_rtos;
 extern struct rtos_type multicore_rtos;
 extern struct rtos_type nuttx_rtos;
 extern struct rtos_type hwthread_rtos;
+extern struct rtos_type riot_rtos;
 
 static struct rtos_type *rtos_types[] = {
 	&ThreadX_rtos,
@@ -52,6 +53,8 @@ static struct rtos_type *rtos_types[] = {
 	&uCOS_III_rtos,
 	&nuttx_rtos,
 	&multicore_rtos,
+	&riot_rtos,
+	/* keep this as last, as it always matches with rtos auto */
 	&hwthread_rtos,
 	NULL
 };
@@ -230,7 +233,7 @@ int rtos_qsymbol(struct connection *connection, char const *packet, int packet_s
 	int rtos_detected = 0;
 	uint64_t addr = 0;
 	size_t reply_len;
-	char reply[GDB_BUFFER_SIZE + 1], cur_sym[GDB_BUFFER_SIZE / 2 + 1] = ""; /* Extra byte for nul-termination */
+	char reply[GDB_BUFFER_SIZE + 1], cur_sym[GDB_BUFFER_SIZE / 2 + 1] = ""; /* Extra byte for null-termination */
 	symbol_table_elem_t *next_sym = NULL;
 	struct target *target = get_target_from_connection(connection);
 	struct rtos *os = target->rtos;
