@@ -12,8 +12,8 @@
     <ToolchainID>
       <ID>com.visualgdb.mingw32</ID>
       <Version>
-        <GCC>9.1.0</GCC>
-        <GDB>8.3</GDB>
+        <GCC>8.1.0</GCC>
+        <GDB>8.1</GDB>
         <Revision>1</Revision>
       </Version>
     </ToolchainID>
@@ -55,6 +55,7 @@
         <GroupSourcesByTypes>true</GroupSourcesByTypes>
         <GroupSourcesByPaths>true</GroupSourcesByPaths>
         <GroupTargetsByPaths>true</GroupTargetsByPaths>
+        <FollowCMakeSourceGroups>false</FollowCMakeSourceGroups>
         <AutoRefreshProject>true</AutoRefreshProject>
         <AlwaysConsiderOutdated>false</AlwaysConsiderOutdated>
         <SortTargetsByName>true</SortTargetsByName>
@@ -67,7 +68,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/cmsis-dap.cfg -c "transport select swd" -c "adapter speed 3000" -f target/psoc6.cfg -c init -c "reset init" -c "echo VisualGDB_OpenOCD_Ready"</Arguments>
+            <Arguments>-f interface/xds110.cfg -c "transport select jtag" -f target/ti_tms570ls1224.cfg -c "adapter speed 1000"</Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>

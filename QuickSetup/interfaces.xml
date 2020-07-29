@@ -334,6 +334,11 @@
 				<PID>2111</PID>
 				<Interface>00</Interface>
 			</UsbIdentity>
+			<UsbIdentity>
+				<VID>04B4</VID>
+				<PID>F148</PID>
+				<Interface>00</Interface>
+			</UsbIdentity>
 		</UsbIdentities>
 		<SerialNumberCommand>cmsis_dap_serial</SerialNumberCommand>
 	</ProgrammingInterface>

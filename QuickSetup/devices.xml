@@ -684,4 +684,23 @@
 		<ScriptFile>target/rs14100.cfg</ScriptFile>
 		<RequiresResetAfterLoad>true</RequiresResetAfterLoad>
 	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>PSOC6</ID>
+		<Name>Cypress PSOC6</Name>
+		<MatchRegex>^CY8C6.*</MatchRegex>
+		<BspID>com.sysprogs.arm.wiced</BspID>
+		<ScriptFile>target/psoc6.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+		<DebuggedCores>
+			<string>Cortex-M0</string>
+			<string>Cortex-M4</string>
+		</DebuggedCores>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>TMS570LS12xx</ID>
+		<Name>TMS570LS12</Name>
+		<MatchRegex>^TMS570LS12.*</MatchRegex>
+		<ScriptFile>target/ti_tms570ls1224.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	
 </ArrayOfTargetDeviceFamily>
