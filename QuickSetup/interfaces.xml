@@ -370,4 +370,18 @@
 		<SerialNumberCommand>xds110_serial</SerialNumberCommand>
         <UniversalDriverId>com.sysprogs.ti.xds110</UniversalDriverId>
 	</ProgrammingInterface>
+	<ProgrammingInterface>
+		<ID>tumpa</ID>
+		<Name>Tumpa</Name>
+		<ScriptFile>interface/ftdi/tumpa.cfg</ScriptFile>
+		<UsbIdentities>
+		  <UsbIdentity>
+			<VID>0403</VID>
+			<PID>8A98</PID>
+			<Interface>00</Interface>
+		  </UsbIdentity>
+		</UsbIdentities>
+		<UniversalDriverId>com.sysprogs.libusb.mini</UniversalDriverId>
+		<SerialNumberCommand>ftdi_serial</SerialNumberCommand>
+	</ProgrammingInterface>	
 </ArrayOfProgrammingInterface>
