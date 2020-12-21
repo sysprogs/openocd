@@ -1,7 +1,8 @@
 AC_PREREQ(2.64)
-AC_INIT([openocd], [0.10.0+dev],
+AC_INIT([openocd], [0.11.0-rc1+dev],
   [OpenOCD Mailing List <openocd-devel@lists.sourceforge.net>])
 AC_CONFIG_SRCDIR([src/openocd.c])
+AC_CONFIG_AUX_DIR([.])
 
 m4_include([config_subdir.m4])dnl
 
@@ -22,7 +23,7 @@ AH_BOTTOM([
 #include <helper/replacements.h>
 ])
 
-AC_LANG_C
+AC_LANG([C])
 AC_PROG_CC
 AC_PROG_CC_C99
 AM_PROG_CC_C_O
@@ -34,7 +35,7 @@ m4_defun([_LT_AC_LANG_CXX_CONFIG], [:])
 m4_defun([_LT_AC_LANG_F77_CONFIG], [:])
 m4_defun([_LT_AC_LANG_GCJ_CONFIG], [:])
 AC_DISABLE_SHARED
-AC_PROG_LIBTOOL
+LT_INIT
 AC_SUBST([LIBTOOL_DEPS])
 
 dnl configure checks required for Jim files (these are obsolete w/ C99)
@@ -43,6 +44,7 @@ AC_TYPE_LONG_LONG_INT
 
 AC_SEARCH_LIBS([ioperm], [ioperm])
 AC_SEARCH_LIBS([dlopen], [dl])
+AC_SEARCH_LIBS([openpty], [util])
 
 AC_CHECK_HEADERS([sys/socket.h])
 AC_CHECK_HEADERS([elf.h])
@@ -117,6 +119,7 @@ m4_define([USB1_ADAPTERS],
 	[[ft232r], [Bitbang mode of FT232R based devices], [FT232R]],
 	[[vsllink], [Versaloon-Link JTAG Programmer], [VSLLINK]],
 	[[xds110], [TI XDS110 Debug Probe], [XDS110]],
+	[[cmsis_dap_v2], [CMSIS-DAP v2 Compliant Debugger], [CMSIS_DAP_USB]],
 	[[osbdm], [OSBDM (JTAG only) Programmer], [OSBDM]],
 	[[opendous], [eStick/opendous JTAG Programmer], [OPENDOUS]],
 	[[aice], [Andes JTAG Programmer], [AICE]]])
@@ -127,7 +130,8 @@ m4_define([USB0_ADAPTERS],
 	[[armjtagew], [Olimex ARM-JTAG-EW Programmer], [ARMJTAGEW]]])
 
 m4_define([HIDAPI_ADAPTERS],
-	[[[cmsis_dap], [CMSIS-DAP Compliant Debugger], [CMSIS_DAP]]])
+	[[[cmsis_dap], [CMSIS-DAP Compliant Debugger], [CMSIS_DAP_HID]],
+	[[nulink], [Nu-Link Programmer], [HLADAPTER_NULINK]]])
 
 m4_define([HIDAPI_USB1_ADAPTERS],
 	[[[kitprog], [Cypress KitProg Programmer], [KITPROG]]])
@@ -265,6 +269,10 @@ AC_ARG_ENABLE([parport_giveio],
 AC_ARG_ENABLE([jtag_vpi],
   AS_HELP_STRING([--enable-jtag_vpi], [Enable building support for JTAG VPI]),
   [build_jtag_vpi=$enableval], [build_jtag_vpi=no])
+
+AC_ARG_ENABLE([jtag_dpi],
+  AS_HELP_STRING([--enable-jtag_dpi], [Enable building support for JTAG DPI]),
+  [build_jtag_dpi=$enableval], [build_jtag_dpi=no])
 
 AC_ARG_ENABLE([amtjtagaccel],
   AS_HELP_STRING([--enable-amtjtagaccel], [Enable building the Amontec JTAG-Accelerator driver]),
@@ -568,6 +576,13 @@ AS_IF([test "x$build_jtag_vpi" = "xyes"], [
   AC_DEFINE([BUILD_JTAG_VPI], [0], [0 if you don't want JTAG VPI.])
 ])
 
+AS_IF([test "x$build_jtag_dpi" = "xyes"], [
+  AC_DEFINE([BUILD_JTAG_DPI], [1], [1 if you want JTAG DPI.])
+], [
+  AC_DEFINE([BUILD_JTAG_DPI], [0], [0 if you don't want JTAG DPI.])
+])
+
+
 AS_IF([test "x$build_amtjtagaccel" = "xyes"], [
   AC_DEFINE([BUILD_AMTJTAGACCEL], [1], [1 if you want the Amontec JTAG-Accelerator driver.])
 ], [
@@ -638,6 +653,15 @@ PKG_CHECK_MODULES([LIBUSB1], [libusb-1.0], [
 
 PKG_CHECK_MODULES([LIBUSB0], [libusb], [use_libusb0=yes], [use_libusb0=no])
 
+PKG_CHECK_MODULES([CAPSTONE], [capstone], [have_capstone=yes],
+	[have_capstone=no])
+
+AS_IF([test "x$have_capstone" = "xyes"], [
+  AC_DEFINE([HAVE_CAPSTONE], [1], [1 if you have captone disassembly framework.])
+], [
+  AC_DEFINE([HAVE_CAPSTONE], [0], [0 if you don't have captone disassembly framework.])
+])
+
 for hidapi_lib in hidapi hidapi-hidraw hidapi-libusb; do
 	PKG_CHECK_MODULES([HIDAPI],[$hidapi_lib],[
 		use_hidapi=yes
@@ -647,7 +671,11 @@ for hidapi_lib in hidapi hidapi-hidraw hidapi-libusb; do
 	])
 done
 
-PKG_CHECK_MODULES([LIBFTDI], [libftdi1], [use_libftdi=yes], [
+PKG_CHECK_MODULES([LIBFTDI], [libftdi1], [
+	use_libftdi=yes
+	PKG_CHECK_EXISTS([libftdi1 >= 1.5],
+		[AC_DEFINE([HAVE_LIBFTDI_TCIOFLUSH], [1], [Define if your libftdi has ftdi_tcioflush()])])
+  ], [
 	PKG_CHECK_MODULES([LIBFTDI], [libftdi], [use_libftdi=yes], [use_libftdi=no])
 ])
 
@@ -696,7 +724,7 @@ AS_IF([test "x$enable_linuxgpiod" != "xno"], [
   build_bitbang=yes
 ])
 
-AS_IF([test "x$enable_stlink" != "xno" -o "x$enable_ti_icdi" != "xno"], [
+AS_IF([test "x$enable_stlink" != "xno" -o "x$enable_ti_icdi" != "xno" -o "x$enable_nulink" != "xno"], [
 	AC_DEFINE([BUILD_HLADAPTER], [1], [1 if you want the High Level JTAG driver.])
 	AM_CONDITIONAL([HLADAPTER], [true])
 ], [
@@ -705,6 +733,7 @@ AS_IF([test "x$enable_stlink" != "xno" -o "x$enable_ti_icdi" != "xno"], [
 ])
 AM_CONDITIONAL([HLADAPTER_STLINK], [test "x$enable_stlink" != "xno"])
 AM_CONDITIONAL([HLADAPTER_ICDI], [test "x$enable_ti_icdi" != "xno"])
+AM_CONDITIONAL([HLADAPTER_NULINK], [test "x$enable_nulink" != "xno"])
 
 AS_IF([test "x$enable_jlink" != "xno"], [
   AS_IF([test "x$use_internal_libjaylink" = "xyes"], [
@@ -735,6 +764,7 @@ AM_CONDITIONAL([BCM2835GPIO], [test "x$build_bcm2835gpio" = "xyes"])
 AM_CONDITIONAL([IMX_GPIO], [test "x$build_imx_gpio" = "xyes"])
 AM_CONDITIONAL([BITBANG], [test "x$build_bitbang" = "xyes"])
 AM_CONDITIONAL([JTAG_VPI], [test "x$build_jtag_vpi" = "xyes" -o "x$build_jtag_vpi" = "xyes"])
+AM_CONDITIONAL([JTAG_DPI], [test "x$build_jtag_dpi" = "xyes" -o "x$build_jtag_dpi" = "xyes"])
 AM_CONDITIONAL([USB_BLASTER_DRIVER], [test "x$enable_usb_blaster" != "xno" -o "x$enable_usb_blaster_2" != "xno"])
 AM_CONDITIONAL([AMTJTAGACCEL], [test "x$build_amtjtagaccel" = "xyes"])
 AM_CONDITIONAL([GW16012], [test "x$build_gw16012" = "xyes"])
@@ -755,6 +785,7 @@ AM_CONDITIONAL([USE_LIBGPIOD], [test "x$use_libgpiod" = "xyes"])
 AM_CONDITIONAL([USE_HIDAPI], [test "x$use_hidapi" = "xyes"])
 AM_CONDITIONAL([USE_LIBJAYLINK], [test "x$use_libjaylink" = "xyes"])
 AM_CONDITIONAL([RSHIM], [test "x$build_rshim" = "xyes"])
+AM_CONDITIONAL([HAVE_CAPSTONE], [test "x$have_capstone" = "xyes"])
 
 AM_CONDITIONAL([MINIDRIVER], [test "x$build_minidriver" = "xyes"])
 AM_CONDITIONAL([MINIDRIVER_DUMMY], [test "x$build_minidriver_dummy" = "xyes"])
@@ -802,6 +833,7 @@ AS_IF([test "x${gcc_wextra}" = "xyes"], [
   GCC_WARNINGS="${GCC_WARNINGS} -Wbad-function-cast"
   GCC_WARNINGS="${GCC_WARNINGS} -Wcast-align"
   GCC_WARNINGS="${GCC_WARNINGS} -Wredundant-decls"
+  GCC_WARNINGS="${GCC_WARNINGS} -Wpointer-arith"
 ])
 AS_IF([test "x${gcc_werror}" = "xyes"], [
   GCC_WARNINGS="${GCC_WARNINGS} -Werror"

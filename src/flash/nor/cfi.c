@@ -423,8 +423,7 @@ static int cfi_read_intel_pri_ext(struct flash_bank *bank)
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
 	struct cfi_intel_pri_ext *pri_ext;
 
-	if (cfi_info->pri_ext)
-		free(cfi_info->pri_ext);
+	free(cfi_info->pri_ext);
 
 	pri_ext = malloc(sizeof(struct cfi_intel_pri_ext));
 	if (pri_ext == NULL) {
@@ -520,8 +519,7 @@ static int cfi_read_spansion_pri_ext(struct flash_bank *bank)
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
 	struct cfi_spansion_pri_ext *pri_ext;
 
-	if (cfi_info->pri_ext)
-		free(cfi_info->pri_ext);
+	free(cfi_info->pri_ext);
 
 	pri_ext = malloc(sizeof(struct cfi_spansion_pri_ext));
 	if (pri_ext == NULL) {
@@ -623,8 +621,7 @@ static int cfi_read_atmel_pri_ext(struct flash_bank *bank)
 	struct cfi_flash_bank *cfi_info = bank->driver_priv;
 	struct cfi_spansion_pri_ext *pri_ext;
 
-	if (cfi_info->pri_ext)
-		free(cfi_info->pri_ext);
+	free(cfi_info->pri_ext);
 
 	pri_ext = malloc(sizeof(struct cfi_spansion_pri_ext));
 	if (pri_ext == NULL) {
@@ -2055,7 +2052,7 @@ static int cfi_intel_write_words(struct flash_bank *bank, const uint8_t *word,
 
 	/* Check for valid size */
 	if (wordcount > bufferwsize) {
-		LOG_ERROR("Number of data words %" PRId32 " exceeds available buffersize %" PRId32,
+		LOG_ERROR("Number of data words %" PRIu32 " exceeds available buffersize %" PRIu32,
 			wordcount, buffersize);
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
@@ -2170,8 +2167,8 @@ static int cfi_spansion_write_words(struct flash_bank *bank, const uint8_t *word
 
 	/* Check for valid size */
 	if (wordcount > bufferwsize) {
-		LOG_ERROR("Number of data words %" PRId32 " exceeds available buffersize %"
-			PRId32, wordcount, buffersize);
+		LOG_ERROR("Number of data words %" PRIu32 " exceeds available buffersize %"
+			PRIu32, wordcount, buffersize);
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 
@@ -2470,7 +2467,7 @@ static int cfi_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t of
 
 	/* handle unaligned tail bytes */
 	if (count > 0) {
-		LOG_INFO("Fixup %" PRId32 " unaligned tail bytes", count);
+		LOG_INFO("Fixup %" PRIu32 " unaligned tail bytes", count);
 
 		/* read a complete word from flash */
 		retval = cfi_target_read_memory(bank, write_p, 1, current_word);
@@ -2593,14 +2590,12 @@ int cfi_probe(struct flash_bank *bank)
 
 	cfi_info->probed = false;
 	cfi_info->num_erase_regions = 0;
-	if (bank->sectors) {
-		free(bank->sectors);
-		bank->sectors = NULL;
-	}
-	if (cfi_info->erase_region_info) {
-		free(cfi_info->erase_region_info);
-		cfi_info->erase_region_info = NULL;
-	}
+
+	free(bank->sectors);
+	bank->sectors = NULL;
+
+	free(cfi_info->erase_region_info);
+	cfi_info->erase_region_info = NULL;
 
 	/* JEDEC standard JESD21C uses 0x5555 and 0x2aaa as unlock addresses,
 	 * while CFI compatible AMD/Spansion flashes use 0x555 and 0x2aa

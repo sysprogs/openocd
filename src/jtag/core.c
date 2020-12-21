@@ -209,7 +209,7 @@ unsigned jtag_tap_count_enabled(void)
 }
 
 /** Append a new TAP to the chain of all taps. */
-void jtag_tap_add(struct jtag_tap *t)
+static void jtag_tap_add(struct jtag_tap *t)
 {
 	unsigned jtag_num_taps = 0;
 
@@ -891,8 +891,8 @@ static int jtag_check_value_inner(uint8_t *captured, uint8_t *in_check_value,
 
 		/* NOTE:  we've lost diagnostic context here -- 'which tap' */
 
-		captured_str = buf_to_str(captured, bits, 16);
-		in_check_value_str = buf_to_str(in_check_value, bits, 16);
+		captured_str = buf_to_hex_str(captured, bits);
+		in_check_value_str = buf_to_hex_str(in_check_value, bits);
 
 		LOG_WARNING("Bad value '%s' captured during DR or IR scan:",
 			captured_str);
@@ -904,7 +904,7 @@ static int jtag_check_value_inner(uint8_t *captured, uint8_t *in_check_value,
 		if (in_check_mask) {
 			char *in_check_mask_str;
 
-			in_check_mask_str = buf_to_str(in_check_mask, bits, 16);
+			in_check_mask_str = buf_to_hex_str(in_check_mask, bits);
 			LOG_WARNING(" check_mask: 0x%s", in_check_mask_str);
 			free(in_check_mask_str);
 		}
@@ -953,14 +953,14 @@ int default_interface_jtag_execute_queue(void)
 
 	int result = jtag->jtag_ops->execute_queue();
 
-#if !BUILD_ZY1000
+#if !HAVE_JTAG_MINIDRIVER_H
 	/* Only build this if we use a regular driver with a command queue.
 	 * Otherwise jtag_command_queue won't be found at compile/link time. Its
 	 * definition is in jtag/commands.c, which is only built/linked by
 	 * jtag/Makefile.am if MINIDRIVER_DUMMY || !MINIDRIVER, but those variables
-	 * aren't accessible here. */
+	 * aren't accessible here. Use HAVE_JTAG_MINIDRIVER_H */
 	struct jtag_command *cmd = jtag_command_queue;
-	while (debug_level >= LOG_LVL_DEBUG && cmd) {
+	while (debug_level >= LOG_LVL_DEBUG_IO && cmd) {
 		switch (cmd->type) {
 			case JTAG_SCAN:
 				LOG_DEBUG_IO("JTAG %s SCAN to %s",
@@ -969,12 +969,12 @@ int default_interface_jtag_execute_queue(void)
 				for (int i = 0; i < cmd->cmd.scan->num_fields; i++) {
 					struct scan_field *field = cmd->cmd.scan->fields + i;
 					if (field->out_value) {
-						char *str = buf_to_str(field->out_value, field->num_bits, 16);
+						char *str = buf_to_hex_str(field->out_value, field->num_bits);
 						LOG_DEBUG_IO("  %db out: %s", field->num_bits, str);
 						free(str);
 					}
 					if (field->in_value) {
-						char *str = buf_to_str(field->in_value, field->num_bits, 16);
+						char *str = buf_to_hex_str(field->in_value, field->num_bits);
 						LOG_DEBUG_IO("  %db  in: %s", field->num_bits, str);
 						free(str);
 					}
@@ -1290,7 +1290,7 @@ static int jtag_examine_chain(void)
 
 		if ((idcode & 1) == 0) {
 			/* Zero for LSB indicates a device in bypass */
-			LOG_INFO("TAP %s does not have valid IDCODE (idcode=0x%x)",
+			LOG_INFO("TAP %s does not have valid IDCODE (idcode=0x%" PRIx32 ")",
 					tap->dotted_name, idcode);
 			tap->hasidcode = false;
 			tap->idcode = 0;
@@ -1436,7 +1436,7 @@ static int jtag_validate_ircapture(void)
 	/* verify the '11' sentinel we wrote is returned at the end */
 	val = buf_get_u64(ir_test, chain_pos, 2);
 	if (val != 0x3) {
-		char *cbuf = buf_to_str(ir_test, total_ir_length, 16);
+		char *cbuf = buf_to_hex_str(ir_test, total_ir_length);
 
 		LOG_ERROR("IR capture error at bit %d, saw 0x%s not 0x...3",
 			chain_pos, cbuf);

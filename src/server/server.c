@@ -210,7 +210,8 @@ int add_service(char *name,
 	new_connection_handler_t new_connection_handler,
 	input_handler_t input_handler,
 	connection_closed_handler_t connection_closed_handler,
-	void *priv)
+	void *priv,
+	struct service **new_service)
 {
 	struct service *c, **p;
 	struct hostent *hp;
@@ -346,6 +347,10 @@ int add_service(char *name,
 		;
 	*p = c;
 
+	/* if new_service is not NULL, return the created service into it */
+	if (new_service)
+		*new_service = c;
+
 	return ERROR_OK;
 }
 
@@ -403,19 +408,14 @@ static int remove_services(void)
 
 		remove_connections(c);
 
-		if (c->name)
-			free(c->name);
+		free(c->name);
 
 		if (c->type == CONNECTION_PIPE) {
 			if (c->fd != -1)
 				close(c->fd);
 		}
-		if (c->port)
-			free(c->port);
-
-		if (c->priv)
-			free(c->priv);
-
+		free(c->port);
+		free(c->priv);
 		/* delete service */
 		free(c);
 
@@ -600,7 +600,7 @@ int server_loop(struct command_context *command_context)
 	return shutdown_openocd == SHUTDOWN_WITH_ERROR_CODE ? ERROR_FAIL : ERROR_OK;
 }
 
-void sig_handler(int sig)
+static void sig_handler(int sig)
 {
 	/* store only first signal that hits us */
 	if (shutdown_openocd == CONTINUE_MAIN_LOOP) {

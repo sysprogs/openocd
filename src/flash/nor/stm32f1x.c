@@ -215,7 +215,7 @@ static int stm32x_check_operation_supported(struct flash_bank *bank)
 	/* if we have a dual flash bank device then
 	 * we need to perform option byte stuff on bank0 only */
 	if (stm32x_info->register_base != FLASH_REG_BASE_B0) {
-		LOG_ERROR("Option Byte Operation's must use bank0");
+		LOG_ERROR("Option byte operations must use bank 0");
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 
@@ -617,9 +617,7 @@ reset_pg_and_lock:
 		retval = retval2;
 
 cleanup:
-	if (new_buffer)
-		free(new_buffer);
-
+	free(new_buffer);
 	return retval;
 }
 
@@ -872,15 +870,11 @@ static int stm32x_probe(struct flash_bank *bank)
 	/* check that calculation result makes sense */
 	assert(num_pages > 0);
 
-	if (bank->sectors) {
-		free(bank->sectors);
-		bank->sectors = NULL;
-	}
+	free(bank->sectors);
+	bank->sectors = NULL;
 
-	if (bank->prot_blocks) {
-		free(bank->prot_blocks);
-		bank->prot_blocks = NULL;
-	}
+	free(bank->prot_blocks);
+	bank->prot_blocks = NULL;
 
 	bank->base = base_address;
 	bank->size = (num_pages * page_size);

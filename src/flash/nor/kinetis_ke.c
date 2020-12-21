@@ -434,7 +434,7 @@ static int kinetis_ke_prepare_flash(struct flash_bank *bank)
 	return ERROR_OK;
 }
 
-int kinetis_ke_stop_watchdog(struct target *target)
+static int kinetis_ke_stop_watchdog(struct target *target)
 {
 	struct working_area *watchdog_algorithm;
 	struct armv7m_algorithm armv7m_info;
@@ -1145,10 +1145,7 @@ static int kinetis_ke_probe(struct flash_bank *bank)
 			break;
 	}
 
-	if (bank->sectors) {
-		free(bank->sectors);
-		bank->sectors = NULL;
-	}
+	free(bank->sectors);
 
 	assert(bank->num_sectors > 0);
 	bank->sectors = malloc(sizeof(struct flash_sector) * bank->num_sectors);

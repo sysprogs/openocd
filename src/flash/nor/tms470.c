@@ -148,11 +148,9 @@ static int tms470_read_part_info(struct flash_bank *bank)
 	rom_flash = (device_ident_reg >> 10) & 1;
 	part_number = (device_ident_reg >> 3) & 0x7f;
 
-	if (bank->sectors) {
-		free(bank->sectors);
-		bank->sectors = NULL;
-		bank->num_sectors = 0;
-	}
+	free(bank->sectors);
+	bank->sectors = NULL;
+	bank->num_sectors = 0;
 
 	/*
 	 * If the part number is known, determine if the flash bank is valid
@@ -903,7 +901,7 @@ static int tms470_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t
 
 	tms470_read_part_info(bank);
 
-	LOG_INFO("Writing %" PRId32 " bytes starting at " TARGET_ADDR_FMT,
+	LOG_INFO("Writing %" PRIu32 " bytes starting at " TARGET_ADDR_FMT,
 			count, bank->base + offset);
 
 	/* set GLBCTRL.4  */

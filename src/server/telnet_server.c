@@ -451,8 +451,7 @@ static int telnet_input(struct connection *connection)
 							if (*t_con->line && (prev_line == NULL ||
 									strcmp(t_con->line, prev_line))) {
 								/* if the history slot is already taken, free it */
-								if (t_con->history[t_con->next_history])
-									free(t_con->history[t_con->next_history]);
+								free(t_con->history[t_con->next_history]);
 
 								/* add line to history */
 								t_con->history[t_con->next_history] = strdup(t_con->line);
@@ -465,8 +464,7 @@ static int telnet_input(struct connection *connection)
 								t_con->current_history =
 										t_con->next_history;
 
-								if (t_con->history[t_con->current_history])
-									free(t_con->history[t_con->current_history]);
+								free(t_con->history[t_con->current_history]);
 								t_con->history[t_con->current_history] = strdup("");
 							}
 
@@ -540,7 +538,17 @@ static int telnet_input(struct connection *connection)
 							telnet_move_cursor(connection, 0);
 						else if (*buf_p == CTRL('E'))
 							telnet_move_cursor(connection, t_con->line_size);
-						else
+						else if (*buf_p == CTRL('K')) {         /* kill line to end */
+							if (t_con->line_cursor < t_con->line_size) {
+								/* overwrite with space, until end of line, move back */
+								for (size_t i = t_con->line_cursor; i < t_con->line_size; i++)
+									telnet_write(connection, " ", 1);
+								for (size_t i = t_con->line_cursor; i < t_con->line_size; i++)
+									telnet_write(connection, "\b", 1);
+								t_con->line[t_con->line_cursor] = '\0';
+								t_con->line_size = t_con->line_cursor;
+							}
+						} else
 							LOG_DEBUG("unhandled nonprintable: %2.2x", *buf_p);
 					}
 				}
@@ -647,29 +655,22 @@ static int telnet_connection_closed(struct connection *connection)
 
 	log_remove_callback(telnet_log_callback, connection);
 
-	if (t_con->prompt) {
-		free(t_con->prompt);
-		t_con->prompt = NULL;
-	}
+	free(t_con->prompt);
+	t_con->prompt = NULL;
 
 	/* save telnet history */
 	telnet_save_history(t_con);
 
 	for (i = 0; i < TELNET_LINE_HISTORY_SIZE; i++) {
-		if (t_con->history[i]) {
-			free(t_con->history[i]);
-			t_con->history[i] = NULL;
-		}
+		free(t_con->history[i]);
+		t_con->history[i] = NULL;
 	}
 
 	/* if this connection registered a debug-message receiver delete it */
 	delete_debug_msg_receiver(connection->cmd_ctx, NULL);
 
-	if (connection->priv) {
-		free(connection->priv);
-		connection->priv = NULL;
-	} else
-		LOG_ERROR("BUG: connection->priv == NULL");
+	free(connection->priv);
+	connection->priv = NULL;
 
 	return ERROR_OK;
 }
@@ -693,7 +694,7 @@ int telnet_init(char *banner)
 
 	int ret = add_service("telnet", telnet_port, CONNECTION_LIMIT_UNLIMITED,
 		telnet_new_connection, telnet_input, telnet_connection_closed,
-		telnet_service);
+		telnet_service, NULL);
 
 	if (ret != ERROR_OK) {
 		free(telnet_service);

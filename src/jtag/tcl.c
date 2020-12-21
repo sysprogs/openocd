@@ -194,6 +194,11 @@ static int Jim_Command_drscan(Jim_Interp *interp, int argc, Jim_Obj *const *args
 	retval = jtag_execute_queue();
 	if (retval != ERROR_OK) {
 		Jim_SetResultString(interp, "drscan: jtag execute failed", -1);
+
+		for (i = 0; i < field_count; i++)
+			free(fields[i].in_value);
+		free(fields);
+
 		return JIM_ERR;
 	}
 
@@ -204,7 +209,7 @@ static int Jim_Command_drscan(Jim_Interp *interp, int argc, Jim_Obj *const *args
 		char *str;
 
 		Jim_GetLong(interp, args[i], &bits);
-		str = buf_to_str(fields[field_count].in_value, bits, 16);
+		str = buf_to_hex_str(fields[field_count].in_value, bits);
 		free(fields[field_count].in_value);
 
 		Jim_ListAppendElement(interp, list, Jim_NewStringObj(interp, str, strlen(str)));
@@ -1155,10 +1160,8 @@ COMMAND_HANDLER(handle_irscan_command)
 	retval = jtag_execute_queue();
 
 error_return:
-	for (i = 0; i < num_fields; i++) {
-		if (NULL != fields[i].out_value)
-			free((void *)fields[i].out_value);
-	}
+	for (i = 0; i < num_fields; i++)
+		free((void *)fields[i].out_value);
 
 	free(fields);
 

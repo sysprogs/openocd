@@ -446,7 +446,7 @@ static int stm32lx_write_half_pages(struct flash_bank *bank, const uint8_t *buff
 
 	/* Make sure we're performing a half-page aligned write. */
 	if (count % hp_nb) {
-		LOG_ERROR("The byte count must be %" PRIu32 "B-aligned but count is %" PRIi32 "B)", hp_nb, count);
+		LOG_ERROR("The byte count must be %" PRIu32 "B-aligned but count is %" PRIu32 "B)", hp_nb, count);
 		return ERROR_FAIL;
 	}
 
@@ -836,10 +836,7 @@ static int stm32lx_probe(struct flash_bank *bank)
 	/* calculate numbers of sectors (4kB per sector) */
 	unsigned int num_sectors = (flash_size_in_kb * 1024) / FLASH_SECTOR_SIZE;
 
-	if (bank->sectors) {
-		free(bank->sectors);
-		bank->sectors = NULL;
-	}
+	free(bank->sectors);
 
 	bank->size = flash_size_in_kb * 1024;
 	bank->base = base_address;

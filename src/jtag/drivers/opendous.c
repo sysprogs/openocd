@@ -144,7 +144,7 @@ static int opendous_usb_write(struct opendous_jtag *opendous_jtag, int out_lengt
 static int opendous_usb_read(struct opendous_jtag *opendous_jtag);
 
 /* helper functions */
-int opendous_get_version_info(void);
+static int opendous_get_version_info(void);
 
 #ifdef _DEBUG_USB_COMMS_
 static void opendous_debug_buffer(uint8_t *buffer, int length);
@@ -310,7 +310,7 @@ static int opendous_execute_queue(void)
 				break;
 
 			case JTAG_SLEEP:
-				LOG_DEBUG_IO("sleep %" PRIi32, cmd->cmd.sleep->us);
+				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 				opendous_tap_execute();
 				jtag_sleep(cmd->cmd.sleep->us);
 				break;
@@ -386,25 +386,17 @@ static int opendous_quit(void)
 {
 	opendous_usb_close(opendous_jtag_handle);
 
-	if (usb_out_buffer) {
-		free(usb_out_buffer);
-		usb_out_buffer = NULL;
-	}
+	free(usb_out_buffer);
+	usb_out_buffer = NULL;
 
-	if (usb_in_buffer) {
-		free(usb_in_buffer);
-		usb_in_buffer = NULL;
-	}
+	free(usb_in_buffer);
+	usb_in_buffer = NULL;
 
-	if (pending_scan_results_buffer) {
-		free(pending_scan_results_buffer);
-		pending_scan_results_buffer = NULL;
-	}
+	free(pending_scan_results_buffer);
+	pending_scan_results_buffer = NULL;
 
-	if (opendous_type) {
-		free(opendous_type);
-		opendous_type = NULL;
-	}
+	free(opendous_type);
+	opendous_type = NULL;
 
 	return ERROR_OK;
 }
@@ -552,7 +544,7 @@ int opendous_get_status(void)
 	return ERROR_OK;
 }
 
-int opendous_get_version_info(void)
+static int opendous_get_version_info(void)
 {
 	return ERROR_OK;
 }
@@ -697,8 +689,7 @@ int opendous_tap_execute(void)
 				return ERROR_JTAG_QUEUE_FAILED;
 			}
 
-			if (pending_scan_result->buffer != NULL)
-				free(pending_scan_result->buffer);
+			free(pending_scan_result->buffer);
 		}
 
 		opendous_tap_init();

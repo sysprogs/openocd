@@ -923,7 +923,7 @@ static int or1k_add_breakpoint(struct target *target,
 	struct or1k_du *du_core = or1k_to_du(or1k);
 	uint8_t data;
 
-	LOG_DEBUG("Adding breakpoint: addr 0x%08" TARGET_PRIxADDR ", len %d, type %d, set: %d, id: %" PRId32,
+	LOG_DEBUG("Adding breakpoint: addr 0x%08" TARGET_PRIxADDR ", len %d, type %d, set: %d, id: %" PRIu32,
 		  breakpoint->address, breakpoint->length, breakpoint->type,
 		  breakpoint->set, breakpoint->unique_id);
 
@@ -943,8 +943,7 @@ static int or1k_add_breakpoint(struct target *target,
 		return retval;
 	}
 
-	if (breakpoint->orig_instr != NULL)
-		free(breakpoint->orig_instr);
+	free(breakpoint->orig_instr);
 
 	breakpoint->orig_instr = malloc(breakpoint->length);
 	memcpy(breakpoint->orig_instr, &data, breakpoint->length);
@@ -982,7 +981,7 @@ static int or1k_remove_breakpoint(struct target *target,
 	struct or1k_common *or1k = target_to_or1k(target);
 	struct or1k_du *du_core = or1k_to_du(or1k);
 
-	LOG_DEBUG("Removing breakpoint: addr 0x%08" TARGET_PRIxADDR ", len %d, type %d, set: %d, id: %" PRId32,
+	LOG_DEBUG("Removing breakpoint: addr 0x%08" TARGET_PRIxADDR ", len %d, type %d, set: %d, id: %" PRIu32,
 		  breakpoint->address, breakpoint->length, breakpoint->type,
 		  breakpoint->set, breakpoint->unique_id);
 
@@ -1201,7 +1200,7 @@ static int or1k_get_gdb_reg_list(struct target *target, struct reg **reg_list[],
 
 }
 
-int or1k_get_gdb_fileio_info(struct target *target, struct gdb_fileio_info *fileio_info)
+static int or1k_get_gdb_fileio_info(struct target *target, struct gdb_fileio_info *fileio_info)
 {
 	return ERROR_FAIL;
 }
@@ -1377,21 +1376,21 @@ static const struct command_registration or1k_hw_ip_command_handlers[] = {
 		.name = "tap_select",
 		.handler = or1k_tap_select_command_handler,
 		.mode = COMMAND_ANY,
-		.usage = "tap_select name",
+		.usage = "name",
 		.help = "Select the TAP core to use",
 	},
 	{
 		.name = "tap_list",
 		.handler = or1k_tap_list_command_handler,
 		.mode = COMMAND_ANY,
-		.usage = "tap_list",
+		.usage = "",
 		.help = "Display available TAP core",
 	},
 	{
 		.name = "du_select",
 		.handler = or1k_du_select_command_handler,
 		.mode = COMMAND_ANY,
-		.usage = "du_select name",
+		.usage = "name",
 		.help = "Select the Debug Unit core to use",
 	},
 	{
@@ -1409,7 +1408,7 @@ static const struct command_registration or1k_reg_command_handlers[] = {
 		.name = "addreg",
 		.handler = or1k_addreg_command_handler,
 		.mode = COMMAND_ANY,
-		.usage = "addreg name addr feature group",
+		.usage = "name addr feature group",
 		.help = "Add a register to the register list",
 	},
 	COMMAND_REGISTRATION_DONE

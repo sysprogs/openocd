@@ -57,7 +57,7 @@ static int telnet_write(struct connection *connection, const void *data, int len
 	return ERROR_SERVER_REMOTE_CLOSED;
 }
 
-int jsp_poll_read(void *priv)
+static int jsp_poll_read(void *priv)
 {
 	struct jsp_service *jsp_service = (struct jsp_service *)priv;
 	unsigned char out_buffer[10];
@@ -184,24 +184,14 @@ static int jsp_input(struct connection *connection)
 
 static int jsp_connection_closed(struct connection *connection)
 {
-	struct telnet_connection *t_con = connection->priv;
 	struct jsp_service *jsp_service = connection->service->priv;
-
-	if (t_con->prompt) {
-		free(t_con->prompt);
-		t_con->prompt = NULL;
-	}
 
 	int retval = target_unregister_timer_callback(&jsp_poll_read, jsp_service);
 	if (ERROR_OK != retval)
 		return retval;
 
-	if (connection->priv) {
-		free(connection->priv);
-		connection->priv = NULL;
-	} else
-		LOG_ERROR("BUG: connection->priv == NULL");
-
+	free(connection->priv);
+	connection->priv = NULL;
 	return ERROR_OK;
 }
 
@@ -217,7 +207,8 @@ int jsp_init(struct or1k_jtag *jtag_info, char *banner)
 		jsp_new_connection,
 		jsp_input,
 		jsp_connection_closed,
-		jsp_service);
+		jsp_service,
+		NULL);
 }
 
 COMMAND_HANDLER(handle_jsp_port_command)

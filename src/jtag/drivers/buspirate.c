@@ -214,7 +214,7 @@ static int buspirate_execute_queue(void)
 
 			break;
 		case JTAG_SLEEP:
-			LOG_DEBUG_IO("sleep %i", cmd->cmd.sleep->us);
+			LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 			buspirate_tap_execute();
 			jtag_sleep(cmd->cmd.sleep->us);
 				break;
@@ -352,10 +352,8 @@ static int buspirate_quit(void)
 
 	buspirate_serial_close(buspirate_fd);
 
-	if (buspirate_port) {
-		free(buspirate_port);
-		buspirate_port = NULL;
-	}
+	free(buspirate_port);
+	buspirate_port = NULL;
 	return ERROR_OK;
 }
 
@@ -1538,5 +1536,3 @@ static int buspirate_swd_run_queue(void)
 	LOG_DEBUG("SWD queue return value: %02x", retval);
 	return retval;
 }
-
-

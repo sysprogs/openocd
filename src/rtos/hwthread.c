@@ -37,7 +37,7 @@ static int hwthread_get_thread_reg_list(struct rtos *rtos, int64_t thread_id,
 					struct rtos_reg **reg_list, int *num_regs);
 static int hwthread_get_symbol_list_to_lookup(symbol_table_elem_t *symbol_list[]);
 static int hwthread_smp_init(struct target *target);
-int hwthread_set_reg(struct rtos *rtos, uint32_t reg_num, uint8_t *reg_value);
+static int hwthread_set_reg(struct rtos *rtos, uint32_t reg_num, uint8_t *reg_value);
 
 #define HW_THREAD_NAME_STR_SIZE (32)
 
@@ -284,7 +284,7 @@ static int hwthread_get_thread_reg(struct rtos *rtos, int64_t thread_id,
 
 	struct reg *reg = register_get_by_number(curr->reg_cache, reg_num, true);
 	if (!reg) {
-		LOG_ERROR("Couldn't find register %d in thread %" PRId64 ".", reg_num,
+		LOG_ERROR("Couldn't find register %" PRIu32 " in thread %" PRId64 ".", reg_num,
 				thread_id);
 		return ERROR_FAIL;
 	}
@@ -301,7 +301,7 @@ static int hwthread_get_thread_reg(struct rtos *rtos, int64_t thread_id,
 	return ERROR_OK;
 }
 
-int hwthread_set_reg(struct rtos *rtos, uint32_t reg_num, uint8_t *reg_value)
+static int hwthread_set_reg(struct rtos *rtos, uint32_t reg_num, uint8_t *reg_value)
 {
 	if (rtos == NULL)
 		return ERROR_FAIL;

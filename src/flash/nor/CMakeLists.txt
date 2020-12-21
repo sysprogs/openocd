@@ -44,6 +44,7 @@ add_library(ocdflashnor
 	stm32h7x.c
 	stm32l4x.c
 	stm32lx.c
+	stmqspi.c
 	stmsmi.c
 	str7x.c
 	str9x.c
@@ -71,5 +72,7 @@ add_library(ocdflashnor
 	swm050.c
 	stm32l5x.c
 	renesas_rpchf.c
+	sfdp.c
 	sh_qspi.c
-	rs14100.c)
+	rs14100.c
+)

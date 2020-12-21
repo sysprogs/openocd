@@ -1054,7 +1054,7 @@ COMMAND_HANDLER(armv8_handle_exception_catch_command)
 			nsec = n->name;
 
 		if (sec == NULL || nsec == NULL) {
-			LOG_WARNING("Exception Catch: unknown exception catch configuration: EDECCR = %02x", edeccr & 0xff);
+			LOG_WARNING("Exception Catch: unknown exception catch configuration: EDECCR = %02" PRIx32, edeccr & 0xff);
 			return ERROR_FAIL;
 		}
 
@@ -1126,7 +1126,7 @@ int armv8_init_arch_info(struct target *target, struct armv8_common *armv8)
 	return ERROR_OK;
 }
 
-int armv8_aarch64_state(struct target *target)
+static int armv8_aarch64_state(struct target *target)
 {
 	struct arm *arm = target_to_arm(target);
 

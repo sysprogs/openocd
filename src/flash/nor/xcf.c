@@ -45,7 +45,7 @@
 #define ID_XCF32P                       0x05059093
 #define ID_MEANINGFUL_MASK              0x0FFFFFFF
 
-const char *xcf_name_list[] = {
+static const char * const xcf_name_list[] = {
 	"XCF08P",
 	"XCF16P",
 	"XCF32P",
@@ -399,7 +399,7 @@ static void flip_u8(uint8_t *out, const uint8_t *in, int len)
  * Function presumes need of bit reversing if it can not exactly detects
  * the opposite.
  */
-bool need_bit_reverse(const uint8_t *buffer)
+static bool need_bit_reverse(const uint8_t *buffer)
 {
 	const size_t L = 20;
 	uint8_t reference[L];
@@ -624,7 +624,7 @@ static int xcf_probe(struct flash_bank *bank)
 			bank->num_sectors = 4;
 			break;
 		default:
-			LOG_ERROR("Unknown flash device ID 0x%X", id);
+			LOG_ERROR("Unknown flash device ID 0x%" PRIX32, id);
 			return ERROR_FAIL;
 	}
 
@@ -640,7 +640,7 @@ static int xcf_probe(struct flash_bank *bank)
 	bank->driver_priv = priv;
 
 	LOG_INFO("product name: %s", product_name(bank));
-	LOG_INFO("device id = 0x%X ", bank->target->tap->idcode);
+	LOG_INFO("device id = 0x%" PRIX32, bank->target->tap->idcode);
 	LOG_INFO("flash size = %d configuration bits",
 		bank->num_sectors * XCF_DATA_SECTOR_SIZE * 8);
 	LOG_INFO("number of sectors = %u", bank->num_sectors);

@@ -264,7 +264,7 @@ static int avrf_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t o
 	}
 
 	LOG_DEBUG("offset is 0x%08" PRIx32 "", offset);
-	LOG_DEBUG("count is %" PRId32 "", count);
+	LOG_DEBUG("count is %" PRIu32 "", count);
 
 	if (ERROR_OK != avr_jtagprg_enterprogmode(avr))
 		return ERROR_FAIL;
@@ -333,10 +333,7 @@ static int avrf_probe(struct flash_bank *bank)
 	}
 
 	if (avr_info != NULL) {
-		if (bank->sectors) {
-			free(bank->sectors);
-			bank->sectors = NULL;
-		}
+		free(bank->sectors);
 
 		/* chip found */
 		bank->base = 0x00000000;

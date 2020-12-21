@@ -43,7 +43,7 @@ add_library(ocdjtagdrivers STATIC
 	drivers/osbdm.c
 	drivers/kitprog.c
 	drivers/opendous.c
-	drivers/cmsis_dap_usb.c
+	drivers/cmsis_dap.c
 	drivers/xds110.c
 	drivers/jtag_usb_common.c
 	drivers/libusb_helper.c)

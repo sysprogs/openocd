@@ -79,7 +79,6 @@ Free Documentation License''.
 * JTAG Commands::                    JTAG Commands
 * Boundary Scan Commands::           Boundary Scan Commands
 * Utility Commands::                 Utility Commands
-* TFTP::                             TFTP
 * GDB and OpenOCD::                  Using GDB and OpenOCD
 * Tcl Scripting API::                Tcl Scripting API
 * FAQ::                              Frequently Asked Questions
@@ -505,6 +504,12 @@ Texas Instruments has an adapter called @b{ICDI}.
 It is not to be confused with the FTDI based adapters that were originally fitted to their
 evaluation boards. This is the adapter fitted to the Stellaris LaunchPad.
 
+@section USB Nuvoton Nu-Link
+Nuvoton has an adapter called @b{Nu-Link}.
+It is available either as stand-alone dongle and embedded on development boards.
+It supports SWD, serial port bridge and mass storage for firmware update.
+Both Nu-Link v1 and v2 are supported.
+
 @section USB CMSIS-DAP based
 ARM has released a interface standard called CMSIS-DAP that simplifies connecting
 debuggers to ARM Cortex based targets @url{http://www.keil.com/support/man/docs/dapdebug/dapdebug_introduction.htm}.
@@ -609,8 +614,21 @@ produced, PDF schematics are easily found and it is easy to make.
 @* A JTAG driver acting as a client for the JTAG VPI server interface.
 @* Link: @url{http://github.com/fjullien/jtag_vpi}
 
+@item @b{jtag_dpi}
+@* A JTAG driver acting as a client for the SystemVerilog Direct Programming
+Interface (DPI) for JTAG devices. DPI allows OpenOCD to connect to the JTAG
+interface of a hardware model written in SystemVerilog, for example, on an
+emulation model of target hardware.
+
 @item @b{xlnx_pcie_xvc}
 @* A JTAG driver exposing Xilinx Virtual Cable over PCI Express to OpenOCD as JTAG/SWD interface.
+
+@item @b{linuxgpiod}
+@* A bitbang JTAG driver using Linux GPIO through library libgpiod.
+
+@item @b{sysfsgpio}
+@* A bitbang JTAG driver using Linux legacy sysfs GPIO.
+This is deprecated from Linux v5.3; prefer using @b{linuxgpiod}.
 
 @end itemize
 
@@ -712,8 +730,11 @@ Configuration files and scripts are searched for in
 @item the current directory,
 @item any search dir specified on the command line using the @option{-s} option,
 @item any search dir specified using the @command{add_script_search_dir} command,
-@item @file{$HOME/.openocd} (not on Windows),
 @item a directory in the @env{OPENOCD_SCRIPTS} environment variable (if set),
+@item @file{%APPDATA%/OpenOCD} (only on Windows),
+@item @file{$HOME/Library/Preferences/org.openocd} (only on Darwin),
+@item @file{$XDG_CONFIG_HOME/openocd} (@env{$XDG_CONFIG_HOME} defaults to @file{$HOME/.config}),
+@item @file{$HOME/.openocd},
 @item the site wide script library @file{$pkgdatadir/site} and
 @item the OpenOCD-supplied script library @file{$pkgdatadir/scripts}.
 @end enumerate
@@ -2415,7 +2436,8 @@ and a specific set of GPIOs is used.
 @end deffn
 
 @deffn {Interface Driver} {cmsis-dap}
-ARM CMSIS-DAP compliant based adapter.
+ARM CMSIS-DAP compliant based adapter v1 (USB HID based)
+or v2 (USB bulk).
 
 @deffn {Config Command} {cmsis_dap_vid_pid} [vid pid]+
 The vendor ID and product ID of the CMSIS-DAP device. If not specified
@@ -2429,6 +2451,23 @@ cmsis_dap_vid_pid 0xc251 0xf001 0x0d28 0x0204
 @deffn {Config Command} {cmsis_dap_serial} [serial]
 Specifies the @var{serial} of the CMSIS-DAP device to use.
 If not specified, serial numbers are not considered.
+@end deffn
+
+@deffn {Config Command} {cmsis_dap_backend} [@option{auto}|@option{usb_bulk}|@option{hid}]
+Specifies how to communicate with the adapter:
+
+@itemize @minus
+@item @option{hid} Use HID generic reports - CMSIS-DAP v1
+@item @option{usb_bulk} Use USB bulk - CMSIS-DAP v2
+@item @option{auto} First try USB bulk CMSIS-DAP v2, if not found try HID CMSIS-DAP v1.
+This is the default if @command{cmsis_dap_backend} is not specified.
+@end itemize
+@end deffn
+
+@deffn {Config Command} {cmsis_dap_usb interface} [number]
+Specifies the @var{number} of the USB interface to use in v2 mode (USB bulk).
+In most cases need not to be specified and interfaces are searched by
+interface string or for user class interface.
 @end deffn
 
 @deffn {Command} {cmsis-dap info}
@@ -2866,8 +2905,8 @@ The following example shows how to read 4 bytes from the EMUCOM channel 0x0:
 @deffn {Config} {jlink usb} <@option{0} to @option{3}>
 Set the USB address of the interface, in case more than one adapter is connected
 to the host. If not specified, USB addresses are not considered. Device
-selection via USB address is deprecated and the serial number should be used
-instead.
+selection via USB address is not always unambiguous. It is recommended to use
+the serial number instead, if possible.
 
 As a configuration command, it can be used only before 'init'.
 @end deffn
@@ -3064,7 +3103,8 @@ This is a driver that supports multiple High Level Adapters.
 This type of adapter does not expose some of the lower level api's
 that OpenOCD would normally use to access the target.
 
-Currently supported adapters include the STMicroelectronics ST-LINK and TI ICDI.
+Currently supported adapters include the STMicroelectronics ST-LINK, TI ICDI
+and Nuvoton Nu-Link.
 ST-LINK firmware version >= V2.J21.S4 recommended due to issues with earlier
 versions of firmware where serial number is reset after first use.  Suggest
 using ST firmware update utility to upgrade ST-LINK firmware even if current
@@ -3078,7 +3118,7 @@ Currently Not Supported.
 Specifies the serial number of the adapter.
 @end deffn
 
-@deffn {Config Command} {hla_layout} (@option{stlink}|@option{icdi})
+@deffn {Config Command} {hla_layout} (@option{stlink}|@option{icdi}|@option{nulink})
 Specifies the adapter layout to use.
 @end deffn
 
@@ -3207,6 +3247,22 @@ pinout.
 @end deffn
 
 
+@deffn {Interface Driver} {linuxgpiod}
+Linux provides userspace access to GPIO through libgpiod since Linux kernel version v4.6.
+The driver emulates either JTAG and SWD transport through bitbanging.
+
+See @file{interface/dln-2-gpiod.cfg} for a sample config.
+@end deffn
+
+
+@deffn {Interface Driver} {sysfsgpio}
+Linux legacy userspace access to GPIO through sysfs is deprecated from Linux kernel version v5.3.
+Prefer using @b{linuxgpiod}, instead.
+
+See @file{interface/sysfsgpio-raspberrypi.cfg} for a sample config.
+@end deffn
+
+
 @deffn {Interface Driver} {openjtag}
 OpenJTAG compatible USB adapter.
 This defines some driver-specific commands:
@@ -3227,6 +3283,22 @@ The USB device description string of the adapter.
 This value is only used with the standard variant.
 @end deffn
 @end deffn
+
+
+@deffn {Interface Driver} {jtag_dpi}
+SystemVerilog Direct Programming Interface (DPI) compatible driver for
+JTAG devices in emulation. The driver acts as a client for the SystemVerilog
+DPI server interface.
+
+@deffn {Config Command} {jtag_dpi_set_port} port
+Specifies the TCP/IP port number of the SystemVerilog DPI server interface.
+@end deffn
+
+@deffn {Config Command} {jtag_dpi_set_address} address
+Specifies the TCP/IP address of the SystemVerilog DPI server interface.
+@end deffn
+@end deffn
+
 
 @section Transport Configuration
 @cindex Transport
@@ -4662,6 +4734,11 @@ possible values of the parameter @var{number}, which are not only numeric values
 Use this option to override, for this target only, the global parameter set with
 command @command{gdb_port}.
 @xref{gdb_port,,command gdb_port}.
+
+@item @code{-gdb-max-connections} @var{number} -- EXPERIMENTAL: set the maximum
+number of GDB connections that are allowed for the target. Default is 1.
+A negative value for @var{number} means unlimited connections.
+See @xref{gdbmeminspect,,Using GDB as a non-intrusive memory inspector}.
 @end itemize
 @end deffn
 
@@ -5217,6 +5294,18 @@ it has been removed by the @option{unlock} flag.
 
 @end deffn
 
+@deffn Command {flash verify_image} filename [offset] [type]
+Verify the image @file{filename} to the current target's flash bank(s).
+Parameters follow the description of 'flash write_image'.
+In contrast to the 'verify_image' command, for banks with specific
+verify method, that one is used instead of the usual target's read
+memory methods. This is necessary for flash banks not readable by
+ordinary memory reads.
+This command gives only an overall good/bad result for each bank, not
+addresses of individual failed bytes as it's intended only as quick
+check for successful programming.
+@end deffn
+
 @section Other Flash commands
 @cindex flash protection
 
@@ -5472,6 +5561,117 @@ flash size, are detected automatically.
 @example
 flash bank $_FLASHNAME stmsmi 0xf8000000 0 0 0 $_TARGETNAME
 @end example
+
+@end deffn
+
+@deffn {Flash Driver} stmqspi
+@cindex STMicroelectronics QuadSPI/OctoSPI Interface
+@cindex QuadSPI
+@cindex OctoSPI
+@cindex stmqspi
+Some devices from STMicroelectronics include a proprietary ``QuadSPI Interface''
+(e.g. STM32F4, STM32F7, STM32L4) or ``OctoSPI Interface'' (e.g. STM32L4+)
+controller able to drive one or even two (dual mode) external SPI flash devices.
+The OctoSPI is a superset of QuadSPI, its presence is detected automatically.
+Currently only the regular command mode is supported, whereas the HyperFlash
+mode is not.
+
+QuadSPI/OctoSPI makes the flash contents directly accessible in the CPU address
+space; in case of dual mode both devices must be of the same type and are
+mapped in the same memory bank (even and odd addresses interleaved).
+CPU can directly read data, execute code (but not boot) from QuadSPI bank.
+
+The 'flash bank' command only requires the @var{base} parameter and the extra
+parameter @var{io_base} in order to identify the memory bank. Both are fixed
+by hardware, see datasheet or RM. All other parameters are ignored.
+
+The controller must be initialized after each reset and properly configured
+for memory-mapped read operation for the particular flash chip(s), for the full
+list of available register settings cf. the controller's RM. This setup is quite
+board specific (that's why booting from this memory is not possible). The
+flash driver infers all parameters from current controller register values when
+'flash probe @var{bank_id}' is executed.
+
+Normal OpenOCD commands like @command{mdw} can be used to display the flash content,
+but only after proper controller initialization as decribed above. However,
+due to a silicon bug in some devices, attempting to access the very last word
+should be avoided.
+
+It is possible to use two (even different) flash chips alternatingly, if individual
+bank chip selects are available. For some package variants, this is not the case
+due to limited pin count. To switch from one to another, adjust FSEL bit accordingly
+and re-issue 'flash probe bank_id'. Note that the bank base address will @emph{not}
+change, so the address spaces of both devices will overlap. In dual flash mode
+both chips must be identical regarding size and most other properties.
+
+Block or sector protection internal to the flash chip is not handled by this
+driver at all, but can be dealt with manually by the 'cmd' command, see below.
+The sector protection via 'flash protect' command etc. is completely internal to
+openocd, intended only to prevent accidental erase or overwrite and it does not
+persist across openocd invocations.
+
+OpenOCD contains a hardcoded list of flash devices with their properties,
+these are auto-detected. If a device is not included in this list, SFDP discovery
+is attempted. If this fails or gives inappropriate results, manual setting is
+required (see 'set' command).
+
+@example
+flash bank $_FLASHNAME stmqspi 0x90000000 0 0 0 $_TARGETNAME 0xA0001000
+flash bank $_FLASHNAME stmqspi 0x70000000 0 0 0 $_TARGETNAME 0xA0001400
+@end example
+
+There are three specific commands
+@deffn Command {stmqspi mass_erase} bank_id
+Clears sector protections and performs a mass erase. Works only if there is no
+chip specific write protection engaged.
+@end deffn
+
+@deffn Command {stmqspi set} bank_id name total_size page_size read_cmd fread_cmd pprg_cmd mass_erase_cmd sector_size sector_erase_cmd
+Set flash parameters: @var{name} human readable string, @var{total_size} size
+in bytes, @var{page_size} is write page size. @var{read_cmd}, @var{fread_cmd} and @var{pprg_cmd}
+are commands for reading and page programming. @var{fread_cmd} is used in DPI and QPI modes,
+@var{read_cmd} in normal SPI (single line) mode. @var{mass_erase_cmd}, @var{sector_size}
+and @var{sector_erase_cmd} are optional.
+
+This command is required if chip id is not hardcoded yet and e.g. for EEPROMs or FRAMs
+which don't support an id command.
+
+In dual mode parameters of both chips are set identically. The parameters refer to
+a single chip, so the whole bank gets twice the specified capacity etc.
+@end deffn
+
+@deffn Command {stmqspi cmd} bank_id resp_num cmd_byte ...
+If @var{resp_num} is zero, sends command @var{cmd_byte} and following data
+bytes. In dual mode command byte is sent to @emph{both} chips but data bytes are
+sent @emph{alternatingly} to chip 1 and 2, first to flash 1, second to flash 2, etc.,
+i.e. the total number of bytes (including cmd_byte) must be odd.
+
+If @var{resp_num} is not zero, cmd and at most four following data bytes are
+sent, in dual mode @emph{simultaneously} to both chips. Then @var{resp_num} bytes
+are read interleaved from both chips starting with chip 1. In this case
+@var{resp_num} must be even.
+
+Note the hardware dictated subtle difference of those two cases in dual-flash mode.
+
+To check basic communication settings, issue
+@example
+stmqspi cmd bank_id 0 0x04; stmqspi cmd bank_id 1 0x05; stmqspi cmd bank_id 0 0x06; stmqspi cmd bank_id 1 0x05
+@end example
+for single flash mode or
+@example
+stmqspi cmd bank_id 0 0x04; stmqspi cmd bank_id 2 0x05; stmqspi cmd bank_id 0 0x06; stmqspi cmd bank_id 2 0x05
+@end example
+for dual flash mode. This should return the status register contents.
+
+In 8-line mode, @var{cmd_byte} is sent twice - first time as given, second time
+complemented. Additionally, in 8-line mode only, some commands (e.g. Read Status)
+need a dummy address, e.g.
+@example
+stmqspi cmd bank_id 1 0x05 0x00 0x00 0x00 0x00
+@end example
+should return the status register contents.
+
+@end deffn
 
 @end deffn
 
@@ -6986,10 +7186,9 @@ The @var{num} parameter is a value shown by @command{flash banks}.
 @end deffn
 
 @deffn {Flash Driver} stm32l4x
-All members of the STM32L4, STM32L4+, STM32WB, STM32WL and STM32G4
+All members of the STM32 G0, G4, L4, L4+, L5, WB and WL
 microcontroller families from STMicroelectronics include internal flash
-and use ARM Cortex-M4 cores.
-Additionally this driver supports STM32G0 family with ARM Cortex-M0+ core.
+and use ARM Cortex-M0+, M4 and M33 cores.
 The driver automatically recognizes a number of these chips using
 the chip identification register, and autoconfigures itself.
 
@@ -8276,6 +8475,94 @@ the watchpoint should trigger. The value may be first be masked
 using @var{mask} to mark ``don't care'' fields.
 @end deffn
 
+
+@section Real Time Transfer (RTT)
+
+Real Time Transfer (RTT) is an interface specified by SEGGER based on basic
+memory reads and writes to transfer data bidirectionally between target and host.
+The specification is independent of the target architecture.
+Every target that supports so called "background memory access", which means
+that the target memory can be accessed by the debugger while the target is
+running, can be used.
+This interface is especially of interest for targets without
+Serial Wire Output (SWO), such as ARM Cortex-M0, or where semihosting is not
+applicable because of real-time constraints.
+
+@quotation Note
+The current implementation supports only single target devices.
+@end quotation
+
+The data transfer between host and target device is organized through
+unidirectional up/down-channels for target-to-host and host-to-target
+communication, respectively.
+
+@quotation Note
+The current implementation does not respect channel buffer flags.
+They are used to determine what happens when writing to a full buffer, for
+example.
+@end quotation
+
+Channels are exposed via raw TCP/IP connections. One or more RTT servers can be
+assigned to each channel to make them accessible to an unlimited number
+of TCP/IP connections.
+
+@deffn Command {rtt setup} address size ID
+Configure RTT for the currently selected target.
+Once RTT is started, OpenOCD searches for a control block with the
+identifier @var{ID} starting at the memory address @var{address} within the next
+@var{size} bytes.
+@end deffn
+
+@deffn Command {rtt start}
+Start RTT.
+If the control block location is not known, OpenOCD starts searching for it.
+@end deffn
+
+@deffn Command {rtt stop}
+Stop RTT.
+@end deffn
+
+@deffn Command {rtt polling_interval [interval]}
+Display the polling interval.
+If @var{interval} is provided, set the polling interval.
+The polling interval determines (in milliseconds) how often the up-channels are
+checked for new data.
+@end deffn
+
+@deffn Command {rtt channels}
+Display a list of all channels and their properties.
+@end deffn
+
+@deffn Command {rtt channellist}
+Return a list of all channels and their properties as Tcl list.
+The list can be manipulated easily from within scripts.
+@end deffn
+
+@deffn Command {rtt server start} port channel
+Start a TCP server on @var{port} for the channel @var{channel}.
+@end deffn
+
+@deffn Command {rtt server stop} port
+Stop the TCP sever with port @var{port}.
+@end deffn
+
+The following example shows how to setup RTT using the SEGGER RTT implementation
+on the target device.
+
+@example
+resume
+
+rtt setup 0x20000000 2048 "SEGGER RTT"
+rtt start
+
+rtt server start 9090 0
+@end example
+
+In this example, OpenOCD searches the control block with the ID "SEGGER RTT"
+starting at 0x20000000 for 2048 bytes. The RTT channel 0 is exposed through the
+TCP/IP port 9090.
+
+
 @section Misc Commands
 
 @cindex profiling
@@ -8590,7 +8877,7 @@ CTI is mandatory for core run control and each core has an individual
 CTI instance attached to it. OpenOCD has limited support for CTI using
 the @emph{cti} group of commands.
 
-@deffn Command {cti create} cti_name @option{-dap} dap_name @option{-ap-num} apn @option{-ctibase} base_address
+@deffn Command {cti create} cti_name @option{-dap} dap_name @option{-ap-num} apn @option{-baseaddr} base_address
 Creates a CTI instance @var{cti_name} on the DAP instance @var{dap_name} on MEM-AP
 @var{apn}. The @var{base_address} must match the base address of the CTI
 on the respective MEM-AP. All arguments are mandatory. This creates a
@@ -9198,7 +9485,7 @@ Selects whether interrupts will be processed when single stepping
 @cindex ITM
 @cindex ETM
 
-@deffn Command {tpiu config} (@option{disable} | ((@option{external} | @option{internal (@var{filename} | -)}) @
+@deffn Command {tpiu config} (@option{disable} | ((@option{external} | @option{internal (@var{filename} | @var{:port} | -)}) @
                (@option{sync @var{port_width}} | ((@option{manchester} | @option{uart}) @var{formatter_enable})) @
                @var{TRACECLKIN_freq} [@var{trace_freq}]))
 
@@ -9218,23 +9505,28 @@ Command options:
 @itemize @minus
 @item @option{disable} disable TPIU handling;
 @item @option{external} configure TPIU to let user capture trace
-output externally (with an additional UART or logic analyzer hardware);
-@item @option{internal @var{filename}} configure TPIU and debug adapter to
-gather trace data and append it to @var{filename} (which can be
-either a regular file or a named pipe);
-@item @option{internal -} configure TPIU and debug adapter to
-gather trace data, but not write to any file. Useful in conjunction with the @command{tcl_trace} command;
+output externally (with an additional UART or logic analyzer hardware).
+@item @option{internal (@var{filename} | @var{:port} | -)} configure TPIU and debug adapter to
+gather trace data then:
+
+@itemize @minus
+@item append it to a regular file or a named pipe if @var{filename} is specified.
+@item listen to a TCP/IP port if @var{:port} is specified, then broadcast the trace data over this port.
+@item if '-' is specified, OpenOCD will forward trace data to @command{tcl_trace} command.
+@*@b{Note:} while broadcasting to file or TCP, the forwarding to @command{tcl_trace} will remain active.
+@end itemize
+
 @item @option{sync @var{port_width}} use synchronous parallel trace output
-mode, and set port width to @var{port_width};
+mode, and set port width to @var{port_width}.
 @item @option{manchester} use asynchronous SWO mode with Manchester
-coding;
+coding.
 @item @option{uart} use asynchronous SWO mode with NRZ (same as
-regular UART 8N1) coding;
+regular UART 8N1) coding.
 @item @var{formatter_enable} is @option{on} or @option{off} to enable
 or disable TPIU formatter which needs to be used when both ITM and ETM
-data is to be output via SWO;
+data is to be output via SWO.
 @item @var{TRACECLKIN_freq} this should be specified to match target's
-current TRACECLKIN frequency (usually the same as HCLK);
+current TRACECLKIN frequency (usually the same as HCLK).
 @item @var{trace_freq} trace port frequency. Can be omitted in
 internal mode to let the adapter driver select the maximum supported
 rate automatically.
@@ -9369,6 +9661,12 @@ indications. It also establishes the expected, basic cross-trigger configuration
 target code relies on. In a configuration file, the command would typically be called from a
 @code{reset-end} or @code{reset-deassert-post} handler, to re-enable debugging after a system reset.
 However, normally it is not necessary to use the command at all.
+@end deffn
+
+@deffn Command {aarch64 disassemble} address [count]
+@cindex disassemble
+Disassembles @var{count} instructions starting at @var{address}.
+If @var{count} is not specified, a single instruction is disassembled.
 @end deffn
 
 @deffn Command {aarch64 smp} [on|off]
@@ -9705,8 +10003,31 @@ This is used to access 64-bit floating point registers on 32-bit targets.
 @end deffn
 
 @deffn Command {riscv set_prefer_sba} on|off
-When on, prefer to use System Bus Access to access memory.  When off, prefer to
-use the Program Buffer to access memory.
+When on, prefer to use System Bus Access to access memory.  When off (default),
+prefer to use the Program Buffer to access memory.
+@end deffn
+
+@deffn Command {riscv set_enable_virtual} on|off
+When on, memory accesses are performed on physical or virtual memory depending
+on the current system configuration. When off (default), all memory accessses are performed
+on physical memory.
+@end deffn
+
+@deffn Command {riscv set_enable_virt2phys} on|off
+When on (default), memory accesses are performed on physical or virtual memory
+depending on the current satp configuration. When off, all memory accessses are
+performed on physical memory.
+@end deffn
+
+@deffn Command {riscv resume_order} normal|reversed
+Some software assumes all harts are executing nearly continuously. Such
+software may be sensitive to the order that harts are resumed in. On harts
+that don't support hasel, this option allows the user to choose the order the
+harts are resumed in. If you are using this option, it's probably masking a
+race condition problem in your code.
+
+Normal order is from lowest hart index to highest. This is the default
+behavior. Reversed order is from highest hart index to lowest.
 @end deffn
 
 @deffn Command {riscv set_ir} (@option{idcode}|@option{dtmcs}|@option{dmi}) [value]
@@ -9718,6 +10039,26 @@ values.
 When utilizing version 0.11 of the RISC-V Debug Specification,
 @option{dtmcs} and @option{dmi} set the IR values for the DTMCONTROL
 and DBUS registers, respectively.
+@end deffn
+
+@deffn Command {riscv use_bscan_tunnel} value
+Enable or disable use of a BSCAN tunnel to reach DM.  Supply the width of
+the DM transport TAP's instruction register to enable.  Supply a value of 0 to disable.
+@end deffn
+
+@deffn Command {riscv set_ebreakm} on|off
+Control dcsr.ebreakm. When on (default), M-mode ebreak instructions trap to
+OpenOCD. When off, they generate a breakpoint exception handled internally.
+@end deffn
+
+@deffn Command {riscv set_ebreaks} on|off
+Control dcsr.ebreaks. When on (default), S-mode ebreak instructions trap to
+OpenOCD. When off, they generate a breakpoint exception handled internally.
+@end deffn
+
+@deffn Command {riscv set_ebreaku} on|off
+Control dcsr.ebreaku. When on (default), U-mode ebreak instructions trap to
+OpenOCD. When off, they generate a breakpoint exception handled internally.
 @end deffn
 
 @subsection RISC-V Authentication Commands
@@ -9743,7 +10084,7 @@ Write the 32-bit value to authdata.
 The following commands allow direct access to the Debug Module Interface, which
 can be used to interact with custom debug features.
 
-@deffn Command {riscv dmi_read}
+@deffn Command {riscv dmi_read} address
 Perform a 32-bit DMI read at address, returning the value.
 @end deffn
 
@@ -10309,28 +10650,6 @@ For quickstart instructions run:
 openocd -f tools/firmware-recovery.tcl -c firmware_help
 @end example
 
-@node TFTP
-@chapter TFTP
-@cindex TFTP
-If OpenOCD runs on an embedded host (as ZY1000 does), then TFTP can
-be used to access files on PCs (either the developer's PC or some other PC).
-
-The way this works on the ZY1000 is to prefix a filename by
-"/tftp/ip/" and append the TFTP path on the TFTP
-server (tftpd). For example,
-
-@example
-load_image /tftp/10.0.0.96/c:\temp\abc.elf
-@end example
-
-will load c:\temp\abc.elf from the developer pc (10.0.0.96) into memory as
-if the file was hosted on the embedded host.
-
-In order to achieve decent performance, you must choose a TFTP server
-that supports a packet size bigger than the default packet size (512 bytes). There
-are numerous TFTP servers out there (free and commercial) and you will have to do
-a bit of googling to find something that fits your requirements.
-
 @node GDB and OpenOCD
 @chapter GDB and OpenOCD
 @cindex GDB
@@ -10554,7 +10873,13 @@ of a running target. Do not use GDB commands @command{continue},
 and GDB would require stopping the target to get the prompt back.
 
 Do not use this mode under an IDE like Eclipse as it caches values of
-previously shown varibles.
+previously shown variables.
+
+It's also possible to connect more than one GDB to the same target by the
+target's configuration option @code{-gdb-max-connections}. This allows, for
+example, one GDB to run a script that continuously polls a set of variables
+while other GDB can be used interactively. Be extremely careful in this case,
+because the two GDB can easily get out-of-sync.
 
 @section RTOS Support
 @cindex RTOS Support

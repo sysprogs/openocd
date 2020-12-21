@@ -59,6 +59,8 @@ static struct rtos_type *rtos_types[] = {
 	NULL
 };
 
+static int rtos_try_next(struct target *target);
+
 int rtos_thread_packet(struct connection *connection, const char *packet, int packet_size);
 
 int rtos_smp_init(struct target *target)
@@ -102,9 +104,7 @@ static void os_free(struct target *target)
 	if (!target->rtos)
 		return;
 
-	if (target->rtos->symbols)
-		free(target->rtos->symbols);
-
+	free(target->rtos->symbols);
 	free(target->rtos);
 	target->rtos = NULL;
 }
@@ -633,7 +633,7 @@ int rtos_generic_stack_read(struct target *target,
 	return ERROR_OK;
 }
 
-int rtos_try_next(struct target *target)
+static int rtos_try_next(struct target *target)
 {
 	struct rtos *os = target->rtos;
 	struct rtos_type **type = rtos_types;
@@ -648,10 +648,9 @@ int rtos_try_next(struct target *target)
 		return 0;
 
 	os->type = *type;
-	if (os->symbols) {
-		free(os->symbols);
-		os->symbols = NULL;
-	}
+
+	free(os->symbols);
+	os->symbols = NULL;
 
 	return 1;
 }
