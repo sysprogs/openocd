@@ -803,6 +803,13 @@ static int target_soft_reset_halt(struct target *target)
  * algorithm.
  *
  * @param target used to run the algorithm
+ * @param num_mem_params
+ * @param mem_params
+ * @param num_reg_params
+ * @param reg_param
+ * @param entry_point
+ * @param exit_point
+ * @param timeout_ms
  * @param arch_info target-specific description of the algorithm.
  */
 int target_run_algorithm(struct target *target,
@@ -838,6 +845,12 @@ done:
  * Executes a target-specific native code algorithm and leaves it running.
  *
  * @param target used to run the algorithm
+ * @param num_mem_params
+ * @param mem_params
+ * @param num_reg_params
+ * @param reg_params
+ * @param entry_point
+ * @param exit_point
  * @param arch_info target-specific description of the algorithm.
  */
 int target_start_algorithm(struct target *target,
@@ -876,6 +889,12 @@ done:
  * Waits for an algorithm started with target_start_algorithm() to complete.
  *
  * @param target used to run the algorithm
+ * @param num_mem_params
+ * @param mem_params
+ * @param num_reg_params
+ * @param reg_params
+ * @param exit_point
+ * @param timeout_ms
  * @param arch_info target-specific description of the algorithm.
  */
 int target_wait_algorithm(struct target *target,
@@ -947,6 +966,7 @@ done:
  * @param entry_point address on the target to execute to start the algorithm
  * @param exit_point address at which to set a breakpoint to catch the
  *     end of the algorithm; can be 0 if target triggers a breakpoint itself
+ * @param arch_info
  */
 
 int target_run_flash_async_algorithm(struct target *target,
@@ -4143,7 +4163,7 @@ COMMAND_HANDLER(handle_wp_command)
 	}
 
 	enum watchpoint_rw type = WPT_ACCESS;
-	uint32_t addr = 0;
+	target_addr_t addr = 0;
 	uint32_t length = 0;
 	uint32_t data_value = 0x0;
 	uint32_t data_mask = 0xffffffff;
@@ -4173,7 +4193,7 @@ COMMAND_HANDLER(handle_wp_command)
 		/* fall through */
 	case 2:
 		COMMAND_PARSE_NUMBER(u32, CMD_ARGV[1], length);
-		COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], addr);
+		COMMAND_PARSE_ADDRESS(CMD_ARGV[0], addr);
 		break;
 
 	default:
@@ -4193,8 +4213,8 @@ COMMAND_HANDLER(handle_rwp_command)
 	if (CMD_ARGC != 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	uint32_t addr;
-	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], addr);
+	target_addr_t addr;
+	COMMAND_PARSE_ADDRESS(CMD_ARGV[0], addr);
 
 	struct target *target = get_current_target(CMD_CTX);
 	watchpoint_remove(target, addr);
@@ -5233,6 +5253,7 @@ no_params:
 				e = Jim_GetOpt_String(goi, &s, NULL);
 				if (e != JIM_OK)
 					return e;
+				free(target->gdb_port_override);
 				target->gdb_port_override = strdup(s);
 			} else {
 				if (goi->argc != 0)
