@@ -154,6 +154,7 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
     
     lastSectionEnd =  ((lastSectionEnd + 15) & ~15);
     plugin->sp = lastSectionEnd + stackSize;
+	LOG_DEBUG("FLASH plugin: placing the stack at 0x%08x-0x%08x", lastSectionEnd, lastSectionEnd + stackSize);
     save_region(target, &plugin->regions[plugin->region_count], lastSectionEnd, stackSize, -1);
     plugin->region_count++;
     
