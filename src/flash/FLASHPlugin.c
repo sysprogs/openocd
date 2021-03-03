@@ -61,7 +61,7 @@ struct plugin_flash_bank
     char *plugin_file;
 };
 
-static int call_plugin_func(struct target *target, int timeout, uint32_t function, uint32_t sp, uint32_t *result, int argc, ...);
+static int call_plugin_func(struct target *target, int timeout, uint32_t function, uint32_t sp, int32_t *result, int argc, ...);
 
 struct memory_backup
 {
@@ -133,7 +133,7 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
     
     uint32_t timeoutTable = advanced_elf_image_find_symbol(image, "FLASHPlugin_TimeoutTable");
     
-    int maxSize = 0;
+    unsigned maxSize = 0;
     
     for (int i = 0; i < image->num_sections; i++)
     {
@@ -204,6 +204,7 @@ static int loaded_plugin_load(struct target *target, struct advanced_elf_image *
         armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
         armv7m_info.core_mode = ARM_MODE_THREAD;
         int bp = breakpoint_add(target, init_done_address, 2, BKPT_SOFT);
+	    (void)bp;
 
         retval = target_run_algorithm(target, 0, NULL, sizeof(reg_params) / sizeof(reg_params[0]), reg_params, plugin->entry, init_done_address, plugin->timeouts.load, &armv7m_info);
         breakpoint_remove(target, init_done_address);
@@ -224,7 +225,7 @@ static int loaded_plugin_unload(struct loaded_plugin *plugin, uint32_t unload_fu
     
     if (unload_func)
     {
-        uint32_t result;
+        int32_t result;
         retval = call_plugin_func(plugin->target, plugin->timeouts.init, unload_func, plugin->sp, &result, 0);
         if (retval == ERROR_OK && result != 0)
         {
@@ -389,7 +390,7 @@ int plugin_write_sync(struct target *target,
             return -1;
     }
     
-    unsigned result = 0;
+    int32_t result = 0;
     retval = call_plugin_func(target, loaded_plugin->timeouts.write, plugin_info->FLASHPlugin_ProgramSync, loaded_plugin->sp, &result, 3, offset, plugin_info->WorkArea.Address, todo);
     if (retval != ERROR_OK)
         return -1;
@@ -440,6 +441,7 @@ int plugin_write_async(struct target *target,
     buf_set_u32(reg_params[5].value, 0, 32, plugin_make_return_addr(return_addr));
     
     int bp = breakpoint_add(target, return_addr, 2, BKPT_SOFT);
+	(void)bp;
     
     retval = target_run_flash_async_algorithm(target,
         buffer,
@@ -518,7 +520,7 @@ static int plugin_write(struct flash_bank *bank,
     return retval;
 }
 
-static int call_plugin_func(struct target *target, int timeout, uint32_t function, uint32_t sp, uint32_t *result, int argc, ...)
+static int call_plugin_func(struct target *target, int timeout, uint32_t function, uint32_t sp, int32_t *result, int argc, ...)
 {
     sp = (sp - 4) & ~3;
     const int r0ParamIndex = 2;
@@ -539,7 +541,7 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
     for (int arg = 0; arg < argc; arg++)
     {
         uint32_t argVal = va_arg(ap, uint32_t);
-        if (arg >= (sizeof(arg_reg_names) / sizeof(arg_reg_names[0])))
+        if ((unsigned)arg >= (sizeof(arg_reg_names) / sizeof(arg_reg_names[0])))
         {
             sp -= 4;
             target_write_memory(target, sp, 4, 1, (uint8_t *)&argVal);
@@ -565,6 +567,7 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
     
     buf_set_u32(reg_params[0].value, 0, 32, sp);
     int bp = breakpoint_add(target, return_addr, 2, BKPT_SOFT);
+	(void)bp;
         
     struct armv7m_algorithm armv7m_info;
     armv7m_info.common_magic = ARMV7M_COMMON_MAGIC;
@@ -574,7 +577,7 @@ static int call_plugin_func(struct target *target, int timeout, uint32_t functio
     breakpoint_remove(target, return_addr);
     
     if (retval == ERROR_OK && result)
-        *result = buf_get_u32(reg_params[r0ParamIndex].value, 0, 32);
+        *result = (int32_t)buf_get_u32(reg_params[r0ParamIndex].value, 0, 32);
     
     for (int i = 0; i < reg_param_count; i++)
         destroy_reg_param(&reg_params[i]);
@@ -603,7 +606,7 @@ static int plugin_probe(struct flash_bank *bank)
     int retval = loaded_plugin_load(target, &plugin_info->image, &loaded_plugin, plugin_info->FLASHPlugin_InitDone, plugin_info->stack_size);
     if (retval == ERROR_OK)
     {
-        uint32_t result;
+        int32_t result;
         uint32_t sp = (loaded_plugin.sp - 4) & ~3;
         
         sp -= sizeof(struct FLASHBankInfo);
@@ -617,7 +620,7 @@ static int plugin_probe(struct flash_bank *bank)
     
     if (plugin_info->FLASHPlugin_FindWorkArea && retval == ERROR_OK)
     {
-        uint32_t result;
+        int32_t result;
         uint32_t sp = (loaded_plugin.sp - 4) & ~3;
         
         sp -= sizeof(struct WorkAreaInfo);
@@ -642,7 +645,7 @@ static int plugin_probe(struct flash_bank *bank)
             retval = ERROR_FLASH_BANK_INVALID;
         }
         
-        for (int i = 0; i < bank->num_sectors; i++)
+        for (unsigned i = 0; i < bank->num_sectors; i++)
         {
             bank->sectors[i].offset = i * bankInfo.BlockSize;
             bank->sectors[i].size = bankInfo.BlockSize;
@@ -751,10 +754,10 @@ static int plugin_protect_check(struct flash_bank *bank)
     int retval = loaded_plugin_load(target, &plugin_info->image, &loaded_plugin, plugin_info->FLASHPlugin_InitDone, plugin_info->stack_size);
     if (retval == ERROR_OK)
     {
-        int retval = loaded_plugin_backup_workarea(&loaded_plugin, plugin_info->WorkArea.Address, workAreaSize);
+        retval = loaded_plugin_backup_workarea(&loaded_plugin, plugin_info->WorkArea.Address, workAreaSize);
         if (retval == ERROR_OK)
         {
-            for (int sector =  0; sector < bank->num_sectors;)
+            for (unsigned sector =  0; sector < bank->num_sectors;)
             {
                 int sectors_to_check = MIN(workAreaSize * 8, bank->num_sectors - sector);
                 int32_t result;
