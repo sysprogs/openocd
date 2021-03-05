@@ -702,5 +702,18 @@
 		<MatchRegex>^TMS570LS12.*</MatchRegex>
 		<ScriptFile>target/ti_tms570ls1224.cfg</ScriptFile>
 	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>IMXRT</ID>
+		<Name>i.MXRT</Name>
+		<MatchRegex>^.IMXRT.*</MatchRegex>
+		<ScriptFile>target/imxrt.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>RP2040</ID>
+		<Name>Raspberry Pi Pico (RP2040)</Name>
+		<MatchRegex>^RP2040.*</MatchRegex>
+		<ScriptFile>target/rp2040.cfg</ScriptFile>
+		<SuggestedTransport>swd</SuggestedTransport>
+	</TargetDeviceFamily>
 	
 </ArrayOfTargetDeviceFamily>

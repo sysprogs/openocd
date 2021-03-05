@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<RemoteToolInstructions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<Builds>
+		<RemoteTool>
+			<Name>OpenOCD</Name>
+			<ID>openocd</ID>
+			<Location>openocd</Location>
+			<TestCommand>
+				<Command>openocd</Command>
+				<Arguments>-v</Arguments>
+			</TestCommand>
+			<InstallSequence>
+				<RemoteCommand>
+					<Command>apt</Command>
+					<Arguments>update</Arguments>
+					<Label>Updating package list...</Label>
+					<Flags>UseSUDO</Flags>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>apt</Command>
+					<Arguments>install -y openocd</Arguments>
+					<Label>Installing OpenOCD...</Label>
+					<Flags>UseSUDO</Flags>
+				</RemoteCommand>
+			</InstallSequence>
+		</RemoteTool>
+		<RemoteTool>
+			<Name>OpenOCD for Raspberry Pi Pico</Name>
+			<ID>openocd-rpi2040</ID>
+			<Location>/opt/openocd-rpi2040/bin/openocd</Location>
+			<TestCommand>
+				<Command>/opt/openocd-rpi2040/bin/openocd</Command>
+				<Arguments>-v</Arguments>
+			</TestCommand>
+			<InstallSequence>
+				<RemoteCommand>
+					<Command>apt</Command>
+					<Arguments>update</Arguments>
+					<Label>Updating package list...</Label>
+					<Flags>UseSUDO</Flags>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>apt</Command>
+					<Arguments>install -y automake autoconf build-essential texinfo libtool libftdi-dev libusb-1.0-0-dev</Arguments>
+					<Label>Installing prerequisites...</Label>
+					<Flags>UseSUDO</Flags>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>rm</Command>
+					<Arguments>-rf /opt/openocd-rpi2040</Arguments>
+					<Label>Removing previous build...</Label>
+					<Flags>UseSUDO</Flags>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>mkdir</Command>
+					<Arguments>-p /opt/openocd-rpi2040/build</Arguments>
+					<Label>Creating build directory...</Label>
+					<Flags>UseSUDO</Flags>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>chmod</Command>
+					<Arguments>777 /opt/openocd-rpi2040/build</Arguments>
+					<Label>Updating permissions...</Label>
+					<Flags>UseSUDO</Flags>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>git</Command>
+					<Arguments>clone https://github.com/raspberrypi/openocd.git --recursive --branch rp2040 --depth=1</Arguments>
+					<Directory>/opt/openocd-rpi2040/build</Directory>
+					<Label>Cloning OpenOCD repository...</Label>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>./bootstrap</Command>
+					<Directory>/opt/openocd-rpi2040/build/openocd</Directory>
+					<Label>Generating configuration script...</Label>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>./configure</Command>
+					<Arguments>--enable-ftdi --enable-sysfsgpio --enable-bcm2835gpio --prefix=/opt/openocd-rpi2040</Arguments>
+					<Directory>/opt/openocd-rpi2040/build/openocd</Directory>
+					<Label>Configuring OpenOCD...</Label>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>make</Command>
+					<Arguments>-j4</Arguments>
+					<Directory>/opt/openocd-rpi2040/build/openocd</Directory>
+					<Label>Building OpenOCD...</Label>
+				</RemoteCommand>
+				<RemoteCommand>
+					<Command>make</Command>
+					<Arguments>install</Arguments>
+					<Directory>/opt/openocd-rpi2040/build/openocd</Directory>
+					<Label>Installing OpenOCD...</Label>
+					<Flags>UseSUDO</Flags>
+				</RemoteCommand>
+			</InstallSequence>
+		</RemoteTool>
+	</Builds>
+</RemoteToolInstructions>

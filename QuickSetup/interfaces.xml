@@ -1,6 +1,39 @@
 <?xml version="1.0"?>
 <ArrayOfProgrammingInterface xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
 	<ProgrammingInterface>
+		<ID>raspberrypi-swd</ID>
+		<Name>Raspberry Pi SWD BitBang</Name>
+		<ScriptFile>interface/raspberrypi-swd.cfg</ScriptFile>
+		<Condition xsi:type="Not">
+			<Argument xsi:type="Equals">
+				<Expression>$$SYS:GDBSTUB_HOST$$</Expression>
+				<ExpectedValue/>
+			</Argument>
+		</Condition>
+	</ProgrammingInterface>
+	<ProgrammingInterface>
+		<ID>raspberrypi2-native</ID>
+		<Name>Raspberry Pi</Name>
+		<ScriptFile>interface/raspberrypi2-native.cfg</ScriptFile>
+		<Condition xsi:type="Not">
+			<Argument xsi:type="Equals">
+				<Expression>$$SYS:GDBSTUB_HOST$$</Expression>
+				<ExpectedValue/>
+			</Argument>
+		</Condition>
+	</ProgrammingInterface>
+	<ProgrammingInterface>
+		<ID>raspberrypi-native</ID>
+		<Name>Raspberry Pi (v1.0)</Name>
+		<ScriptFile>interface/raspberrypi-native.cfg</ScriptFile>
+		<Condition xsi:type="Not">
+			<Argument xsi:type="Equals">
+				<Expression>$$SYS:GDBSTUB_HOST$$</Expression>
+				<ExpectedValue/>
+			</Argument>
+		</Condition>
+	</ProgrammingInterface>
+	<ProgrammingInterface>
 		<ID>stlink-v1</ID>
 		<Name>ST-Link v1</Name>
 		<ClassID>stlink</ClassID>
