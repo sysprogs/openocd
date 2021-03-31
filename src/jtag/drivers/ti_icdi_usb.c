@@ -483,7 +483,7 @@ static int icdi_usb_read_regs(void *handle TARGET_ARGUMENT)
 	return ERROR_OK;
 }
 
-static int icdi_usb_read_reg(void *handle, unsigned int regsel, uint32_t *val TARGET_ARGUMENT)
+static int icdi_usb_read_reg(void *handle, unsigned regsel, uint32_t *val TARGET_ARGUMENT)
 {
 	int result;
 	struct icdi_usb_handle_s *h = handle;
@@ -512,7 +512,7 @@ static int icdi_usb_read_reg(void *handle, unsigned int regsel, uint32_t *val TA
 	return result;
 }
 
-static int icdi_usb_write_reg(void *handle, unsigned int regsel, uint32_t val TARGET_ARGUMENT)
+static int icdi_usb_write_reg(void *handle, unsigned regsel, uint32_t val TARGET_ARGUMENT)
 {
 	int result;
 	char cmd[20];

@@ -521,7 +521,7 @@ static int cortex_m_debug_entry(struct target *target)
 
 	for (i = 0; i < num_regs; i++) {
 		r = &armv7m->arm.core_cache->reg_list[i];
-		if (!r->valid)
+		if (r->exist && !r->valid)
 			arm->read_core_reg(target, r, i, ARM_MODE_ANY);
 	}
 
@@ -1704,8 +1704,6 @@ void cortex_m_deinit_target(struct target *target)
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
 
-	armv7m_trace_tpiu_exit(target);
-
 	free(cortex_m->fp_comparator_list);
 
 	cortex_m_dwt_free(target);
@@ -2138,10 +2136,8 @@ int cortex_m_examine(struct target *target)
 		if (retval != ERROR_OK)
 			return retval;
 
-		if (armv7m->trace_config.config_type != TRACE_CONFIG_TYPE_DISABLED) {
-			armv7m_trace_tpiu_config(target);
+		if (armv7m->trace_config.itm_deferred_config)
 			armv7m_trace_itm_config(target);
-		}
 
 		/* NOTE: FPB and DWT are both optional. */
 
@@ -2626,6 +2622,11 @@ static const struct command_registration cortex_m_command_handlers[] = {
 	{
 		.chain = armv7m_trace_command_handlers,
 	},
+	/* START_DEPRECATED_TPIU */
+	{
+		.chain = arm_tpiu_deprecated_command_handlers,
+	},
+	/* END_DEPRECATED_TPIU */
 	{
 		.name = "cortex_m",
 		.mode = COMMAND_EXEC,
@@ -2641,7 +2642,6 @@ static const struct command_registration cortex_m_command_handlers[] = {
 
 struct target_type cortexm_target = {
 	.name = "cortex_m",
-	.deprecated_name = "cortex_m3",
 
 	.poll = cortex_m_poll,
 	.arch_state = armv7m_arch_state,

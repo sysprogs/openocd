@@ -35,6 +35,7 @@ add_library(target
 	arm_jtag.c
 	arm_semihosting.c
 	arm_simulator.c
+	arm_tpiu_swo.c
 	avr32_ap7k.c
 	avr32_jtag.c
 	avr32_mem.c

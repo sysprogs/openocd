@@ -38,7 +38,7 @@ static int multicore_smp_init(struct target *target);
 static int multicore_update_threads(struct rtos *rtos);
 static int multicore_get_thread_reg_list(struct rtos *rtos, int64_t thread_id, struct rtos_reg **rtos_reg_list, int *num_regs);
 static int multicore_step_hook(struct target *target, int current, uint32_t address, int handle_breakpoints);
-static int multicore_symbol_list_lookup(symbol_table_elem_t *symbol_list[]);
+static int multicore_symbol_list_lookup(struct symbol_table_elem *symbol_list[]);
 
 
 const struct rtos_type multicore_rtos = {
@@ -57,10 +57,10 @@ enum
     ThreadIdBase = 1,
 };
 
-static int multicore_symbol_list_lookup(symbol_table_elem_t *symbol_list[])
+static int multicore_symbol_list_lookup(struct symbol_table_elem *symbol_list[])
 {
-    *symbol_list = (symbol_table_elem_t *)malloc(sizeof(symbol_table_elem_t));
-    memset(*symbol_list, 0, sizeof(symbol_table_elem_t));
+	*symbol_list = (struct symbol_table_elem *)malloc(sizeof(struct symbol_table_elem));
+	memset(*symbol_list, 0, sizeof(struct symbol_table_elem));
     return 0;
 }
 
