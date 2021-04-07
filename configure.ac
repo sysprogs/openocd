@@ -123,12 +123,10 @@ m4_define([USB1_ADAPTERS],
 	[[cmsis_dap_v2], [CMSIS-DAP v2 Compliant Debugger], [CMSIS_DAP_USB]],
 	[[osbdm], [OSBDM (JTAG only) Programmer], [OSBDM]],
 	[[opendous], [eStick/opendous JTAG Programmer], [OPENDOUS]],
+	[[armjtagew], [Olimex ARM-JTAG-EW Programmer], [ARMJTAGEW]],
 	[[rlink], [Raisonance RLink JTAG Programmer], [RLINK]],
+	[[usbprog], [USBProg JTAG Programmer], [USBPROG]],
 	[[aice], [Andes JTAG Programmer], [AICE]]])
-
-m4_define([USB0_ADAPTERS],
-	[[[usbprog], [USBProg JTAG Programmer], [USBPROG]],
-	[[armjtagew], [Olimex ARM-JTAG-EW Programmer], [ARMJTAGEW]]])
 
 m4_define([HIDAPI_ADAPTERS],
 	[[[cmsis_dap], [CMSIS-DAP Compliant Debugger], [CMSIS_DAP_HID]],
@@ -249,7 +247,6 @@ m4_define([AC_ARG_ADAPTERS], [
 
 AC_ARG_ADAPTERS([
   USB1_ADAPTERS,
-  USB0_ADAPTERS,
   HIDAPI_ADAPTERS,
   HIDAPI_USB1_ADAPTERS,
   LIBFTDI_ADAPTERS,
@@ -585,8 +582,6 @@ PKG_CHECK_MODULES([LIBUSB1], [libusb-1.0], [
 	AC_MSG_WARN([libusb-1.x not found, trying legacy libusb-0.1 as a fallback; consider installing libusb-1.x instead])
 ])
 
-PKG_CHECK_MODULES([LIBUSB0], [libusb], [use_libusb0=yes], [use_libusb0=no])
-
 AC_ARG_WITH([capstone],
 		AS_HELP_STRING([--with-capstone], [Use Capstone disassembly library (default=auto)])
 	, [
@@ -648,7 +643,6 @@ m4_define([PROCESS_ADAPTERS], [
 ])
 
 PROCESS_ADAPTERS([USB1_ADAPTERS], ["x$use_libusb1" = "xyes"], [libusb-1.x])
-PROCESS_ADAPTERS([USB0_ADAPTERS], ["x$use_libusb0" = "xyes"], [libusb-0.1])
 PROCESS_ADAPTERS([HIDAPI_ADAPTERS], ["x$use_hidapi" = "xyes"], [hidapi])
 PROCESS_ADAPTERS([HIDAPI_USB1_ADAPTERS], ["x$use_hidapi" = "xyes" -a "x$use_libusb1" = "xyes"], [hidapi and libusb-1.x])
 PROCESS_ADAPTERS([LIBFTDI_ADAPTERS], ["x$use_libftdi" = "xyes"], [libftdi])
@@ -705,7 +699,6 @@ AM_CONDITIONAL([REMOTE_BITBANG], [test "x$build_remote_bitbang" = "xyes"])
 AM_CONDITIONAL([BUSPIRATE], [test "x$build_buspirate" = "xyes"])
 AM_CONDITIONAL([SYSFSGPIO], [test "x$build_sysfsgpio" = "xyes"])
 AM_CONDITIONAL([XLNX_PCIE_XVC], [test "x$build_xlnx_pcie_xvc" = "xyes"])
-AM_CONDITIONAL([USE_LIBUSB0], [test "x$use_libusb0" = "xyes"])
 AM_CONDITIONAL([USE_LIBUSB1], [test "x$use_libusb1" = "xyes"])
 AM_CONDITIONAL([IS_CYGWIN], [test "x$is_cygwin" = "xyes"])
 AM_CONDITIONAL([IS_MINGW], [test "x$is_mingw" = "xyes"])
@@ -784,7 +777,7 @@ echo
 echo
 echo OpenOCD configuration summary
 echo --------------------------------------------------
-m4_foreach([adapter], [USB1_ADAPTERS, USB0_ADAPTERS,
+m4_foreach([adapter], [USB1_ADAPTERS,
 	HIDAPI_ADAPTERS, HIDAPI_USB1_ADAPTERS, LIBFTDI_ADAPTERS,
 	LIBFTDI_USB1_ADAPTERS,
 	LIBGPIOD_ADAPTERS,
