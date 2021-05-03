@@ -17,11 +17,6 @@ AC_SUBST([MAKEINFO])
 AM_INIT_AUTOMAKE([-Wall -Wno-portability dist-bzip2 dist-zip subdir-objects])
 
 AC_CONFIG_HEADERS([config.h])
-AH_BOTTOM([
-#include <helper/system.h>
-#include <helper/types.h>
-#include <helper/replacements.h>
-])
 
 AC_LANG([C])
 AC_PROG_CC
@@ -49,6 +44,9 @@ AC_SEARCH_LIBS([openpty], [util])
 
 AC_CHECK_HEADERS([sys/socket.h])
 AC_CHECK_HEADERS([elf.h])
+AC_EGREP_HEADER(Elf64_Ehdr, [elf.h], [
+  AC_DEFINE([HAVE_ELF64], [1], [Define to 1 if the system has the type `Elf64_Ehdr'.])
+])
 AC_CHECK_HEADERS([dirent.h])
 AC_CHECK_HEADERS([fcntl.h])
 AC_CHECK_HEADERS([malloc.h])

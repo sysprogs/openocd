@@ -50,6 +50,14 @@ EXTRA_DIST += \
 	README.macOS \
 	$(EXTRA_DIST_NEWS) \
 	Doxyfile.in \
+	LICENSES/license-rules.txt \
+	LICENSES/preferred/BSD-1-Clause \
+	LICENSES/preferred/BSD-2-Clause \
+	LICENSES/preferred/BSD-3-Clause \
+	LICENSES/preferred/GFDL-1.2 \
+	LICENSES/preferred/gfdl-1.2.texi.readme \
+	LICENSES/preferred/GPL-2.0 \
+	LICENSES/stand-alone/GPL-3.0 \
 	tools/logger.pl \
 	tools/rlink_make_speed_table \
 	tools/st7_dtc_as \

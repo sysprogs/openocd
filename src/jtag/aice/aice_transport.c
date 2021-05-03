@@ -27,6 +27,7 @@
 #include <target/target.h>
 #include <jtag/aice/aice_interface.h>
 #include <jtag/aice/aice_transport.h>
+#include <string.h>
 
 /* */
 static int jim_newtap_expected_id(Jim_Nvp *n, Jim_GetOptInfo *goi,
@@ -255,9 +256,8 @@ static int jim_aice_arp_init_reset(Jim_Interp *interp, int argc, Jim_Obj * const
 	e = aice_init_reset(context);
 
 	if (e != ERROR_OK) {
-		Jim_Obj *eObj = Jim_NewIntObj(goi.interp, e);
-		Jim_SetResultFormatted(goi.interp, "error: %#s", eObj);
-		Jim_FreeNewObj(goi.interp, eObj);
+		Jim_Obj *obj = Jim_NewIntObj(goi.interp, e);
+		Jim_SetResultFormatted(goi.interp, "error: %#s", obj);
 		return JIM_ERR;
 	}
 	return JIM_OK;

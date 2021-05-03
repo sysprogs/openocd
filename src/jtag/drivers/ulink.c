@@ -21,6 +21,7 @@
 #endif
 
 #include <math.h>
+#include "helper/system.h"
 #include <jtag/interface.h>
 #include <jtag/commands.h>
 #include <target/image.h>
@@ -266,7 +267,7 @@ static int ulink_usb_open(struct ulink **device)
 {
 	ssize_t num_devices, i;
 	bool found;
-	libusb_device **usb_devices;
+	struct libusb_device **usb_devices;
 	struct libusb_device_descriptor usb_desc;
 	struct libusb_device_handle *usb_device_handle;
 
