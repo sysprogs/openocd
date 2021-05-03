@@ -23,7 +23,6 @@ add_library(ocdusbblaster STATIC drivers/usb_blaster/usb_blaster.c drivers/usb_b
 
 add_library(ocdjtagdrivers STATIC
 	drivers/driver.c
-	drivers/usb_common.c
 	drivers/ftdi.c
 	drivers/mpsse.c
 	drivers/usbprog.c
