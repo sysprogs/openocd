@@ -70,7 +70,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/cmsis-dap.cfg -c "adapter speed 3000" -f target/imxrt1064.cfg -c "init" -c "reset init"</Arguments>
+            <Arguments>-f interface/ftdi/olimex-arm-usb-ocd-h.cfg -f target/pic32mx.cfg -c "adapter speed 3000" -c init -c "reset init"</Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>

@@ -75,6 +75,7 @@ add_library(ocdjlink STATIC
 	drivers/libjaylink/libjaylink/transport_usb.c
 	drivers/libjaylink/libjaylink/discovery_usb.c)
 
+target_include_directories(ocdjlink PRIVATE ../..)
 target_compile_definitions(ocdjlink PRIVATE HAVE_LIBUSB)
 	
 add_library(jtag STATIC adapter.c core.c interface.c interfaces.c tcl.c commands.c swim.c)
