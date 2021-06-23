@@ -178,6 +178,7 @@ struct cortex_m_dwt_comparator {
 enum cortex_m_soft_reset_config {
 	CORTEX_M_RESET_SYSRESETREQ,
 	CORTEX_M_RESET_VECTRESET,
+	CORTEX_M_RESET_LPC55SX,
 };
 
 enum cortex_m_isrmasking_mode {

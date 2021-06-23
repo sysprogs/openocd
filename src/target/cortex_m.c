@@ -733,6 +733,8 @@ static int cortex_m_poll(struct target *target)
 
 static int cortex_m_halt(struct target *target)
 {
+	struct cortex_m_common *cortex_m = target_to_cm(target);
+	
 	LOG_DEBUG("target->state: %s",
 		target_state_name(target));
 
@@ -744,7 +746,7 @@ static int cortex_m_halt(struct target *target)
 	if (target->state == TARGET_UNKNOWN)
 		LOG_WARNING("target was in unknown state when halt was requested");
 
-	if (target->state == TARGET_RESET) {
+	if (target->state == TARGET_RESET && cortex_m->soft_reset_config != CORTEX_M_RESET_LPC55SX) {
 		if ((jtag_get_reset_config() & RESET_SRST_PULLS_TRST) && jtag_get_srst()) {
 			LOG_ERROR("can't request a halt while in reset if nSRST pulls nTRST");
 			return ERROR_TARGET_FAILURE;
@@ -1139,6 +1141,166 @@ static int cortex_m_step(struct target *target, int current,
 	return ERROR_OK;
 }
 
+//Per table 1102 in section 51.5.4.1, UM11295 (rev 1.4)
+enum DM_AP_REGISTER
+{
+	DM_AP_CSW = 0,
+	DM_AP_REQUEST = 4,
+	DM_AP_RETURN = 8,
+	DM_AP_ID = AP_REG_IDR
+}
+;
+
+//Based on section 51.6.1 of UM11295 (rev 1.4)
+static int dap_lpc55sx_start_debug_session(struct adiv5_dap *dap)
+{
+	int retval;
+	struct adiv5_ap *ap = dap_ap(dap, 2);
+		
+	uint32_t ap_id = 0;
+	retval = dap_queue_ap_read(ap, DM_AP_ID, &ap_id);
+	if (retval != ERROR_OK)
+		return retval;
+	
+	retval = dap_run(dap);
+	if (retval != ERROR_OK)
+		return retval;
+
+	if (ap_id != 0x002A0000)
+	{
+		LOG_ERROR("Unexpected DM-AP ID: %08x\r\n", ap_id);
+		return E_FAIL;
+	}
+	
+	retval = dap_queue_ap_write(ap, DM_AP_CSW, 0x21);	//RESYNC_REQ + CHIP_RESET_REQ
+	if(retval != ERROR_OK)
+		return retval;
+
+	retval = dap_run(dap);
+	if (retval != ERROR_OK)
+		return retval;
+	
+	alive_sleep(150);
+	int64_t start = timeval_ms();
+
+	for (uint32_t csw = -1; csw;)
+	{
+		retval = dap_queue_ap_read(ap, DM_AP_CSW, &csw);
+		if (retval != ERROR_OK)
+			return retval;
+
+		retval = dap_run(dap);
+		if (retval != ERROR_OK)
+			return retval;
+		
+		if ((timeval_ms() - start) > 1000)
+			return ERROR_TIMEOUT;
+	}	
+	retval = dap_queue_ap_write(ap, DM_AP_REQUEST, 7);	//START_DBG_SESSION
+	if(retval != ERROR_OK)
+		return retval;
+
+	retval = dap_run(dap);
+	if (retval != ERROR_OK)
+		return retval;
+
+	for (uint32_t ret = -1; ret & 0xFFFF;)
+	{
+		retval = dap_queue_ap_read(ap, DM_AP_RETURN, &ret);
+		if (retval != ERROR_OK)
+			return retval;
+
+		retval = dap_run(dap);
+		if (retval != ERROR_OK)
+			return retval;
+		
+		if ((timeval_ms() - start) > 1000)
+			return ERROR_TIMEOUT;
+	}
+	
+	dap_invalidate_cache(dap);
+	return ERROR_OK;
+}
+
+static int cortex_m_reset_lpc55sx_using_dm_ap(struct target *target)
+{
+	struct armv7m_common *armv7m = target_to_armv7m(target);
+	int retval = dap_lpc55sx_start_debug_session(armv7m->debug_ap->dap);
+	if (retval != ERROR_OK)
+		return retval;
+	
+	target->state = TARGET_RESET;
+	
+	retval = target_halt(target);
+	if (retval != ERROR_OK)
+		return retval;
+	
+	retval = target_wait_state(target, TARGET_HALTED, 1000);
+	if (retval != ERROR_OK)
+		return retval;
+	
+	return ERROR_OK;
+}
+
+static int cortex_m_reset_lpc55sx(struct target *target)
+{
+	/* According to the LPC55S1x documentation, we should be able to reset into the entry point by setting a watchpoint at address 0x50000040 (UM11295, Section 51.6.4).
+	 * However, it doesn't seem to work on the actual hardware, so instead we read the program entry point from the FLASH memory, and set a regular breakpoint there.
+	 **/
+	int retval = ERROR_OK;
+	uint32_t breakpointAddress = 0;
+	struct armv7m_common *armv7m = target_to_armv7m(target);
+	
+	if (target->reset_halt)
+	{
+		retval = target_halt(target);
+		if (retval != ERROR_OK)
+			return retval;
+				
+		retval = target_wait_state(target, TARGET_HALTED, 1000);
+		if (retval != ERROR_OK)
+			return retval;
+		
+		uint32_t entryPoint = 0;
+		
+		retval = target_read_memory(target, 0 + 4, 4, 1, (uint8_t *)&entryPoint);
+		if (retval == ERROR_OK && entryPoint != 0 && entryPoint != -1)
+		{
+			retval = breakpoint_add(target, entryPoint, 2, BKPT_HARD);
+			if (retval == ERROR_OK)
+				breakpointAddress = entryPoint;
+		}
+		
+		if (breakpointAddress)
+		{
+			LOG_INFO("LPC55Sx: found entry point at 0x%08x.", breakpointAddress);
+		}
+		else
+		{
+			LOG_WARNING("LPC55Sx: could not locate the entry point in FLASH memory. Performing a reset using DM-AP.");
+			return cortex_m_reset_lpc55sx_using_dm_ap(target);
+		}
+	}
+		
+	mem_ap_write_atomic_u32(armv7m->debug_ap, NVIC_AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
+	
+	alive_sleep(120);
+	target->state = TARGET_RESET;
+	
+	if (breakpointAddress)
+	{
+		retval = target_wait_state(target, TARGET_HALTED, 250);
+		breakpoint_remove(target, breakpointAddress);
+		if (retval != ERROR_OK)
+		{
+			LOG_WARNING("LPC55Sx: timed out waiting for post-reset breakpoint. Performing a reset using DM-AP.");
+			return cortex_m_reset_lpc55sx_using_dm_ap(target);
+		}
+	}
+	
+	return ERROR_OK;
+}
+
 static int cortex_m_assert_reset(struct target *target)
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
@@ -1229,6 +1391,10 @@ static int cortex_m_assert_reset(struct target *target)
 
 		/* srst is asserted, ignore AP access errors */
 		retval = ERROR_OK;
+	} else if (cortex_m->soft_reset_config == CORTEX_M_RESET_LPC55SX) {
+		retval = cortex_m_reset_lpc55sx(target);
+		register_cache_invalidate(cortex_m->armv7m.arm.core_cache);
+		return retval;
 	} else {
 		/* Use a standard Cortex-M3 software reset mechanism.
 		 * We default to using VECRESET as it is supported on all current cores
@@ -2028,6 +2194,12 @@ int cortex_m_examine(struct target *target)
 		if (cortex_m->apsel == DP_APSEL_INVALID) {
 			/* Search for the MEM-AP */
 			retval = cortex_m_find_mem_ap(swjdp, &armv7m->debug_ap);
+			if (retval != ERROR_OK && cortex_m->soft_reset_config == CORTEX_M_RESET_LPC55SX) {
+				retval = dap_lpc55sx_start_debug_session(swjdp);
+				if (retval == ERROR_OK)
+					retval = cortex_m_find_mem_ap(swjdp, &armv7m->debug_ap);
+			}
+			
 			if (retval != ERROR_OK) {
 				LOG_ERROR("Could not find MEM-AP to control the core");
 				return retval;
@@ -2504,7 +2676,10 @@ COMMAND_HANDLER(handle_cortex_m_reset_config_command)
 			else
 				cortex_m->soft_reset_config = CORTEX_M_RESET_VECTRESET;
 
-		} else
+		}
+		else if (stricmp(*CMD_ARGV, "lpc55sxx") == 0)
+			cortex_m->soft_reset_config = CORTEX_M_RESET_LPC55SX;
+		else
 			return ERROR_COMMAND_SYNTAX_ERROR;
 	}
 
@@ -2515,6 +2690,10 @@ COMMAND_HANDLER(handle_cortex_m_reset_config_command)
 
 		case CORTEX_M_RESET_VECTRESET:
 			reset_config = "vectreset";
+			break;
+
+		case CORTEX_M_RESET_LPC55SX:
+			reset_config = "lpc55sxx";
 			break;
 
 		default:
