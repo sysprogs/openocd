@@ -172,6 +172,13 @@
 		<ScriptFile>target/stm32wbx.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>BLUENRG-LP</ID>
+		<Name>BlueNRG-LP</Name>
+		<MatchRegex>^BlueNRG-LP$</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32.bluenrg-lp</BspID>
+		<ScriptFile>target/bluenrg-lp.cfg</ScriptFile>
+	</TargetDeviceFamily>
 	<!-- ============================================ AT91SAM7/9 ============================================ -->
 	<TargetDeviceFamily>
 		<ID>at91sam7s</ID>
