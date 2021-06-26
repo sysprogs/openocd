@@ -905,7 +905,7 @@ static int stm32l4_auto_probe(struct flash_bank *bank)
 	return stm32l4_probe(bank);
 }
 
-static int get_stm32l4_info(struct flash_bank *bank, char *buf, int buf_size)
+static int get_stm32l4_info(struct flash_bank *bank, struct command_invocation *cmd)
 {
 	struct stm32l4_flash_bank *stm32l4_info = bank->driver_priv;
 	struct stm32l4_part_info *part_info = stm32l4_info->part_info;
@@ -918,18 +918,18 @@ static int get_stm32l4_info(struct flash_bank *bank, char *buf, int buf_size)
 				rev_str = part_info->revs[i].str;
 
 				if (rev_str != NULL) {
-					snprintf(buf, buf_size, "%s - Rev: %s",
+					command_print(cmd, "%s - Rev: %s",
 							part_info->device_str, rev_str);
 					return ERROR_OK;
 				}
 			}
 		}
 
-		snprintf(buf, buf_size, "%s - Rev: unknown (0x%04x)",
+		command_print(cmd, "%s - Rev: unknown (0x%04x)",
 				part_info->device_str, rev_id);
 		return ERROR_OK;
 	} else {
-		snprintf(buf, buf_size, "Cannot identify target as a stm32g4x device");
+		command_print(cmd, "Cannot identify target as a stm32g4x device");
 		return ERROR_FAIL;
 	}
 

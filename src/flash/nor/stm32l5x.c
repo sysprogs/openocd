@@ -857,7 +857,7 @@ static int stm32l4_auto_probe(struct flash_bank *bank)
 	return stm32l4_probe(bank);
 }
 
-static int get_stm32l4_info(struct flash_bank *bank, char *buf, int buf_size)
+static int get_stm32l4_info(struct flash_bank *bank, struct command_invocation *cmd)
 {
 	struct target *target = bank->target;
 	uint32_t dbgmcu_idcode;
@@ -907,11 +907,11 @@ static int get_stm32l4_info(struct flash_bank *bank, char *buf, int buf_size)
 		break;
 
 	default:
-		snprintf(buf, buf_size, "Cannot identify target as a STM32L4\n");
+		command_print(cmd, "Cannot identify target as a STM32L4\n");
 		return ERROR_FAIL;
 	}
 
-	snprintf(buf, buf_size, "%s - Rev: %1d.%02d",
+	command_print(cmd, "%s - Rev: %1d.%02d",
 			 device_str, rev_id, rev_minor);
 
 	return ERROR_OK;

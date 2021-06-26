@@ -354,14 +354,14 @@ static int rs14100_auto_probe(struct flash_bank *bank)
 }
 
 
-static int get_rs14100_info(struct flash_bank *bank, char *buf, int buf_size)
+static int get_rs14100_info(struct flash_bank *bank, struct command_invocation *cmd)
 {
 	struct rs14100_flash_bank *rs14100_info = bank->driver_priv;
 	
 	LOG_ERROR("In Auto-Probe...");
 
 	if (!(rs14100_info->probed)) {
-		snprintf(buf, buf_size,
+		command_print(cmd,
 			"\nSPIFI flash bank not probed yet\n");
 		return ERROR_OK;
 	}

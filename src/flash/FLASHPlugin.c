@@ -669,11 +669,11 @@ static int plugin_auto_probe(struct flash_bank *bank)
     return plugin_probe(bank);
 }
 
-static int get_plugin_info(struct flash_bank *bank, char *buf, int buf_size)
+static int get_plugin_info(struct flash_bank *bank, struct command_invocation *cmd)
 {
     struct plugin_flash_bank *plugin_info = bank->driver_priv;
     
-    snprintf(buf, buf_size, "Plugin-managed FLASH\r\nPlugin file: %s", plugin_info->plugin_file);
+    command_print(cmd, "Plugin-managed FLASH\r\nPlugin file: %s", plugin_info->plugin_file);
     return ERROR_OK;
 }
 

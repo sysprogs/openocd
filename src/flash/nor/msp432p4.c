@@ -575,7 +575,7 @@ static int msp432p4_protect_check(struct flash_bank *bank)
 	/* Function not required. At startup all sectors are protected. */
 	return ERROR_OK;
 }
-static int get_msp432p4_info(struct flash_bank *bank, char *buf, int buf_size)
+static int get_msp432p4_info(struct flash_bank *bank, struct command_invocation *cmd)
 {
 	return ERROR_OK;
 }
