@@ -1000,25 +1000,26 @@ static int aarch64_debug_entry(struct target *target)
 	/* Examine debug reason */
 	armv8_dpm_report_dscr(dpm, dscr);
 
-	/* save address of instruction that triggered the watchpoint? */
+	/* save the memory address that triggered the watchpoint */
 	if (target->debug_reason == DBG_REASON_WATCHPOINT) {
 		uint32_t tmp;
-		uint64_t wfar = 0;
 
 		retval = mem_ap_read_atomic_u32(armv8->debug_ap,
-				armv8->debug_base + CPUV8_DBG_WFAR1,
-				&tmp);
+				armv8->debug_base + CPUV8_DBG_EDWAR0, &tmp);
 		if (retval != ERROR_OK)
 			return retval;
-		wfar = tmp;
-		wfar = (wfar << 32);
-		retval = mem_ap_read_atomic_u32(armv8->debug_ap,
-				armv8->debug_base + CPUV8_DBG_WFAR0,
-				&tmp);
-		if (retval != ERROR_OK)
-			return retval;
-		wfar |= tmp;
-		armv8_dpm_report_wfar(&armv8->dpm, wfar);
+		target_addr_t edwar = tmp;
+
+		/* EDWAR[63:32] has unknown content in aarch32 state */
+		if (core_state == ARM_STATE_AARCH64) {
+			retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+					armv8->debug_base + CPUV8_DBG_EDWAR1, &tmp);
+			if (retval != ERROR_OK)
+				return retval;
+			edwar |= ((target_addr_t)tmp) << 32;
+		}
+
+		armv8->dpm.wp_addr = edwar;
 	}
 
 	retval = armv8_dpm_read_current_registers(&armv8->dpm);
@@ -1444,7 +1445,7 @@ static int aarch64_set_hybrid_breakpoint(struct target *target, struct breakpoin
 	}
 
 	breakpoint->set = brp_1 + 1;
-	breakpoint->linked_BRP = brp_2;
+	breakpoint->linked_brp = brp_2;
 	control_CTX = ((CTX_machmode & 0x7) << 20)
 		| (brp_2 << 16)
 		| (0 << 14)
@@ -1506,7 +1507,7 @@ static int aarch64_unset_breakpoint(struct target *target, struct breakpoint *br
 	if (breakpoint->type == BKPT_HARD) {
 		if ((breakpoint->address != 0) && (breakpoint->asid != 0)) {
 			int brp_i = breakpoint->set - 1;
-			int brp_j = breakpoint->linked_BRP;
+			int brp_j = breakpoint->linked_brp;
 			if ((brp_i < 0) || (brp_i >= aarch64->brp_num)) {
 				LOG_DEBUG("Invalid BRP number in breakpoint");
 				return ERROR_OK;
@@ -1556,7 +1557,7 @@ static int aarch64_unset_breakpoint(struct target *target, struct breakpoint *br
 			if (retval != ERROR_OK)
 				return retval;
 
-			breakpoint->linked_BRP = 0;
+			breakpoint->linked_brp = 0;
 			breakpoint->set = 0;
 			return ERROR_OK;
 
@@ -1865,31 +1866,19 @@ int aarch64_hit_watchpoint(struct target *target,
 
 	struct armv8_common *armv8 = target_to_armv8(target);
 
-	uint64_t exception_address;
+	target_addr_t exception_address;
 	struct watchpoint *wp;
 
-	exception_address = armv8->dpm.wp_pc;
+	exception_address = armv8->dpm.wp_addr;
 
 	if (exception_address == 0xFFFFFFFF)
 		return ERROR_FAIL;
 
-	/**********************************************************/
-	/* see if a watchpoint address matches a value read from  */
-	/* the EDWAR register. Testing shows that on some ARM CPUs*/
-	/* the EDWAR value needs to have 8 added to it so we add  */
-	/* that check as well not sure if that is a core bug)     */
-	/**********************************************************/
-	for (exception_address = armv8->dpm.wp_pc; exception_address <= (armv8->dpm.wp_pc + 8);
-		exception_address += 8) {
-		for (wp = target->watchpoints; wp; wp = wp->next) {
-			if ((exception_address >= wp->address) && (exception_address < (wp->address + wp->length))) {
-				*hit_watchpoint = wp;
-				if (exception_address != armv8->dpm.wp_pc)
-					LOG_DEBUG("watchpoint hit required EDWAR to be increased by 8");
-				return ERROR_OK;
-			}
+	for (wp = target->watchpoints; wp; wp = wp->next)
+		if (exception_address >= wp->address && exception_address < (wp->address + wp->length)) {
+			*hit_watchpoint = wp;
+			return ERROR_OK;
 		}
-	}
 
 	return ERROR_FAIL;
 }
@@ -2823,15 +2812,15 @@ enum aarch64_cfg_param {
 	CFG_CTI,
 };
 
-static const Jim_Nvp nvp_config_opts[] = {
+static const struct jim_nvp nvp_config_opts[] = {
 	{ .name = "-cti", .value = CFG_CTI },
 	{ .name = NULL, .value = -1 }
 };
 
-static int aarch64_jim_configure(struct target *target, Jim_GetOptInfo *goi)
+static int aarch64_jim_configure(struct target *target, struct jim_getopt_info *goi)
 {
 	struct aarch64_private_config *pc;
-	Jim_Nvp *n;
+	struct jim_nvp *n;
 	int e;
 
 	pc = (struct aarch64_private_config *)target->private_config;
@@ -2862,12 +2851,12 @@ static int aarch64_jim_configure(struct target *target, Jim_GetOptInfo *goi)
 		Jim_SetEmptyResult(goi->interp);
 
 		/* check first if topmost item is for us */
-		e = Jim_Nvp_name2value_obj(goi->interp, nvp_config_opts,
+		e = jim_nvp_name2value_obj(goi->interp, nvp_config_opts,
 				goi->argv[0], &n);
 		if (e != JIM_OK)
 			return JIM_CONTINUE;
 
-		e = Jim_GetOpt_Obj(goi, NULL);
+		e = jim_getopt_obj(goi, NULL);
 		if (e != JIM_OK)
 			return e;
 
@@ -2876,7 +2865,7 @@ static int aarch64_jim_configure(struct target *target, Jim_GetOptInfo *goi)
 			if (goi->isconfigure) {
 				Jim_Obj *o_cti;
 				struct arm_cti *cti;
-				e = Jim_GetOpt_Obj(goi, &o_cti);
+				e = jim_getopt_obj(goi, &o_cti);
 				if (e != JIM_OK)
 					return e;
 				cti = cti_instance_by_jim_obj(goi->interp, o_cti);
@@ -2968,15 +2957,15 @@ COMMAND_HANDLER(aarch64_mask_interrupts_command)
 	struct target *target = get_current_target(CMD_CTX);
 	struct aarch64_common *aarch64 = target_to_aarch64(target);
 
-	static const Jim_Nvp nvp_maskisr_modes[] = {
+	static const struct jim_nvp nvp_maskisr_modes[] = {
 		{ .name = "off", .value = AARCH64_ISRMASK_OFF },
 		{ .name = "on", .value = AARCH64_ISRMASK_ON },
 		{ .name = NULL, .value = -1 },
 	};
-	const Jim_Nvp *n;
+	const struct jim_nvp *n;
 
 	if (CMD_ARGC > 0) {
-		n = Jim_Nvp_name2value_simple(nvp_maskisr_modes, CMD_ARGV[0]);
+		n = jim_nvp_name2value_simple(nvp_maskisr_modes, CMD_ARGV[0]);
 		if (n->name == NULL) {
 			LOG_ERROR("Unknown parameter: %s - should be off or on", CMD_ARGV[0]);
 			return ERROR_COMMAND_SYNTAX_ERROR;
@@ -2985,7 +2974,7 @@ COMMAND_HANDLER(aarch64_mask_interrupts_command)
 		aarch64->isrmasking_mode = n->value;
 	}
 
-	n = Jim_Nvp_value2name_simple(nvp_maskisr_modes, aarch64->isrmasking_mode);
+	n = jim_nvp_value2name_simple(nvp_maskisr_modes, aarch64->isrmasking_mode);
 	command_print(CMD, "aarch64 interrupt mask %s", n->name);
 
 	return ERROR_OK;

@@ -23,8 +23,6 @@
 #define get_field(reg, mask) (((reg) & (mask)) / ((mask) & ~((mask) << 1)))
 #define set_field(reg, mask, val) (((reg) & ~(mask)) | (((val) * ((mask) & ~((mask) << 1))) & (mask)))
 
-#define DIM(x)		(sizeof(x)/sizeof(*x))
-
 /* Constants for legacy SiFive hardware breakpoints. */
 #define CSR_BPCONTROL_X			(1<<0)
 #define CSR_BPCONTROL_W			(1<<1)
@@ -184,10 +182,10 @@ struct scan_field _bscan_tunnel_nested_tap_select_dmi[] = {
 		}
 };
 struct scan_field *bscan_tunnel_nested_tap_select_dmi = _bscan_tunnel_nested_tap_select_dmi;
-uint32_t bscan_tunnel_nested_tap_select_dmi_num_fields = DIM(_bscan_tunnel_nested_tap_select_dmi);
+uint32_t bscan_tunnel_nested_tap_select_dmi_num_fields = ARRAY_SIZE(_bscan_tunnel_nested_tap_select_dmi);
 
 struct scan_field *bscan_tunnel_data_register_select_dmi = _bscan_tunnel_data_register_select_dmi;
-uint32_t bscan_tunnel_data_register_select_dmi_num_fields = DIM(_bscan_tunnel_data_register_select_dmi);
+uint32_t bscan_tunnel_data_register_select_dmi_num_fields = ARRAY_SIZE(_bscan_tunnel_data_register_select_dmi);
 
 struct trigger {
 	uint64_t address;
@@ -348,8 +346,8 @@ uint32_t dtmcontrol_scan_via_bscan(struct target *target, uint32_t out)
 		tunneled_dr[0].in_value = NULL;
 	}
 	jtag_add_ir_scan(target->tap, &select_user4, TAP_IDLE);
-	jtag_add_dr_scan(target->tap, DIM(tunneled_ir), tunneled_ir, TAP_IDLE);
-	jtag_add_dr_scan(target->tap, DIM(tunneled_dr), tunneled_dr, TAP_IDLE);
+	jtag_add_dr_scan(target->tap, ARRAY_SIZE(tunneled_ir), tunneled_ir, TAP_IDLE);
+	jtag_add_dr_scan(target->tap, ARRAY_SIZE(tunneled_dr), tunneled_dr, TAP_IDLE);
 	select_dmi_via_bscan(target);
 
 	int retval = jtag_execute_queue();
@@ -1706,7 +1704,7 @@ static int riscv_run_algorithm(struct target *target, int num_mem_params,
 	}
 
 	/* Save registers */
-	struct reg *reg_pc = register_get_by_name(target->reg_cache, "pc", 1);
+	struct reg *reg_pc = register_get_by_name(target->reg_cache, "pc", true);
 	if (!reg_pc || reg_pc->type->get(reg_pc) != ERROR_OK)
 		return ERROR_FAIL;
 	uint64_t saved_pc = buf_get_u64(reg_pc->value, 0, reg_pc->size);
@@ -1715,7 +1713,7 @@ static int riscv_run_algorithm(struct target *target, int num_mem_params,
 	uint64_t saved_regs[32];
 	for (int i = 0; i < num_reg_params; i++) {
 		LOG_DEBUG("save %s", reg_params[i].reg_name);
-		struct reg *r = register_get_by_name(target->reg_cache, reg_params[i].reg_name, 0);
+		struct reg *r = register_get_by_name(target->reg_cache, reg_params[i].reg_name, false);
 		if (!r) {
 			LOG_ERROR("Couldn't find register named '%s'", reg_params[i].reg_name);
 			return ERROR_FAIL;
@@ -1749,7 +1747,7 @@ static int riscv_run_algorithm(struct target *target, int num_mem_params,
 
 	LOG_DEBUG("Disabling Interrupts");
 	struct reg *reg_mstatus = register_get_by_name(target->reg_cache,
-			"mstatus", 1);
+			"mstatus", true);
 	if (!reg_mstatus) {
 		LOG_ERROR("Couldn't find mstatus!");
 		return ERROR_FAIL;
@@ -1788,7 +1786,7 @@ static int riscv_run_algorithm(struct target *target, int num_mem_params,
 				GDB_REGNO_PC,
 				GDB_REGNO_MSTATUS, GDB_REGNO_MEPC, GDB_REGNO_MCAUSE,
 			};
-			for (unsigned i = 0; i < DIM(regnums); i++) {
+			for (unsigned i = 0; i < ARRAY_SIZE(regnums); i++) {
 				enum gdb_regno regno = regnums[i];
 				riscv_reg_t reg_value;
 				if (riscv_get_register(target, &reg_value, regno) != ERROR_OK)
@@ -1830,7 +1828,7 @@ static int riscv_run_algorithm(struct target *target, int num_mem_params,
 	for (int i = 0; i < num_reg_params; i++) {
 		if (reg_params[i].direction == PARAM_IN ||
 				reg_params[i].direction == PARAM_IN_OUT) {
-			struct reg *r = register_get_by_name(target->reg_cache, reg_params[i].reg_name, 0);
+			struct reg *r = register_get_by_name(target->reg_cache, reg_params[i].reg_name, false);
 			if (r->type->get(r) != ERROR_OK) {
 				LOG_ERROR("get(%s) failed", r->name);
 				return ERROR_FAIL;
@@ -1838,7 +1836,7 @@ static int riscv_run_algorithm(struct target *target, int num_mem_params,
 			buf_cpy(r->value, reg_params[i].value, reg_params[i].size);
 		}
 		LOG_DEBUG("restore %s", reg_params[i].reg_name);
-		struct reg *r = register_get_by_name(target->reg_cache, reg_params[i].reg_name, 0);
+		struct reg *r = register_get_by_name(target->reg_cache, reg_params[i].reg_name, false);
 		buf_set_u64(buf, 0, info->xlen[0], saved_regs[r->number]);
 		if (r->type->set(r, buf) != ERROR_OK) {
 			LOG_ERROR("set(%s) failed", r->name);
@@ -2040,7 +2038,6 @@ int riscv_openocd_poll(struct target *target)
 	} else if (target->smp) {
 		unsigned halts_discovered = 0;
 		unsigned total_targets = 0;
-		bool newly_halted[RISCV_MAX_HARTS] = {0};
 		unsigned should_remain_halted = 0;
 		unsigned should_resume = 0;
 		unsigned i = 0;
@@ -2049,7 +2046,6 @@ int riscv_openocd_poll(struct target *target)
 			total_targets++;
 			struct target *t = list->target;
 			riscv_info_t *r = riscv_info(t);
-			assert(i < DIM(newly_halted));
 			enum riscv_poll_hart out = riscv_poll_hart(t, r->current_hartid);
 			switch (out) {
 			case RPH_NO_CHANGE:
@@ -2060,7 +2056,6 @@ int riscv_openocd_poll(struct target *target)
 				break;
 			case RPH_DISCOVERED_HALTED:
 				halts_discovered++;
-				newly_halted[i] = true;
 				t->state = TARGET_HALTED;
 				enum riscv_halt_reason halt_reason =
 					riscv_halt_reason(t, r->current_hartid);
@@ -2818,6 +2813,14 @@ static unsigned riscv_xlen_nonconst(struct target *target)
 	return riscv_xlen(target);
 }
 
+static unsigned int riscv_data_bits(struct target *target)
+{
+	RISCV_INFO(r);
+	if (r->data_bits)
+		return r->data_bits(target);
+	return riscv_xlen(target);
+}
+
 struct target_type riscv_target = {
 	.name = "riscv",
 
@@ -2862,6 +2865,7 @@ struct target_type riscv_target = {
 	.commands = riscv_command_handlers,
 
 	.address_bits = riscv_xlen_nonconst,
+	.data_bits = riscv_data_bits
 };
 
 /*** RISC-V Interface ***/
@@ -3771,7 +3775,7 @@ int riscv_init_registers(struct target *target)
 #undef DECLARE_CSR
 	};
 	/* encoding.h does not contain the registers in sorted order. */
-	qsort(csr_info, DIM(csr_info), sizeof(*csr_info), cmp_csr_info);
+	qsort(csr_info, ARRAY_SIZE(csr_info), sizeof(*csr_info), cmp_csr_info);
 	unsigned csr_info_index = 0;
 
 	unsigned custom_range_index = 0;
@@ -4031,7 +4035,7 @@ int riscv_init_registers(struct target *target)
 			unsigned csr_number = number - GDB_REGNO_CSR0;
 
 			while (csr_info[csr_info_index].number < csr_number &&
-					csr_info_index < DIM(csr_info) - 1) {
+					csr_info_index < ARRAY_SIZE(csr_info) - 1) {
 				csr_info_index++;
 			}
 			if (csr_info[csr_info_index].number == csr_number) {

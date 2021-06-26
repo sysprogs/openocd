@@ -2778,7 +2778,7 @@ static int kinetis_auto_probe(struct flash_bank *bank)
 	return kinetis_probe(bank);
 }
 
-static int kinetis_info(struct flash_bank *bank, char *buf, int buf_size)
+static int kinetis_info(struct flash_bank *bank, struct command_invocation *cmd)
 {
 	const char *bank_class_names[] = {
 		"(ANY)", "PFlash", "FlexNVM", "FlexRAM"
@@ -2788,7 +2788,7 @@ static int kinetis_info(struct flash_bank *bank, char *buf, int buf_size)
 	struct kinetis_chip *k_chip = k_bank->k_chip;
 	uint32_t size_k = bank->size / 1024;
 
-	snprintf(buf, buf_size,
+	command_print_sameline(cmd,
 		"%s %s: %" PRIu32 "k %s bank %s at " TARGET_ADDR_FMT,
 		bank->driver->name, k_chip->name,
 		size_k, bank_class_names[k_bank->flash_class],
@@ -2803,7 +2803,7 @@ static int kinetis_blank_check(struct flash_bank *bank)
 	struct kinetis_chip *k_chip = k_bank->k_chip;
 	int result;
 
-	/* suprisingly blank check does not work in VLPR and HSRUN modes */
+	/* surprisingly blank check does not work in VLPR and HSRUN modes */
 	result = kinetis_check_run_mode(k_chip);
 	if (result != ERROR_OK)
 		return result;

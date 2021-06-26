@@ -62,12 +62,12 @@ static inline bool jimcmd_is_proc(Jim_Cmd *cmd)
 	return cmd->isproc;
 }
 
-static inline bool jimcmd_is_ocd_command(Jim_Cmd *cmd)
+bool jimcmd_is_oocd_command(Jim_Cmd *cmd)
 {
 	return !cmd->isproc && cmd->u.native.cmdProc == jim_command_dispatch;
 }
 
-static inline void *jimcmd_privdata(Jim_Cmd *cmd)
+void *jimcmd_privdata(Jim_Cmd *cmd)
 {
 	return cmd->isproc ? NULL : cmd->u.native.privData;
 }
@@ -261,7 +261,7 @@ static struct command *command_find_from_name(Jim_Interp *interp, const char *na
 	Jim_IncrRefCount(jim_name);
 	Jim_Cmd *cmd = Jim_GetCommand(interp, jim_name, JIM_NONE);
 	Jim_DecrRefCount(interp, jim_name);
-	if (!cmd || jimcmd_is_proc(cmd) || !jimcmd_is_ocd_command(cmd))
+	if (!cmd || jimcmd_is_proc(cmd) || !jimcmd_is_oocd_command(cmd))
 		return NULL;
 
 	return jimcmd_privdata(cmd);
@@ -343,7 +343,8 @@ static struct command *register_command(struct command_context *context,
 		return NULL;
 	}
 
-	LOG_DEBUG("registering '%s'...", full_name);
+	if (false) /* too noisy with debug_level 3 */
+		LOG_DEBUG("registering '%s'...", full_name);
 	int retval = Jim_CreateCommand(context->interp, full_name,
 				jim_command_dispatch, c, command_free);
 	if (retval != JIM_OK) {
@@ -441,7 +442,8 @@ int unregister_commands_match(struct command_context *cmd_ctx, const char *forma
 			Jim_DecrRefCount(interp, elem);
 			continue;
 		}
-		LOG_DEBUG("delete command \"%s\"", name);
+		if (false) /* too noisy with debug_level 3 */
+			LOG_DEBUG("delete command \"%s\"", name);
 #if JIM_VERSION >= 80
 		Jim_DeleteCommand(interp, elem);
 #else
@@ -818,14 +820,13 @@ static COMMAND_HELPER(command_help_show, struct help_entry *c,
 		((c->help != NULL) && (strstr(c->help, cmd_match) != NULL));
 
 	if (is_match) {
-		command_help_show_indent(n);
-		LOG_USER_N("%s", c->cmd_name);
-
 		if (c->usage && strlen(c->usage) > 0) {
-			LOG_USER_N(" ");
-			command_help_show_wrap(c->usage, 0, n + 5);
-		} else
-			LOG_USER_N("\n");
+			char *msg = alloc_printf("%s %s", c->cmd_name, c->usage);
+			command_help_show_wrap(msg, n, n + 5);
+			free(msg);
+		} else {
+			command_help_show_wrap(c->cmd_name, n, n + 5);
+		}
 	}
 
 	if (is_match && show_help) {
@@ -865,9 +866,9 @@ static COMMAND_HELPER(command_help_show, struct help_entry *c,
 					stage_msg = " (?mode error?)";
 					break;
 			}
-			msg = alloc_printf("%s%s", c->help ? : "", stage_msg);
+			msg = alloc_printf("%s%s", c->help ? c->help : "", stage_msg);
 		} else
-			msg = alloc_printf("%s", c->help ? : "");
+			msg = alloc_printf("%s", c->help ? c->help : "");
 
 		if (NULL != msg) {
 			command_help_show_wrap(msg, n + 3, n + 3);
@@ -1019,7 +1020,7 @@ static int jim_command_mode(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 		Jim_Cmd *cmd = Jim_GetCommand(interp, s, JIM_NONE);
 		Jim_DecrRefCount(interp, s);
 		free(full_name);
-		if (!cmd || !(jimcmd_is_proc(cmd) || jimcmd_is_ocd_command(cmd))) {
+		if (!cmd || !(jimcmd_is_proc(cmd) || jimcmd_is_oocd_command(cmd))) {
 			Jim_SetResultString(interp, "unknown", -1);
 			return JIM_OK;
 		}
@@ -1221,7 +1222,6 @@ static const struct command_registration command_builtin_handlers[] = {
 		.handler = jim_echo,
 		.mode = COMMAND_ANY,
 		.help = "Logs a message at \"user\" priority. "
-			"Output message to stdout. "
 			"Option \"-n\" suppresses trailing newline",
 		.usage = "[-n] string",
 	},

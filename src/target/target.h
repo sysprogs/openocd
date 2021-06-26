@@ -157,7 +157,7 @@ struct target {
 
 	struct target_event_action *event_action;
 
-	int reset_halt;						/* attempt resetting the CPU into the halted mode? */
+	bool reset_halt;						/* attempt resetting the CPU into the halted mode? */
 	target_addr_t working_area;				/* working area (initialised RAM). Evaluated
 										 * upon first allocation from virtual/physical address. */
 	bool working_area_virt_spec;		/* virtual address specified? */
@@ -687,6 +687,13 @@ target_addr_t target_address_max(struct target *target);
  * This routine is a wrapper for target->type->address_bits.
  */
 unsigned target_address_bits(struct target *target);
+
+/**
+ * Return the number of data bits this target supports.
+ *
+ * This routine is a wrapper for target->type->data_bits.
+ */
+unsigned int target_data_bits(struct target *target);
 
 /** Return the *name* of this targets current state */
 const char *target_state_name(struct target *target);

@@ -514,7 +514,7 @@ int arm_dpm_write_dirty_registers(struct arm_dpm *dpm, bool bpwp)
 				continue;
 			if (arm->cpsr == cache->reg_list + i)
 				continue;
-			if (!cache->reg_list[i].dirty)
+			if (!cache->reg_list[i].exist || !cache->reg_list[i].dirty)
 				continue;
 
 			r = cache->reg_list[i].arch_info;
@@ -763,7 +763,7 @@ static int arm_dpm_full_context(struct target *target)
 		for (unsigned i = 0; i < cache->num_regs; i++) {
 			struct arm_reg *r;
 
-			if (cache->reg_list[i].valid)
+			if (!cache->reg_list[i].exist || cache->reg_list[i].valid)
 				continue;
 			r = cache->reg_list[i].arch_info;
 
@@ -1010,7 +1010,7 @@ void arm_dpm_report_wfar(struct arm_dpm *dpm, uint32_t addr)
 			/* ?? */
 			break;
 	}
-	dpm->wp_pc = addr;
+	dpm->wp_addr = addr;
 }
 
 /*----------------------------------------------------------------------*/
@@ -1088,9 +1088,11 @@ int arm_dpm_setup(struct arm_dpm *dpm)
 		target->type->remove_breakpoint = dpm_remove_breakpoint;
 	}
 
-	/* watchpoint setup */
-	target->type->add_watchpoint = dpm_add_watchpoint;
-	target->type->remove_watchpoint = dpm_remove_watchpoint;
+	/* watchpoint setup -- optional until it works everywhere */
+	if (!target->type->add_watchpoint) {
+		target->type->add_watchpoint = dpm_add_watchpoint;
+		target->type->remove_watchpoint = dpm_remove_watchpoint;
+	}
 
 	/* FIXME add vector catch support */
 

@@ -37,7 +37,7 @@
 #define QSPI_W_EN (0x1)
 #define QSPI_SS_DISABLE (0x0)
 #define QSPI_SS_ENABLE (0x1)
-#define WRITE_DISBALE (0x0)
+#define WRITE_DISABLE (0x0)
 #define WRITE_ENABLE (0x1)
 
 #define QSPI_TIMEOUT (1000)
@@ -914,17 +914,16 @@ static int mrvlqspi_flash_erase_check(struct flash_bank *bank)
 	return ERROR_OK;
 }
 
-static int mrvlqspi_get_info(struct flash_bank *bank, char *buf, int buf_size)
+static int mrvlqspi_get_info(struct flash_bank *bank, struct command_invocation *cmd)
 {
 	struct mrvlqspi_flash_bank *mrvlqspi_info = bank->driver_priv;
 
 	if (!(mrvlqspi_info->probed)) {
-		snprintf(buf, buf_size,
-			"\nQSPI flash bank not probed yet\n");
+		command_print_sameline(cmd, "\nQSPI flash bank not probed yet\n");
 		return ERROR_OK;
 	}
 
-	snprintf(buf, buf_size, "\nQSPI flash information:\n"
+	command_print_sameline(cmd, "\nQSPI flash information:\n"
 		"  Device \'%s\' ID 0x%08" PRIx32 "\n",
 		mrvlqspi_info->dev->name, mrvlqspi_info->dev->device_id);
 
