@@ -1,5 +1,9 @@
 /***************************************************************************
- *   Copyright (C) 2005 by Dominic Rath                                    *
+ *   This is a FLASH driver for the PIC32MM family based on the original   *
+ *   PIC32MX driver. Due to complexity constraints, it is forked rather    *
+ *   merged.															   *
+ *																		   *
+ *	 Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
  *                                                                         *
  *   Copyright (C) 2008 by Spencer Oliver                                  *
@@ -32,7 +36,10 @@
 #include <target/mips32.h>
 #include <target/mips_m4k.h>
 
-#define PIC32MM_MANUF_ID	0x029
+#include <target/target_type.h>
+#include <target/register.h>
+
+#define PIC32_MANUF_ID	0x029
 
 /* pic32mm memory locations */
 
@@ -50,23 +57,14 @@
 
 /* pic32mm configuration register locations */
 
-#define PIC32MM_DEVCFG0_1xx_2xx	0xBFC00BFC
-#define PIC32MM_DEVCFG0		0xBFC02FFC
-#define PIC32MM_DEVCFG1		0xBFC02FF8
-#define PIC32MM_DEVCFG2		0xBFC02FF4
-#define PIC32MM_DEVCFG3		0xBFC02FF0
-#define PIC32MM_DEVID		0xBF80F220
-
-#define PIC32MM_BMXPFMSZ	0xBF882060
-#define PIC32MM_BMXBOOTSZ	0xBF882070
-#define PIC32MM_BMXDRMSZ	0xBF882040
+#define PIC32MM_DEVID		0xBF803660
 
 /* pic32mm flash controller register locations */
 
-#define PIC32MM_NVMCON		0xBF80F400
-#define PIC32MM_NVMCONCLR	0xBF80F404
-#define PIC32MM_NVMCONSET	0xBF80F408
-#define PIC32MM_NVMCONINV	0xBF80F40C
+#define PIC32MM_NVMCON		0xBF802930
+#define PIC32MM_NVMCONCLR	0xBF802934
+#define PIC32MM_NVMCONSET	0xBF802938
+#define PIC32MM_NVMCONINV	0xBF80293C
 #define NVMCON_NVMWR		(1 << 15)
 #define NVMCON_NVMWREN		(1 << 14)
 #define NVMCON_NVMERR		(1 << 13)
@@ -75,128 +73,112 @@
 #define NVMCON_OP_PFM_ERASE		0x5
 #define NVMCON_OP_PAGE_ERASE	0x4
 #define NVMCON_OP_ROW_PROG		0x3
+#define NVMCON_OP_DWORD_PROG	0x2
 #define NVMCON_OP_WORD_PROG		0x1
 #define NVMCON_OP_NOP			0x0
 
-#define PIC32MM_NVMKEY		0xBF80F410
-#define PIC32MM_NVMADDR		0xBF80F420
-#define PIC32MM_NVMADDRCLR	0xBF80F424
-#define PIC32MM_NVMADDRSET	0xBF80F428
-#define PIC32MM_NVMADDRINV	0xBF80F42C
-#define PIC32MM_NVMDATA		0xBF80F430
-#define PIC32MM_NVMSRCADDR	0xBF80F440
+#define PIC32MM_NVMKEY		0xBF802940
+#define PIC32MM_NVMADDR		0xBF802950
+#define PIC32MM_NVMADDRCLR	0xBF802954
+#define PIC32MM_NVMADDRSET	0xBF802958
+#define PIC32MM_NVMADDRINV	0xBF80295C
+#define PIC32MM_NVMDATA0	0xBF802960
+#define PIC32MM_NVMDATA1	0xBF802970
+#define PIC32MM_NVMSRCADDR	0xBF802980
+
+#define PIC32MM_NVMPWP		0xBF802990
+#define PIC32MM_NVMBWP		0xBF8029A0
 
 /* flash unlock keys */
 
 #define NVMKEY1			0xAA996655
 #define NVMKEY2			0x556699AA
 
-#define MX_1xx_2xx			1	/* PIC32mx1xx/2xx */
-#define MX_17x_27x			2	/* PIC32mx17x/27x */
-
-struct pic32mm_flash_bank {
-	bool probed;
-	int dev_type;		/* Default 0. 1 for Pic32MX1XX/2XX variant */
-};
-
 /*
  * DEVID values as per PIC32MM Flash Programming Specification Rev N
  */
 
-static const struct pic32mm_devs_s {
-	uint32_t devid;
+static const struct {
 	const char *name;
+	uint32_t devid;
 } pic32mm_devs[] = {
-	{0x04A07053, "110F016B"},
-	{0x04A09053, "110F016C"},
-	{0x04A0B053, "110F016D"},
-	{0x04A06053, "120F032B"},
-	{0x04A08053, "120F032C"},
-	{0x04A0A053, "120F032D"},
-	{0x04D07053, "130F064B"},
-	{0x04D09053, "130F064C"},
-	{0x04D0B053, "130F064D"},
-	{0x04D06053, "150F128B"},
-	{0x04D08053, "150F128C"},
-	{0x04D0A053, "150F128D"},
-	{0x06610053, "170F256B"},
-	{0x0661A053, "170F256D"},
-	{0x04A01053, "210F016B"},
-	{0x04A03053, "210F016C"},
-	{0x04A05053, "210F016D"},
-	{0x04A00053, "220F032B"},
-	{0x04A02053, "220F032C"},
-	{0x04A04053, "220F032D"},
-	{0x04D01053, "230F064B"},
-	{0x04D03053, "230F064C"},
-	{0x04D05053, "230F064D"},
-	{0x04D00053, "250F128B"},
-	{0x04D02053, "250F128C"},
-	{0x04D04053, "250F128D"},
-	{0x06600053, "270F256B"},
-	{0x0660A053, "270F256D"},
-	{0x05600053, "330F064H"},
-	{0x05601053, "330F064L"},
-	{0x05602053, "430F064H"},
-	{0x05603053, "430F064L"},
-	{0x0570C053, "350F128H"},
-	{0x0570D053, "350F128L"},
-	{0x0570E053, "450F128H"},
-	{0x0570F053, "450F128L"},
-	{0x05704053, "350F256H"},
-	{0x05705053, "350F256L"},
-	{0x05706053, "450F256H"},
-	{0x05707053, "450F256L"},
-	{0x05808053, "370F512H"},
-	{0x05809053, "370F512L"},
-	{0x0580A053, "470F512H"},
-	{0x0580B053, "470F512L"},
-	{0x00938053, "360F512L"},
-	{0x00934053, "360F256L"},
-	{0x0092D053, "340F128L"},
-	{0x0092A053, "320F128L"},
-	{0x00916053, "340F512H"},
-	{0x00912053, "340F256H"},
-	{0x0090D053, "340F128H"},
-	{0x0090A053, "320F128H"},
-	{0x00906053, "320F064H"},
-	{0x00902053, "320F032H"},
-	{0x00978053, "460F512L"},
-	{0x00974053, "460F256L"},
-	{0x0096D053, "440F128L"},
-	{0x00952053, "440F256H"},
-	{0x00956053, "440F512H"},
-	{0x0094D053, "440F128H"},
-	{0x00942053, "420F032H"},
-	{0x04307053, "795F512L"},
-	{0x0430E053, "795F512H"},
-	{0x04306053, "775F512L"},
-	{0x0430D053, "775F512H"},
-	{0x04312053, "775F256L"},
-	{0x04303053, "775F256H"},
-	{0x04417053, "764F128L"},
-	{0x0440B053, "764F128H"},
-	{0x04341053, "695F512L"},
-	{0x04325053, "695F512H"},
-	{0x04311053, "675F512L"},
-	{0x0430C053, "675F512H"},
-	{0x04305053, "675F256L"},
-	{0x0430B053, "675F256H"},
-	{0x04413053, "664F128L"},
-	{0x04407053, "664F128H"},
-	{0x04411053, "664F064L"},
-	{0x04405053, "664F064H"},
-	{0x0430F053, "575F512L"},
-	{0x04309053, "575F512H"},
-	{0x04333053, "575F256L"},
-	{0x04317053, "575F256H"},
-	{0x0440F053, "564F128L"},
-	{0x04403053, "564F128H"},
-	{0x0440D053, "564F064L"},
-	{0x04401053, "564F064H"},
-	{0x04400053, "534F064H"},
-	{0x0440C053, "534F064L"},
-	{0x00000000, NULL}
+	//See table 18-1 in DS60001364D
+	{"PIC32MM0016GPL020", 0x6B04},
+	{"PIC32MM0032GPL020", 0x6B0C},
+	{"PIC32MM0064GPL020", 0x6B14},
+	{"PIC32MM0016GPL028", 0x6B02},
+	{"PIC32MM0032GPL028", 0x6B0A},
+	{"PIC32MM0064GPL028", 0x6B12},
+	{"PIC32MM0016GPL036", 0x6B06},
+	{"PIC32MM0032GPL036", 0x6B0B},
+	{"PIC32MM0064GPL036", 0x6B16},
+	{"PIC32MM0064GPM028", 0x7708},
+	{"PIC32MM0128GPM028", 0x7710},
+	{"PIC32MM0256GPM028", 0x7718},
+	{"PIC32MM0064GPM036", 0x770A},
+	{"PIC32MM0128GPM036", 0x7712},
+	{"PIC32MM0256GPM036", 0x771A},
+	{"PIC32MM0064GPM048", 0x772C},
+	{"PIC32MM0128GPM048", 0x7734},
+	{"PIC32MM0256GPM048", 0x773C},
+	{"PIC32MM0064GPM064", 0x770E},
+	{"PIC32MM0128GPM064", 0x7716},
+	{"PIC32MM0256GPM064", 0x771E},
+};
+
+struct pic32mm_device_layout
+{
+	uint32_t flash_size_in_bytes, ram_size_in_bytes;
+	uint32_t page_size_in_words, row_size_in_words;
+	uint32_t boot_pages_per_protection_region;
+};
+
+enum
+{
+	PIC32MM_FLASH_WORD_SIZE_IN_BYTES = 4,
+};
+
+static inline bool pic32mm_is_boot_bank(struct flash_bank *bank)
+{
+	return Virt2Phys(bank->base) == PIC32MM_PHYS_BOOT_FLASH;
+}
+
+static int pic32mm_compute_device_layout(const char *pDeviceName, struct pic32mm_device_layout *layout, bool isBootFLASH)
+{
+	memset(layout, 0, sizeof(*layout));
+	int FLASHNumber = atoi(pDeviceName + 7);
+	int bootFLASHProtectionRegionSize = 0;
+	
+	if (pDeviceName[13] == 'M')
+	{
+		//See figures 4-1, 4-2 and 4-3 of DS60001387D
+		layout->ram_size_in_bytes = ((FLASHNumber >= 256) ? 32 : 16) * 1024;
+		bootFLASHProtectionRegionSize = 0x800;	//Register 5-7 in DS60001387D. 0x4000 according to the datasheet, but 0x800 in practice.
+	}
+	else if (pDeviceName[13] == 'L')
+	{
+		//See figures 4-1, 4-2 and 4-3 of DS60001324C
+		layout->ram_size_in_bytes = ((FLASHNumber >= 32) ? 8 : 4) * 1024;
+		bootFLASHProtectionRegionSize = 0x800;
+	}
+	else
+		return ERROR_FAIL;
+	
+	if (isBootFLASH)
+		layout->flash_size_in_bytes = 0x1700;	//From figures 4-1, 4-2 and 4-3 of the datasheets
+	else
+		layout->flash_size_in_bytes = FLASHNumber * 1024;
+
+	layout->row_size_in_words = 64;
+	layout->page_size_in_words = 512;
+	layout->boot_pages_per_protection_region = bootFLASHProtectionRegionSize / (layout->page_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES);
+	return ERROR_OK;
+}
+
+struct pic32mm_flash_bank {
+	bool probed;
+	struct pic32mm_device_layout layout;
+	uint32_t protection_status;
 };
 
 /* flash bank pic32mm <base> <size> 0 0 <target#>
@@ -208,11 +190,10 @@ FLASH_BANK_COMMAND_HANDLER(pic32mm_flash_bank_command)
 	if (CMD_ARGC < 6)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	pic32mm_info = malloc(sizeof(struct pic32mm_flash_bank));
+	pic32mm_info = calloc(1, sizeof(struct pic32mm_flash_bank));
 	bank->driver_priv = pic32mm_info;
 
 	pic32mm_info->probed = false;
-	pic32mm_info->dev_type = 0;
 
 	return ERROR_OK;
 }
@@ -248,6 +229,8 @@ static int pic32mm_nvm_exec(struct flash_bank *bank, uint32_t op, uint32_t timeo
 	uint32_t status;
 
 	target_write_u32(target, PIC32MM_NVMCON, NVMCON_NVMWREN | op);
+	uint32_t tmp;
+	target_read_u32(target, PIC32MM_NVMCON, &tmp);
 
 	/* unlock flash registers */
 	target_write_u32(target, PIC32MM_NVMKEY, NVMKEY1);
@@ -266,6 +249,7 @@ static int pic32mm_nvm_exec(struct flash_bank *bank, uint32_t op, uint32_t timeo
 
 static int pic32mm_protect_check(struct flash_bank *bank)
 {
+#if 0
 	struct target *target = bank->target;
 	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
 
@@ -316,8 +300,104 @@ static int pic32mm_protect_check(struct flash_bank *bank)
 		bank->sectors[s].is_protected = 1;
 	for (; s < bank->num_sectors; s++)
 		bank->sectors[s].is_protected = 0;
-
+#endif
+	
 	return ERROR_OK;
+}
+
+static int pic32mm_unprotect_sectors(struct flash_bank *bank, unsigned int first, unsigned int last)
+{
+	uint32_t reg, mask = 0;
+	int retval;
+	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
+	
+	if (pic32mm_is_boot_bank(bank))
+	{
+		retval = target_read_u32(bank->target, PIC32MM_NVMBWP, &reg);
+		if (retval != ERROR_OK)
+			return retval;
+		
+		for (unsigned page = first; page <= last; page++)
+		{
+			uint32_t group = page / pic32mm_info->layout.boot_pages_per_protection_region;
+			if (group > 2)
+				break;
+			
+			mask |= (1 << (8 + group));
+		}
+		
+		if (reg & mask)
+		{
+			if (!(reg & 0x8000))
+			{
+				LOG_ERROR("The NVMBWP register is locked and cannot be modified");
+				return ERROR_FLASH_OPERATION_FAILED;
+			}
+			
+			reg &= ~mask;
+			
+			if (!(reg & 0x8000))
+			{
+				LOG_ERROR("Internal error: trying to permanently lock NVMBWP");
+				return ERROR_FLASH_OPERATION_FAILED;
+			}
+			
+			target_write_u32(bank->target, PIC32MM_NVMKEY, NVMKEY1);
+			target_write_u32(bank->target, PIC32MM_NVMKEY, NVMKEY2);
+
+			retval = target_write_u32(bank->target, PIC32MM_NVMBWP, reg);
+		}
+		
+		return retval;
+	}
+	else
+	{
+		retval = target_read_u32(bank->target, PIC32MM_NVMPWP, &reg);
+		if (retval != ERROR_OK)
+			return retval;
+		
+		if (!(reg & 0x00FFFFFF))
+			return ERROR_OK;	//Memory is not locked
+		
+		uint32_t sector_offset = (last + 1) * pic32mm_info->layout.page_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES;
+		if (sector_offset < (reg & 0x00FFFFFF))
+		{
+			if (!(reg & 0x80000000))
+			{
+				LOG_ERROR("The NVMPWP register is locked and cannot be modified");
+				return ERROR_FLASH_OPERATION_FAILED;
+			}
+			
+			reg = (reg & 0xFF000000) | sector_offset;
+			
+			if (!(reg & 0x80000000))
+			{
+				LOG_ERROR("Internal error: trying to permanently lock NVMPWP");
+				return ERROR_FLASH_OPERATION_FAILED;
+			}			
+			
+			target_write_u32(bank->target, PIC32MM_NVMKEY, NVMKEY1);
+			target_write_u32(bank->target, PIC32MM_NVMKEY, NVMKEY2);
+
+			retval = target_write_u32(bank->target, PIC32MM_NVMPWP, reg);
+		}
+
+		return retval;
+	}
+}
+
+static int pic32mm_invalidate_flash_line_buffer(struct flash_bank *bank)
+{
+	//Invalidate the data stored in the FLASH line buffer by reading 2 unrelated sectors one after another
+	uint8_t tmp[4];
+	int res = target_read_memory(bank->target, bank->base, 4, 1, tmp);
+	if (res != ERROR_OK)
+		return res;
+	
+	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
+	res = target_read_memory(bank->target, bank->base + pic32mm_info->layout.page_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES, 4, 1, tmp);
+	
+	return res;
 }
 
 static int pic32mm_erase(struct flash_bank *bank, unsigned int first,
@@ -330,6 +410,10 @@ static int pic32mm_erase(struct flash_bank *bank, unsigned int first,
 		LOG_ERROR("Target not halted");
 		return ERROR_TARGET_NOT_HALTED;
 	}
+	
+	status = pic32mm_unprotect_sectors(bank, first, last);
+	if (status != ERROR_OK)
+		return status;
 
 	if ((first == 0) && (last == (bank->num_sectors - 1))
 		&& (Virt2Phys(bank->base) == PIC32MM_PHYS_PGM_FLASH)) {
@@ -381,7 +465,7 @@ static uint32_t pic32mm_flash_write_code[] = {
 	0x3C095566,		/* lui $t1, 0x5566 */
 	0x352999AA,		/* ori $t1, 0x99aa */
 	0x3C0ABF80,		/* lui $t2, 0xbf80 */
-	0x354AF400,		/* ori $t2, 0xf400 */
+	0x354A2930,		/* ori $t2, 0x2930 */
 	0x340B4003,		/* ori $t3, $zero, 0x4003 */
 	0x340C8000,		/* ori $t4, $zero, 0x8000 */
 					/* write_row: */
@@ -444,14 +528,14 @@ static uint32_t pic32mm_flash_write_code[] = {
 static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		uint32_t offset, uint32_t count)
 {
+	int retval = ERROR_OK;
+#if 0
 	struct target *target = bank->target;
-	uint32_t buffer_size = 16384;
 	struct working_area *write_algorithm;
-	struct working_area *source;
+	//struct working_area *source;
 	uint32_t address = bank->base + offset;
 	struct reg_param reg_params[3];
 	uint32_t row_size;
-	int retval = ERROR_OK;
 
 	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
 	struct mips32_algorithm mips32_info;
@@ -475,12 +559,12 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		row_size = 128;
 		break;
 	default:
-		/* 512 byte row */
-		pic32mm_flash_write_code[8] = 0x2CD30080;
-		pic32mm_flash_write_code[14] = 0x24840200;
-		pic32mm_flash_write_code[15] = 0x24A50200;
-		pic32mm_flash_write_code[17] = 0x24C6FF80;
-		row_size = 512;
+		/* 256 byte row */
+		pic32mm_flash_write_code[8] = 0x2CD30040;
+		pic32mm_flash_write_code[14] = 0x24840100;
+		pic32mm_flash_write_code[15] = 0x24A50100;
+		pic32mm_flash_write_code[17] = 0x24C6FF00;
+		row_size = 256;
 		break;
 	}
 
@@ -491,18 +575,8 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 	if (retval != ERROR_OK)
 		return retval;
 
-	/* memory buffer */
-	while (target_alloc_working_area_try(target, buffer_size, &source) != ERROR_OK) {
-		buffer_size /= 2;
-		if (buffer_size <= 256) {
-			/* we already allocated the writing code, but failed to get a
-			 * buffer, free the algorithm */
-			target_free_working_area(target, write_algorithm);
-
-			LOG_WARNING("no large enough working area available, can't do block memory writes");
-			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
-		}
-	}
+	target_addr_t dataBuffer = 0xa0000000;
+	uint32_t buffer_size = 0x800;
 
 	mips32_info.common_magic = MIPS32_COMMON_MAGIC;
 	mips32_info.isa_mode = MIPS32_ISA_MIPS32;
@@ -534,7 +608,8 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 
 			memcpy(new_buffer + row_offset, buffer, thisrun_count * 4);
 
-			retval = target_write_buffer(target, source->address,
+			retval = target_write_buffer(target,
+				dataBuffer,
 				row_offset + thisrun_count * 4, new_buffer);
 			if (retval != ERROR_OK)
 				break;
@@ -542,13 +617,14 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 			thisrun_count = (count > (buffer_size / 4)) ?
 					(buffer_size / 4) : count;
 
-			retval = target_write_buffer(target, source->address,
+			retval = target_write_buffer(target,
+				dataBuffer,
 					thisrun_count * 4, buffer);
 			if (retval != ERROR_OK)
 				break;
 		}
 
-		buf_set_u32(reg_params[0].value, 0, 32, Virt2Phys(source->address));
+		buf_set_u32(reg_params[0].value, 0, 32, Virt2Phys(dataBuffer));
 		buf_set_u32(reg_params[1].value, 0, 32, Virt2Phys(address));
 		buf_set_u32(reg_params[2].value, 0, 32, thisrun_count + row_offset / 4);
 
@@ -584,7 +660,7 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		}
 	}
 
-	target_free_working_area(target, source);
+	//target_free_working_area(target, source);
 	target_free_working_area(target, write_algorithm);
 
 	destroy_reg_param(&reg_params[0]);
@@ -592,17 +668,19 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 	destroy_reg_param(&reg_params[2]);
 
 	free(new_buffer);
+#endif
 	return retval;
 }
 
-static int pic32mm_write_word(struct flash_bank *bank, uint32_t address, uint32_t word)
+static int pic32mm_write_dword(struct flash_bank *bank, uint32_t address, uint32_t word0, uint32_t word1)
 {
 	struct target *target = bank->target;
 
 	target_write_u32(target, PIC32MM_NVMADDR, Virt2Phys(address));
-	target_write_u32(target, PIC32MM_NVMDATA, word);
+	target_write_u32(target, PIC32MM_NVMDATA0, word0);
+	target_write_u32(target, PIC32MM_NVMDATA1, word1);
 
-	return pic32mm_nvm_exec(bank, NVMCON_OP_WORD_PROG, 5);
+	return pic32mm_nvm_exec(bank, NVMCON_OP_DWORD_PROG, 5);
 }
 
 static int pic32mm_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t offset, uint32_t count)
@@ -647,11 +725,11 @@ static int pic32mm_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 		}
 	}
 
-	while (words_remaining > 0) {
-		uint32_t value;
-		memcpy(&value, buffer + bytes_written, sizeof(uint32_t));
+	while (words_remaining > 1) {
+		uint32_t value[2];
+		memcpy(value, buffer + bytes_written, 8);
 
-		status = pic32mm_write_word(bank, address, value);
+		status = pic32mm_write_dword(bank, address, value[0], value[1]);
 
 		if (status & NVMCON_NVMERR) {
 			LOG_ERROR("Flash write error NVMERR (status = 0x%08" PRIx32 ")", status);
@@ -663,16 +741,16 @@ static int pic32mm_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 			return ERROR_FLASH_OPERATION_FAILED;
 		}
 
-		bytes_written += 4;
-		words_remaining--;
-		address += 4;
+		bytes_written += 8;
+		words_remaining-=2;
+		address += 8;
 	}
 
 	if (bytes_remaining) {
-		uint32_t value = 0xffffffff;
-		memcpy(&value, buffer + bytes_written, bytes_remaining);
+		uint32_t value[2] = { -1, -1 };
+		memcpy(value, buffer + bytes_written, bytes_remaining);
 
-		status = pic32mm_write_word(bank, address, value);
+		status = pic32mm_write_dword(bank, address, value[0], value[1]);
 
 		if (status & NVMCON_NVMERR) {
 			LOG_ERROR("Flash write error NVMERR (status = 0x%08" PRIx32 ")", status);
@@ -688,108 +766,99 @@ static int pic32mm_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	return ERROR_OK;
 }
 
+
+
 static int pic32mm_probe(struct flash_bank *bank)
 {
 	struct target *target = bank->target;
 	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
 	struct mips32_common *mips32 = target->arch_info;
 	struct mips_ejtag *ejtag_info = &mips32->ejtag_info;
-	int i;
-	uint32_t num_pages = 0;
-	uint32_t device_id;
-	int page_size;
-
+	
+	//See Table 18-2 of DS60001364D
+	uint32_t devID = (unsigned)((ejtag_info->idcode >> 12) & 0xffff);
+	uint32_t manufacturingID = (unsigned)((ejtag_info->idcode >> 1) & 0x7ff);
+	const char *pDeviceName = NULL;
+	int retval;
+	
 	pic32mm_info->probed = false;
 
-	device_id = ejtag_info->idcode;
 	LOG_INFO("device id = 0x%08" PRIx32 " (manuf 0x%03x dev 0x%04x, ver 0x%02x)",
-			  device_id,
-			  (unsigned)((device_id >> 1) & 0x7ff),
-			  (unsigned)((device_id >> 12) & 0xffff),
-			  (unsigned)((device_id >> 28) & 0xf));
-
-	if (((device_id >> 1) & 0x7ff) != PIC32MM_MANUF_ID) {
-		LOG_WARNING("Cannot identify target as a PIC32MM family.");
+		ejtag_info->idcode,
+		manufacturingID,
+		(unsigned)((ejtag_info->idcode >> 12) & 0xffff),
+		devID);
+	
+	if (manufacturingID != PIC32_MANUF_ID) {
+		LOG_WARNING("Cannot identify target as a PIC32MM family. Unexpected manufacturing ID: %02x", manufacturingID);
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
-
-	/* Check for PIC32mx1xx/2xx */
-	for (i = 0; pic32mm_devs[i].name != NULL; i++) {
-		if (pic32mm_devs[i].devid == (device_id & 0x0fffffff)) {
-			if ((pic32mm_devs[i].name[0] == '1') || (pic32mm_devs[i].name[0] == '2'))
-				pic32mm_info->dev_type = (pic32mm_devs[i].name[1] == '7') ? MX_17x_27x : MX_1xx_2xx;
+	
+	for (int i = 0; i < (sizeof(pic32mm_devs) / sizeof(pic32mm_devs[0])); i++) {
+		if (pic32mm_devs[i].devid == devID ) {
+			pDeviceName = pic32mm_devs[i].name;
 			break;
 		}
 	}
-
-	switch (pic32mm_info->dev_type) {
-	case	MX_1xx_2xx:
-	case	MX_17x_27x:
-		page_size = 1024;
-		break;
-	default:
-		page_size = 4096;
-		break;
+	
+	if (!pDeviceName)
+	{
+		LOG_WARNING("Cannot identify target as a PIC32MM family. Unexpected device ID: %02x", devID);
+		return ERROR_FLASH_OPERATION_FAILED;
 	}
-
-	if (Virt2Phys(bank->base) == PIC32MM_PHYS_BOOT_FLASH) {
-		/* 0x1FC00000: Boot flash size */
-#if 0
-		/* for some reason this register returns 8k for the boot bank size
-		 * this does not match the docs, so for now set the boot bank at a
-		 * fixed 12k */
-		if (target_read_u32(target, PIC32MM_BMXBOOTSZ, &num_pages) != ERROR_OK) {
-			LOG_WARNING("PIC32MM flash size failed, probe inaccurate - assuming 12k flash");
-			num_pages = (12 * 1024);
-		}
-#else
-		/* fixed 12k boot bank - see comments above */
-		switch (pic32mm_info->dev_type) {
-		case	MX_1xx_2xx:
-		case	MX_17x_27x:
-			num_pages = (3 * 1024);
-			break;
-		default:
-			num_pages = (12 * 1024);
-			break;
-		}
-#endif
-	} else {
-		/* read the flash size from the device */
-		if (target_read_u32(target, PIC32MM_BMXPFMSZ, &num_pages) != ERROR_OK) {
-			switch (pic32mm_info->dev_type) {
-			case	MX_1xx_2xx:
-			case	MX_17x_27x:
-				LOG_WARNING("PIC32MM flash size failed, probe inaccurate - assuming 32k flash");
-				num_pages = (32 * 1024);
-				break;
-			default:
-				LOG_WARNING("PIC32MM flash size failed, probe inaccurate - assuming 512k flash");
-				num_pages = (512 * 1024);
-				break;
-			}
-		}
+	
+	retval = pic32mm_compute_device_layout(pDeviceName, &pic32mm_info->layout, pic32mm_is_boot_bank(bank));
+	if (retval != ERROR_OK)
+	{
+		LOG_WARNING("Cannot compute FLASH memory layout");
+		return ERROR_FLASH_OPERATION_FAILED;
 	}
-
-	LOG_INFO("flash size = %" PRIu32 "kbytes", num_pages / 1024);
+	
+	LOG_INFO("Detected %s with %d KB FLASH and %d KB RAM.", 
+		pDeviceName,
+		pic32mm_info->layout.flash_size_in_bytes / 1024,
+		pic32mm_info->layout.ram_size_in_bytes / 1024);
+	
+	LOG_INFO("FLASH row size is %d words and page size is %d words",
+		pic32mm_info->layout.row_size_in_words,
+		pic32mm_info->layout.page_size_in_words);	
+	
+	if (pic32mm_is_boot_bank(bank))
+	{
+		if (target_read_u32(target, PIC32MM_NVMBWP, &pic32mm_info->protection_status) != ERROR_OK)
+			pic32mm_info->protection_status = 0;
+	}
+	else
+	{
+		if (target_read_u32(target, PIC32MM_NVMPWP, &pic32mm_info->protection_status) != ERROR_OK)
+			pic32mm_info->protection_status = 0;
+	}
 
 	free(bank->sectors);
+	
+	unsigned page_size_in_bytes = pic32mm_info->layout.page_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES;
+	bank->size = pic32mm_info->layout.flash_size_in_bytes;
+	bank->num_sectors = (pic32mm_info->layout.flash_size_in_bytes + page_size_in_bytes - 1) / page_size_in_bytes;
+	bank->sectors = malloc(sizeof(struct flash_sector) * bank->num_sectors);
 
-	/* calculate numbers of pages */
-	num_pages /= page_size;
-	bank->size = (num_pages * page_size);
-	bank->num_sectors = num_pages;
-	bank->sectors = malloc(sizeof(struct flash_sector) * num_pages);
-
-	for (i = 0; i < (int)num_pages; i++) {
-		bank->sectors[i].offset = i * page_size;
-		bank->sectors[i].size = page_size;
+	for (unsigned i = 0; i < bank->num_sectors; i++) {
+		bank->sectors[i].offset = i * page_size_in_bytes;
+		bank->sectors[i].size = page_size_in_bytes;
 		bank->sectors[i].is_erased = -1;
-		bank->sectors[i].is_protected = 1;
+		
+		if ((bank->sectors[i].offset + bank->sectors[i].size) > bank->size)
+			bank->sectors[i].size = bank->size - bank->sectors[i].offset;	//Boot ROM size is not page-aligned according to the datasheet.
+		
+		if (pic32mm_is_boot_bank(bank))
+		{
+			int mask = 1 << (8 + (i / pic32mm_info->layout.boot_pages_per_protection_region));	//NVMBWP: Register 5-7 in DS60001387D
+			bank->sectors[i].is_protected = (pic32mm_info->protection_status & mask) != 0;
+		}
+		else if (pic32mm_info->protection_status & 0x00FFFFFF)
+			bank->sectors[i].is_protected = (bank->sectors[i].offset + page_size_in_bytes) <= (pic32mm_info->protection_status & 0x00FFFFFF);
 	}
 
 	pic32mm_info->probed = true;
-
 	return ERROR_OK;
 }
 
@@ -810,11 +879,11 @@ static int pic32mm_info(struct flash_bank *bank, struct command_invocation *cmd)
 
 	device_id = ejtag_info->idcode;
 
-	if (((device_id >> 1) & 0x7ff) != PIC32MM_MANUF_ID) {
+	if (((device_id >> 1) & 0x7ff) != PIC32_MANUF_ID) {
 		command_print_sameline(cmd,
-				"Cannot identify target as a PIC32MM family (manufacturer 0x%03x != 0x%03x)\n",
-				(unsigned)((device_id >> 1) & 0x7ff),
-				PIC32MM_MANUF_ID);
+			"Cannot identify target as a PIC32MM family (manufacturer 0x%03x != 0x%03x)\n",
+			(unsigned)((device_id >> 1) & 0x7ff),
+			PIC32_MANUF_ID);
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 
@@ -829,22 +898,28 @@ static int pic32mm_info(struct flash_bank *bank, struct command_invocation *cmd)
 	if (pic32mm_devs[i].name == NULL)
 		command_print_sameline(cmd, "Unknown");
 
-	command_print_sameline(cmd, " Ver: 0x%02x",
-			(unsigned)((device_id >> 28) & 0xf));
+	command_print_sameline(cmd,
+		" Ver: 0x%02x",
+		(unsigned)((device_id >> 28) & 0xf));
 
 	return ERROR_OK;
 }
 
+extern struct flash_driver virtual_flash;
+struct flash_bank *virtual_get_master_bank(struct flash_bank *bank);
+
+	
 COMMAND_HANDLER(pic32mm_handle_pgm_word_command)
 {
-	uint32_t address, value;
+	uint32_t address;
+	uint64_t value;
 	int status, res;
 
 	if (CMD_ARGC != 3)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
 	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], address);
-	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[1], value);
+	COMMAND_PARSE_NUMBER(u64, CMD_ARGV[1], value);
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 2, &bank);
@@ -855,18 +930,42 @@ COMMAND_HANDLER(pic32mm_handle_pgm_word_command)
 		command_print(CMD, "flash address '%s' is out of bounds", CMD_ARGV[0]);
 		return ERROR_OK;
 	}
-
+	
+	struct flash_bank *pic32mm_bank = bank;
+	
+	if (bank->driver == &virtual_flash)
+		pic32mm_bank = virtual_get_master_bank(bank);
+	
+	struct pic32mm_flash_bank *pic32mm_info = pic32mm_bank->driver_priv;
+	
+	unsigned sector = (address - bank->base) / (pic32mm_info->layout.page_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES);
+	res = pic32mm_unprotect_sectors(pic32mm_bank, sector, sector);
+	if (res != ERROR_OK)
+	{
+		command_print(CMD, "failed to unlock FLASH");
+		return ERROR_OK;
+	}
+	
 	res = ERROR_OK;
-	status = pic32mm_write_word(bank, address, value);
+	status = pic32mm_write_dword(pic32mm_bank, address, (uint32_t)value, (uint32_t)(value >> 32));
 	if (status & NVMCON_NVMERR)
 		res = ERROR_FLASH_OPERATION_FAILED;
 	if (status & NVMCON_LVDERR)
 		res = ERROR_FLASH_OPERATION_FAILED;
 
-	if (res == ERROR_OK)
-		command_print(CMD, "pic32mm pgm word complete");
-	else
+	if (res != ERROR_OK)
 		command_print(CMD, "pic32mm pgm word failed (status = 0x%x)", status);
+	else
+	{
+		pic32mm_invalidate_flash_line_buffer(bank);
+		
+		uint64_t read_value;
+		res = target_read_memory(bank->target, address, 4, 2, (uint8_t *)&read_value);
+		if (read_value == value)
+			command_print(CMD, "pic32mm: programmed and verified word at 0x%08x", address);
+		else
+			command_print(CMD, "pic32mm: failed to verify word at 0x%08x. Read 0x%16llx", address, read_value);
+	}
 
 	return ERROR_OK;
 }

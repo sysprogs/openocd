@@ -22,7 +22,7 @@
 
 #include "imp.h"
 
-static struct flash_bank *virtual_get_master_bank(struct flash_bank *bank)
+struct flash_bank *virtual_get_master_bank(struct flash_bank *bank)
 {
 	struct flash_bank *master_bank;
 
