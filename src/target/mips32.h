@@ -68,6 +68,7 @@
 
 /* offsets into mips32 core register cache */
 enum {
+	MIPS32_STATUS = 32,
 	MIPS32_PC = 37,
 	MIPS32_FIR = 71,
 	MIPS32NUMCOREREGS
@@ -109,6 +110,7 @@ struct mips32_common {
 	int num_data_bpoints;
 	int num_inst_bpoints_avail;
 	int num_data_bpoints_avail;
+	int disable_bulk_write_memory;
 	struct mips32_comparator *inst_break_list;
 	struct mips32_comparator *data_break_list;
 

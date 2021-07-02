@@ -216,6 +216,7 @@ struct target {
 	bool first_reset;
 
 	char *gdb_port_override;			/* target-specific override for gdb_port */
+	int gdb_sign_extends_addresses;
 
 	int gdb_max_connections;			/* max number of simultaneous gdb connections */
 

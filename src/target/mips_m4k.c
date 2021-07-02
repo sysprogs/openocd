@@ -1092,7 +1092,7 @@ static int mips_m4k_write_memory(struct target *target, target_addr_t address,
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if (size == 4 && count > 32) {
+	if (size == 4 && count > 32 && !mips32->disable_bulk_write_memory) {
 		int retval = mips_m4k_bulk_write_memory(target, address, count, buffer);
 		if (retval == ERROR_OK)
 			return ERROR_OK;
@@ -1237,8 +1237,8 @@ static int mips_m4k_bulk_write_memory(struct target *target, target_addr_t addre
 
 	fast_data_area = mips32->fast_data_area;
 
-	if (address <= fast_data_area->address + fast_data_area->size &&
-			fast_data_area->address <= address + count) {
+	if (address < fast_data_area->address + fast_data_area->size &&
+			fast_data_area->address < address + count) {
 		LOG_ERROR("fast_data (" TARGET_ADDR_FMT ") is within write area "
 			  "(" TARGET_ADDR_FMT "-" TARGET_ADDR_FMT ").",
 			  fast_data_area->address, address, address + count);
@@ -1355,6 +1355,17 @@ COMMAND_HANDLER(mips_m4k_handle_scan_delay_command)
 	return ERROR_OK;
 }
 
+COMMAND_HANDLER(mips_m4k_handle_disable_bulk_memory_write)
+{
+	struct target *target = get_current_target(CMD_CTX);
+	struct mips32_common *mips32 = target_to_mips32(target);
+	
+	mips32->disable_bulk_write_memory = true;
+	command_print(CMD, "MIPS32 target will not use bulk memory write optimization");
+
+	return ERROR_OK;
+}
+
 static const struct command_registration mips_m4k_exec_command_handlers[] = {
 	{
 		.name = "cp0",
@@ -1369,6 +1380,13 @@ static const struct command_registration mips_m4k_exec_command_handlers[] = {
 		.mode = COMMAND_ANY,
 		.help = "display/set scan delay in nano seconds",
 		.usage = "[value]",
+	},
+	{
+		.name = "disable_bulk_memory_write",
+		.handler = mips_m4k_handle_disable_bulk_memory_write,
+		.mode = COMMAND_ANY,
+		.help = "Disables the bulk memory write optimization for MIPS32 targets",
+		.usage = "",
 	},
 	{
 		.chain = smp_command_handlers,

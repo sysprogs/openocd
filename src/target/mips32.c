@@ -373,6 +373,8 @@ struct reg_cache *mips32_build_reg_cache(struct target *target)
 int mips32_init_arch_info(struct target *target, struct mips32_common *mips32, struct jtag_tap *tap)
 {
 	target->arch_info = mips32;
+	target->gdb_sign_extends_addresses = true;
+	
 	mips32->common_magic = MIPS32_COMMON_MAGIC;
 	mips32->fast_data_area = NULL;
 	mips32->isa_imp = MIPS32_ONLY;	/* default */
