@@ -196,7 +196,6 @@ static int pic32mm_compute_device_layout(struct target *target, struct pic32mm_d
 struct pic32mm_flash_bank {
 	bool probed;
 	struct pic32mm_device_layout layout;
-	uint32_t protection_status;
 };
 
 /* flash bank pic32mm <base> <size> 0 0 <target#>
@@ -265,61 +264,19 @@ static int pic32mm_nvm_exec(struct flash_bank *bank, uint32_t op, uint32_t timeo
 	return status;
 }
 
+static void pic32mm_recompute_sector_protection(struct flash_bank *bank);
+
 static int pic32mm_protect_check(struct flash_bank *bank)
 {
-#if 0
 	struct target *target = bank->target;
 	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
-
-	uint32_t config0_address;
-	uint32_t devcfg0;
-	unsigned int s, num_pages;
 
 	if (target->state != TARGET_HALTED) {
 		LOG_ERROR("Target not halted");
 		return ERROR_TARGET_NOT_HALTED;
 	}
-
-	switch (pic32mm_info->dev_type) {
-	case	MX_1xx_2xx:
-	case	MX_17x_27x:
-		config0_address = PIC32MM_DEVCFG0_1xx_2xx;
-		break;
-	default:
-		config0_address = PIC32MM_DEVCFG0;
-		break;
-	}
-
-	target_read_u32(target, config0_address, &devcfg0);
-
-	if ((devcfg0 & (1 << 28)) == 0) /* code protect bit */
-		num_pages = 0xffff;			/* All pages protected */
-	else if (Virt2Phys(bank->base) == PIC32MM_PHYS_BOOT_FLASH) {
-		if (devcfg0 & (1 << 24))
-			num_pages = 0;			/* All pages unprotected */
-		else
-			num_pages = 0xffff;		/* All pages protected */
-	} else {
-		/* pgm flash */
-		switch (pic32mm_info->dev_type) {
-		case	MX_1xx_2xx:
-			num_pages = (~devcfg0 >> 10) & 0x7f;
-			break;
-		case	MX_17x_27x:
-			num_pages = (~devcfg0 >> 10) & 0x1ff;
-			break;
-		default:
-			num_pages = (~devcfg0 >> 12) & 0xff;
-			break;
-		}
-	}
-
-	for (s = 0; s < bank->num_sectors && s < num_pages; s++)
-		bank->sectors[s].is_protected = 1;
-	for (; s < bank->num_sectors; s++)
-		bank->sectors[s].is_protected = 0;
-#endif
 	
+	pic32mm_recompute_sector_protection(bank);
 	return ERROR_OK;
 }
 
@@ -847,6 +804,35 @@ static const char *pic32mm_find_device(struct target *target, bool log)
 	return NULL;
 }
 
+static void pic32mm_recompute_sector_protection(struct flash_bank *bank)
+{
+	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
+	struct target *target = bank->target;
+	
+	uint32_t protection_status = 0;
+	
+	if (pic32mm_is_boot_bank(bank))
+	{
+		if (target_read_u32(target, PIC32MM_NVMBWP, &protection_status) != ERROR_OK)
+			protection_status = 0;
+	}
+	else
+	{
+		if (target_read_u32(target, PIC32MM_NVMPWP, &protection_status) != ERROR_OK)
+			protection_status = 0;
+	}
+
+	for (unsigned i = 0; i < bank->num_sectors; i++) {
+		if(pic32mm_is_boot_bank(bank))
+		{
+			int mask = 1 << (8 + (i / pic32mm_info->layout.boot_pages_per_protection_region));	//NVMBWP: Register 5-7 in DS60001387D
+			bank->sectors[i].is_protected = (protection_status & mask) != 0;
+		}
+		else
+			bank->sectors[i].is_protected = (bank->sectors[i].offset + bank->sectors[i].size) <= (protection_status & 0x00FFFFFF);
+	}
+}
+
 static int pic32mm_probe(struct flash_bank *bank)
 {
 	struct target *target = bank->target;
@@ -868,24 +854,13 @@ static int pic32mm_probe(struct flash_bank *bank)
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 	
-	if (pic32mm_is_boot_bank(bank))
-	{
-		if (target_read_u32(target, PIC32MM_NVMBWP, &pic32mm_info->protection_status) != ERROR_OK)
-			pic32mm_info->protection_status = 0;
-	}
-	else
-	{
-		if (target_read_u32(target, PIC32MM_NVMPWP, &pic32mm_info->protection_status) != ERROR_OK)
-			pic32mm_info->protection_status = 0;
-	}
-
 	free(bank->sectors);
-	
+
 	unsigned page_size_in_bytes = pic32mm_info->layout.page_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES;
 	bank->size = pic32mm_is_boot_bank(bank) ? pic32mm_info->layout.boot_flash_size_in_bytes : pic32mm_info->layout.flash_size_in_bytes;
 	bank->num_sectors = (bank->size + page_size_in_bytes - 1) / page_size_in_bytes;
-	bank->sectors = malloc(sizeof(struct flash_sector) * bank->num_sectors);
-
+	bank->sectors = malloc(sizeof(struct flash_sector) * bank->num_sectors);	
+	
 	for (unsigned i = 0; i < bank->num_sectors; i++) {
 		bank->sectors[i].offset = i * page_size_in_bytes;
 		bank->sectors[i].size = page_size_in_bytes;
@@ -893,15 +868,9 @@ static int pic32mm_probe(struct flash_bank *bank)
 		
 		if ((bank->sectors[i].offset + bank->sectors[i].size) > bank->size)
 			bank->sectors[i].size = bank->size - bank->sectors[i].offset;	//Boot ROM size is not page-aligned according to the datasheet.
-		
-		if (pic32mm_is_boot_bank(bank))
-		{
-			int mask = 1 << (8 + (i / pic32mm_info->layout.boot_pages_per_protection_region));	//NVMBWP: Register 5-7 in DS60001387D
-			bank->sectors[i].is_protected = (pic32mm_info->protection_status & mask) != 0;
-		}
-		else if (pic32mm_info->protection_status & 0x00FFFFFF)
-			bank->sectors[i].is_protected = (bank->sectors[i].offset + page_size_in_bytes) <= (pic32mm_info->protection_status & 0x00FFFFFF);
 	}
+	
+	pic32mm_recompute_sector_protection(bank);
 
 	pic32mm_info->probed = true;
 	return ERROR_OK;
