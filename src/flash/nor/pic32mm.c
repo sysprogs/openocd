@@ -128,7 +128,7 @@ static const struct {
 
 struct pic32mm_device_layout
 {
-	uint32_t flash_size_in_bytes, ram_size_in_bytes;
+	uint32_t flash_size_in_bytes, ram_size_in_bytes, boot_flash_size_in_bytes;
 	uint32_t page_size_in_words, row_size_in_words;
 	uint32_t boot_pages_per_protection_region;
 };
@@ -143,8 +143,14 @@ static inline bool pic32mm_is_boot_bank(struct flash_bank *bank)
 	return Virt2Phys(bank->base) == PIC32MM_PHYS_BOOT_FLASH;
 }
 
-static int pic32mm_compute_device_layout(const char *pDeviceName, struct pic32mm_device_layout *layout, bool isBootFLASH)
+static const char *pic32mm_find_device(struct target *target, bool log);
+
+static int pic32mm_compute_device_layout(struct target *target, struct pic32mm_device_layout *layout, bool log)
 {
+	const char *pDeviceName = pic32mm_find_device(target, log);
+	if (!pDeviceName)
+		return ERROR_FAIL;
+	
 	memset(layout, 0, sizeof(*layout));
 	int FLASHNumber = atoi(pDeviceName + 7);
 	int bootFLASHProtectionRegionSize = 0;
@@ -164,14 +170,26 @@ static int pic32mm_compute_device_layout(const char *pDeviceName, struct pic32mm
 	else
 		return ERROR_FAIL;
 	
-	if (isBootFLASH)
-		layout->flash_size_in_bytes = 0x1700;	//From figures 4-1, 4-2 and 4-3 of the datasheets
-	else
-		layout->flash_size_in_bytes = FLASHNumber * 1024;
+	layout->flash_size_in_bytes = FLASHNumber * 1024;
+	layout->boot_flash_size_in_bytes = 0x1700;	//From figures 4-1, 4-2 and 4-3 of the datasheets
 
 	layout->row_size_in_words = 64;
 	layout->page_size_in_words = 512;
 	layout->boot_pages_per_protection_region = bootFLASHProtectionRegionSize / (layout->page_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES);
+	
+	if (log)
+	{
+		LOG_INFO("Detected %s with %d KB FLASH, %d KB boot FLASH and %d KB RAM.", 
+			pDeviceName,
+			layout->flash_size_in_bytes / 1024,
+			layout->boot_flash_size_in_bytes / 1024,
+			layout->ram_size_in_bytes / 1024);
+	
+		LOG_INFO("FLASH row size is %d words and page size is %d words",
+			layout->row_size_in_words,
+			layout->page_size_in_words);	
+	}
+	
 	return ERROR_OK;
 }
 
@@ -793,7 +811,41 @@ static int pic32mm_write(struct flash_bank *bank, const uint8_t *buffer, uint32_
 	return ERROR_OK;
 }
 
-
+static const char *pic32mm_find_device(struct target *target, bool log)
+{
+	struct mips32_common *mips32 = target->arch_info;
+	struct mips_ejtag *ejtag_info = &mips32->ejtag_info;
+	
+	//See Table 18-2 of DS60001364D
+	uint32_t devID = (unsigned)((ejtag_info->idcode >> 12) & 0xffff);
+	uint32_t manufacturingID = (unsigned)((ejtag_info->idcode >> 1) & 0x7ff);
+	int retval;
+	
+	if (log)
+	{
+		LOG_INFO("device id = 0x%08" PRIx32 " (manuf 0x%03x dev 0x%04x, ver 0x%02x)",
+			ejtag_info->idcode,
+			manufacturingID,
+			(unsigned)((ejtag_info->idcode >> 12) & 0xffff),
+			devID);
+	}
+	
+	if (manufacturingID != PIC32_MANUF_ID) {
+		LOG_WARNING("Cannot identify target as a PIC32MM family. Unexpected manufacturing ID: %02x", manufacturingID);
+		return NULL;
+	}
+	
+	for (int i = 0; i < (sizeof(pic32mm_devs) / sizeof(pic32mm_devs[0])); i++) {
+		if (pic32mm_devs[i].devid == devID) {
+			return pic32mm_devs[i].name;
+		}
+	}
+	
+	if (log)
+		LOG_WARNING("Cannot identify target as a PIC32MM family. Unexpected device ID: %02x", devID);
+	
+	return NULL;
+}
 
 static int pic32mm_probe(struct flash_bank *bank)
 {
@@ -805,50 +857,16 @@ static int pic32mm_probe(struct flash_bank *bank)
 	//See Table 18-2 of DS60001364D
 	uint32_t devID = (unsigned)((ejtag_info->idcode >> 12) & 0xffff);
 	uint32_t manufacturingID = (unsigned)((ejtag_info->idcode >> 1) & 0x7ff);
-	const char *pDeviceName = NULL;
 	int retval;
 	
 	pic32mm_info->probed = false;
 
-	LOG_INFO("device id = 0x%08" PRIx32 " (manuf 0x%03x dev 0x%04x, ver 0x%02x)",
-		ejtag_info->idcode,
-		manufacturingID,
-		(unsigned)((ejtag_info->idcode >> 12) & 0xffff),
-		devID);
-	
-	if (manufacturingID != PIC32_MANUF_ID) {
-		LOG_WARNING("Cannot identify target as a PIC32MM family. Unexpected manufacturing ID: %02x", manufacturingID);
-		return ERROR_FLASH_OPERATION_FAILED;
-	}
-	
-	for (int i = 0; i < (sizeof(pic32mm_devs) / sizeof(pic32mm_devs[0])); i++) {
-		if (pic32mm_devs[i].devid == devID ) {
-			pDeviceName = pic32mm_devs[i].name;
-			break;
-		}
-	}
-	
-	if (!pDeviceName)
-	{
-		LOG_WARNING("Cannot identify target as a PIC32MM family. Unexpected device ID: %02x", devID);
-		return ERROR_FLASH_OPERATION_FAILED;
-	}
-	
-	retval = pic32mm_compute_device_layout(pDeviceName, &pic32mm_info->layout, pic32mm_is_boot_bank(bank));
+	retval = pic32mm_compute_device_layout(target, &pic32mm_info->layout, false);
 	if (retval != ERROR_OK)
 	{
 		LOG_WARNING("Cannot compute FLASH memory layout");
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
-	
-	LOG_INFO("Detected %s with %d KB FLASH and %d KB RAM.", 
-		pDeviceName,
-		pic32mm_info->layout.flash_size_in_bytes / 1024,
-		pic32mm_info->layout.ram_size_in_bytes / 1024);
-	
-	LOG_INFO("FLASH row size is %d words and page size is %d words",
-		pic32mm_info->layout.row_size_in_words,
-		pic32mm_info->layout.page_size_in_words);	
 	
 	if (pic32mm_is_boot_bank(bank))
 	{
@@ -864,8 +882,8 @@ static int pic32mm_probe(struct flash_bank *bank)
 	free(bank->sectors);
 	
 	unsigned page_size_in_bytes = pic32mm_info->layout.page_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES;
-	bank->size = pic32mm_info->layout.flash_size_in_bytes;
-	bank->num_sectors = (pic32mm_info->layout.flash_size_in_bytes + page_size_in_bytes - 1) / page_size_in_bytes;
+	bank->size = pic32mm_is_boot_bank(bank) ? pic32mm_info->layout.boot_flash_size_in_bytes : pic32mm_info->layout.flash_size_in_bytes;
+	bank->num_sectors = (bank->size + page_size_in_bytes - 1) / page_size_in_bytes;
 	bank->sectors = malloc(sizeof(struct flash_sector) * bank->num_sectors);
 
 	for (unsigned i = 0; i < bank->num_sectors; i++) {
@@ -936,6 +954,19 @@ extern struct flash_driver virtual_flash;
 struct flash_bank *virtual_get_master_bank(struct flash_bank *bank);
 
 	
+COMMAND_HANDLER(pic32mm_handle_find_work_area_command)
+{
+	struct target *target = get_current_target(CMD_CTX);
+	struct pic32mm_device_layout layout;
+	int retval = pic32mm_compute_device_layout(target, &layout, true);
+	if (retval != ERROR_OK)
+		return retval;
+	
+	target->working_area_size = layout.ram_size_in_bytes;
+	
+	return ERROR_OK;
+}
+
 COMMAND_HANDLER(pic32mm_handle_pgm_word_command)
 {
 	uint32_t address;
@@ -1060,6 +1091,13 @@ static const struct command_registration pic32mm_exec_command_handlers[] = {
 		.handler = pic32mm_handle_pgm_word_command,
 		.mode = COMMAND_EXEC,
 		.help = "program a word",
+	},
+	{
+		.name = "find_work_area",
+		.handler = pic32mm_handle_find_work_area_command,
+		.mode = COMMAND_EXEC,
+		.usage = "",
+		.help = "Find work area based on the chip ID",
 	},
 	{
 		.name = "unlock",
