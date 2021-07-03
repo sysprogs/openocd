@@ -317,7 +317,7 @@ static int breakpoint_remove_internal(struct target *target, target_addr_t addre
 	struct breakpoint *breakpoint = target->breakpoints;
 
 	while (breakpoint) {
-		if ((breakpoint->address == address) ||
+		if (((breakpoint->address & ~target->ignored_breakpoint_address_bits) == (address & ~target->ignored_breakpoint_address_bits)) ||
 		    (breakpoint->address == 0 && breakpoint->asid == address))
 			break;
 		breakpoint = breakpoint->next;

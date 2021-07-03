@@ -217,6 +217,7 @@ struct target {
 
 	char *gdb_port_override;			/* target-specific override for gdb_port */
 	int gdb_sign_extends_addresses;
+	int ignored_breakpoint_address_bits;
 
 	int gdb_max_connections;			/* max number of simultaneous gdb connections */
 

@@ -374,6 +374,7 @@ int mips32_init_arch_info(struct target *target, struct mips32_common *mips32, s
 {
 	target->arch_info = mips32;
 	target->gdb_sign_extends_addresses = true;
+	target->ignored_breakpoint_address_bits = 1;
 	
 	mips32->common_magic = MIPS32_COMMON_MAGIC;
 	mips32->fast_data_area = NULL;
