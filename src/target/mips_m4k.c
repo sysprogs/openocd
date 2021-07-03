@@ -808,12 +808,12 @@ static int mips_m4k_unset_breakpoint(struct target *target,
 			}
 		} else {
 			/* check that user program has not modified breakpoint instruction */
-			retval = target_read_memory(target, breakpoint->address, 2, 1, current_instr);
+			retval = target_read_memory(target, breakpoint->address & ~1, 2, 1, current_instr);
 			if (retval != ERROR_OK)
 				return retval;
 
 			if (target_buffer_get_u16(target, current_instr) == MIPS16_SDBBP(isa_req)) {
-				retval = target_write_memory(target, breakpoint->address, 2, 1,
+				retval = target_write_memory(target, breakpoint->address & ~1, 2, 1,
 									breakpoint->orig_instr);
 				if (retval != ERROR_OK)
 					return retval;
