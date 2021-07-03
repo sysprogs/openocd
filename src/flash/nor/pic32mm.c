@@ -458,125 +458,132 @@ static int pic32mm_protect(struct flash_bank *bank, int set, unsigned int first,
 
 /* see contrib/loaders/flash/pic32mm.s for src */
 
-static uint32_t pic32mm_flash_write_code[] = {
-					/* write: */
-	0x3C08AA99,		/* lui $t0, 0xaa99 */
-	0x35086655,		/* ori $t0, 0x6655 */
-	0x3C095566,		/* lui $t1, 0x5566 */
-	0x352999AA,		/* ori $t1, 0x99aa */
-	0x3C0ABF80,		/* lui $t2, 0xbf80 */
-	0x354A2930,		/* ori $t2, 0x2930 */
-	0x340B4003,		/* ori $t3, $zero, 0x4003 */
-	0x340C8000,		/* ori $t4, $zero, 0x8000 */
-					/* write_row: */
-	0x2CD30080,		/* sltiu $s3, $a2, 128 */
-	0x16600008,		/* bne $s3, $zero, write_word */
-	0x340D4000,		/* ori $t5, $zero, 0x4000 */
-	0xAD450020,		/* sw $a1, 32($t2) */
-	0xAD440040,		/* sw $a0, 64($t2) */
-	0x04110016,		/* bal progflash */
-	0x24840200,		/* addiu $a0, $a0, 512 */
-	0x24A50200,		/* addiu $a1, $a1, 512 */
-	0x1000FFF7,		/* beq $zero, $zero, write_row */
-	0x24C6FF80,		/* addiu $a2, $a2, -128 */
-					/* write_word: */
-	0x3C15A000,		/* lui $s5, 0xa000 */
-	0x36B50000,		/* ori $s5, $s5, 0x0 */
-	0x00952025,		/* or $a0, $a0, $s5 */
-	0x10000008,		/* beq $zero, $zero, next_word */
-	0x340B4001,		/* ori $t3, $zero, 0x4001 */
-					/* prog_word: */
-	0x8C940000,		/* lw $s4, 0($a0) */
-	0xAD540030,		/* sw $s4, 48($t2) */
-	0xAD450020,		/* sw $a1, 32($t2) */
-	0x04110009,		/* bal progflash */
-	0x24840004,		/* addiu $a0, $a0, 4 */
-	0x24A50004,		/* addiu $a1, $a1, 4 */
-	0x24C6FFFF,		/* addiu $a2, $a2, -1 */
-					/* next_word: */
-	0x14C0FFF8,		/* bne $a2, $zero, prog_word */
-	0x00000000,		/* nop */
-					/* done: */
-	0x10000002,		/* beq $zero, $zero, exit */
-	0x24040000,		/* addiu $a0, $zero, 0 */
-					/* error: */
-	0x26240000,		/* addiu $a0, $s1, 0 */
-					/* exit: */
-	0x7000003F,		/* sdbbp */
-					/* progflash: */
-	0xAD4B0000,		/* sw $t3, 0($t2) */
-	0xAD480010,		/* sw $t0, 16($t2) */
-	0xAD490010,		/* sw $t1, 16($t2) */
-	0xAD4C0008,		/* sw $t4, 8($t2) */
-					/* waitflash: */
-	0x8D500000,		/* lw $s0, 0($t2) */
-	0x020C8024,		/* and $s0, $s0, $t4 */
-	0x1600FFFD,		/* bne $s0, $zero, waitflash */
-	0x00000000,		/* nop */
-	0x00000000,		/* nop */
-	0x00000000,		/* nop */
-	0x00000000,		/* nop */
-	0x00000000,		/* nop */
-	0x8D510000,		/* lw $s1, 0($t2) */
-	0x30113000,		/* andi $s1, $zero, 0x3000 */
-	0x1620FFEF,		/* bne $s1, $zero, error */
-	0xAD4D0004,		/* sw $t5, 4($t2) */
-	0x03E00008,		/* jr $ra */
-	0x00000000		/* nop */
+static uint16_t pic32mm_flash_write_code[] = {
+	/* 9d000000 <main> */
+	/* 0x9d000000 */ 0x41a8, 0xaa99, /* lui	t0,0xaa99 */
+	/* 0x9d000004 */ 0x5108, 0x6655, /* ori	t0,t0,0x6655 */
+	/* 0x9d000008 */ 0x41a9, 0x5566, /* lui	t1,0x5566 */
+	/* 0x9d00000c */ 0x5129, 0x99aa, /* ori	t1,t1,0x99aa */
+	/* 0x9d000010 */ 0x41aa, 0xbf80, /* lui	t2,0xbf80 */
+	/* 0x9d000014 */ 0x514a, 0x2930, /* ori	t2,t2,0x2930 */
+	/* 0x9d000018 */ 0x5160, 0x4003, /* li	t3,0x4003 */
+	/* 0x9d00001c */ 0x5180, 0x8000, /* li	t4,0x8000 */
+
+	/* 9d000020 <write_row> */
+	/* 0x9d000020 */ 0xb266, 0x0040, /* sltiu	s3,a2,64 */
+	/* 0x9d000024 */ 0xb413, 0x0010, /* bnez	s3,9d000048 <write_word> */
+	/* 0x9d000028 */ 0x51a0, 0x4000, /* li	t5,0x4000 */
+	/* 0x9d00002c */ 0xf8aa, 0x0020, /* sw	a1,32(t2) */
+	/* 0x9d000030 */ 0xf88a, 0x0050, /* sw	a0,80(t2) */
+	/* 0x9d000034 */ 0x4060, 0x002b, /* bal	9d00008e <progflash> */
+	/* 0x9d000038 */ 0x3084, 0x0100, /* addiu	a0,a0,256 */
+	/* 0x9d00003c */ 0x30a5, 0x0100, /* addiu	a1,a1,256 */
+	/* 0x9d000040 */ 0x9400, 0xffee, /* b	9d000020 <write_row> */
+	/* 0x9d000044 */ 0x30c6, 0xffc0, /* addiu	a2,a2,-64 */
+
+	/* 9d000048 <write_word> */
+	/* 0x9d000048 */ 0x41b5, 0xa000, /* lui	s5,0xa000 */
+	/* 0x9d00004c */ 0x52b5, 0x0000, /* ori	s5,s5,0x0 */
+	/* 0x9d000050 */ 0x02a4, 0x2290, /* or	a0,a0,s5 */
+	/* 0x9d000054 */ 0x9400, 0x0014, /* b	9d000080 <next_word> */
+	/* 0x9d000058 */ 0x5160, 0x4002, /* li	t3,0x4002 */
+
+	/* 9d00005c <prog_word> */
+	/* 0x9d00005c */ 0xfe84, 0x0000, /* lw	s4,0(a0) */
+	/* 0x9d000060 */ 0xfa8a, 0x0030, /* sw	s4,48(t2) */
+	/* 0x9d000064 */ 0xfe84, 0x0004, /* lw	s4,4(a0) */
+	/* 0x9d000068 */ 0xfa8a, 0x0040, /* sw	s4,64(t2) */
+	/* 0x9d00006c */ 0xf8aa, 0x0020, /* sw	a1,32(t2) */
+	/* 0x9d000070 */ 0x4060, 0x000d, /* bal	9d00008e <progflash> */
+	/* 0x9d000074 */ 0x3084, 0x0008, /* addiu	a0,a0,8 */
+	/* 0x9d000078 */ 0x6ed4, /* addiu	a1,a1,8 */
+	/* 0x9d00007a */ 0x6f6e, /* addiu	a2,a2,-1 */
+	/* 0x9d00007c */ 0x8f03, /* beqz	a2,9d000084 <done> */
+	/* 0x9d00007e */ 0x6f6e, /* addiu	a2,a2,-1 */
+
+	/* 9d000080 <next_word> */
+	/* 0x9d000080 */ 0xaf6d, /* bnez	a2,9d00005c <prog_word> */
+	/* 0x9d000082 */ 0x0c00, /* nop */
+
+	/* 9d000084 <done> */
+	/* 0x9d000084 */ 0x9400, 0x0002, /* b	9d00008c <exit> */
+	/* 0x9d000088 */ 0x0c80, /* move	a0,zero */
+
+	/* 9d00008a <error> */
+	/* 0x9d00008a */ 0x0c91, /* move	a0,s1 */
+
+	/* 9d00008c <exit> */
+	/* 0x9d00008c */ 0x46c0, /* sdbbp */
+
+	/* 9d00008e <progflash> */
+	/* 0x9d00008e */ 0xf96a, 0x0000, /* sw	t3,0(t2) */
+	/* 0x9d000092 */ 0xf90a, 0x0010, /* sw	t0,16(t2) */
+	/* 0x9d000096 */ 0xf92a, 0x0010, /* sw	t1,16(t2) */
+	/* 0x9d00009a */ 0xf98a, 0x0008, /* sw	t4,8(t2) */
+
+	/* 9d00009e <waitflash> */
+	/* 0x9d00009e */ 0xfe0a, 0x0000, /* lw	s0,0(t2) */
+	/* 0x9d0000a2 */ 0x0190, 0x8250, /* and	s0,s0,t4 */
+	/* 0x9d0000a6 */ 0xac7b, /* bnez	s0,9d00009e <waitflash> */
+	/* 0x9d0000a8 */ 0x0c00, /* nop */
+	/* 0x9d0000aa */ 0x0c00, /* nop */
+	/* 0x9d0000ac */ 0x0c00, /* nop */
+	/* 0x9d0000ae */ 0x0c00, /* nop */
+	/* 0x9d0000b0 */ 0x0c00, /* nop */
+	/* 0x9d0000b2 */ 0xfe2a, 0x0000, /* lw	s1,0(t2) */
+	/* 0x9d0000b6 */ 0xd220, 0x3000, /* andi	s1,zero,0x3000 */
+	/* 0x9d0000ba */ 0xace7, /* bnez	s1,9d00008a <error> */
+	/* 0x9d0000bc */ 0xf9aa, 0x0004, /* sw	t5,4(t2) */
+	/* 0x9d0000c0 */ 0x459f, /* jr	ra */
+	/* 0x9d0000c2 */ 0x0c00, /* nop */
 };
 
 static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		uint32_t offset, uint32_t count)
 {
-	int retval = ERROR_OK;
-#if 0
 	struct target *target = bank->target;
+	uint32_t buffer_size = 16384;
 	struct working_area *write_algorithm;
-	//struct working_area *source;
+	struct working_area *source;
 	uint32_t address = bank->base + offset;
 	struct reg_param reg_params[3];
-	uint32_t row_size;
+	int retval = ERROR_OK;
 
 	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
 	struct mips32_algorithm mips32_info;
 
+	uint32_t row_size = pic32mm_info->layout.row_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES;
+	
 	/* flash write code */
-	if (target_alloc_working_area(target, sizeof(pic32mm_flash_write_code),
-			&write_algorithm) != ERROR_OK) {
+	if (target_alloc_working_area(target,
+		sizeof(pic32mm_flash_write_code),
+		&write_algorithm) != ERROR_OK) {
 		LOG_WARNING("no working area available, can't do block memory writes");
 		return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 	}
 
-	/* Change values for counters and row size, depending on variant */
-	switch (pic32mm_info->dev_type) {
-	case	MX_1xx_2xx:
-	case	MX_17x_27x:
-		/* 128 byte row */
-		pic32mm_flash_write_code[8] = 0x2CD30020;
-		pic32mm_flash_write_code[14] = 0x24840080;
-		pic32mm_flash_write_code[15] = 0x24A50080;
-		pic32mm_flash_write_code[17] = 0x24C6FFE0;
-		row_size = 128;
-		break;
-	default:
-		/* 256 byte row */
-		pic32mm_flash_write_code[8] = 0x2CD30040;
-		pic32mm_flash_write_code[14] = 0x24840100;
-		pic32mm_flash_write_code[15] = 0x24A50100;
-		pic32mm_flash_write_code[17] = 0x24C6FF00;
-		row_size = 256;
-		break;
-	}
-
 	uint8_t code[sizeof(pic32mm_flash_write_code)];
-	target_buffer_set_u32_array(target, code, ARRAY_SIZE(pic32mm_flash_write_code),
-			pic32mm_flash_write_code);
+	target_buffer_set_u16_array(target,
+		code,
+		ARRAY_SIZE(pic32mm_flash_write_code),
+		pic32mm_flash_write_code);
+	
 	retval = target_write_buffer(target, write_algorithm->address, sizeof(code), code);
 	if (retval != ERROR_OK)
 		return retval;
 
-	target_addr_t dataBuffer = 0xa0000000;
-	uint32_t buffer_size = 0x800;
+	/* memory buffer */
+	while (target_alloc_working_area_try(target, buffer_size, &source) != ERROR_OK) {
+		buffer_size /= 2;
+		if (buffer_size <= 256) {
+			/* we already allocated the writing code, but failed to get a
+			 * buffer, free the algorithm */
+			target_free_working_area(target, write_algorithm);
+
+			LOG_WARNING("no large enough working area available, can't do block memory writes");
+			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
+		}
+	}
 
 	mips32_info.common_magic = MIPS32_COMMON_MAGIC;
 	mips32_info.isa_mode = MIPS32_ISA_MIPS32;
@@ -593,9 +600,10 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 			LOG_ERROR("Out of memory");
 			return ERROR_FAIL;
 		}
-		memset(new_buffer,  0xff, row_offset);
+		memset(new_buffer, 0xff, row_offset);
 		address -= row_offset;
-	} else
+	}
+	else
 		row_offset = 0;
 
 	while (count > 0) {
@@ -609,28 +617,37 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 			memcpy(new_buffer + row_offset, buffer, thisrun_count * 4);
 
 			retval = target_write_buffer(target,
-				dataBuffer,
-				row_offset + thisrun_count * 4, new_buffer);
+				source->address,
+				row_offset + thisrun_count * 4,
+				new_buffer);
 			if (retval != ERROR_OK)
 				break;
-		} else {
+		}
+		else {
 			thisrun_count = (count > (buffer_size / 4)) ?
 					(buffer_size / 4) : count;
 
 			retval = target_write_buffer(target,
-				dataBuffer,
-					thisrun_count * 4, buffer);
+				source->address,
+				thisrun_count * 4,
+				buffer);
 			if (retval != ERROR_OK)
 				break;
 		}
 
-		buf_set_u32(reg_params[0].value, 0, 32, Virt2Phys(dataBuffer));
+		buf_set_u32(reg_params[0].value, 0, 32, Virt2Phys(source->address));
 		buf_set_u32(reg_params[1].value, 0, 32, Virt2Phys(address));
 		buf_set_u32(reg_params[2].value, 0, 32, thisrun_count + row_offset / 4);
 
-		retval = target_run_algorithm(target, 0, NULL, 3, reg_params,
-				write_algorithm->address,
-				0, 10000, &mips32_info);
+		retval = target_run_algorithm(target,
+			0,
+			NULL,
+			3,
+			reg_params,
+			write_algorithm->address,
+			0,
+			10000,
+			&mips32_info);
 		if (retval != ERROR_OK) {
 			LOG_ERROR("error executing pic32mm flash write algorithm");
 			retval = ERROR_FLASH_OPERATION_FAILED;
@@ -660,7 +677,7 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		}
 	}
 
-	//target_free_working_area(target, source);
+	target_free_working_area(target, source);
 	target_free_working_area(target, write_algorithm);
 
 	destroy_reg_param(&reg_params[0]);
@@ -668,7 +685,6 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 	destroy_reg_param(&reg_params[2]);
 
 	free(new_buffer);
-#endif
 	return retval;
 }
 
@@ -685,8 +701,8 @@ static int pic32mm_write_dword(struct flash_bank *bank, uint32_t address, uint32
 
 static int pic32mm_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t offset, uint32_t count)
 {
-	uint32_t words_remaining = (count / 4);
-	uint32_t bytes_remaining = (count & 0x00000003);
+	uint32_t words_remaining = (count / 8) * 2;	//PIC32MM can only write one pair of words at a time
+	uint32_t bytes_remaining = count - words_remaining * 4;
 	uint32_t address = bank->base + offset;
 	uint32_t bytes_written = 0;
 	uint32_t status;

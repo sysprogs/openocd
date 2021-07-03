@@ -1,4 +1,22 @@
 /***************************************************************************
+ *   Based on the original PIC32MX driver                                  *
+ *                                                                         *
+ *                                                                         *
+ *   To convert this file into an embeddable code, run:                    *
+ *          xc32-as pic32mm.s -o pic32mm.o -mmicromips                     *
+ *          xc32-objdump -d pic32mm.o > pic32mm.dmp                        *
+ *                                                                         *
+ *   Then, apply regexes in Notepad++:                                     *
+ *    (1)   (.*):$   =>   /* \1 */           (comment out labels)          *
+ *                                                                         *
+ *    (2)  [ ]*([0-9a-f ]+):[ \t]*([0-9a-f]+) ([0-9a-f]+)[ \t]*(.*)$       *
+ *                =>      /* 0x\1 */ 0x\2, 0x\3, /* \4 */                  *
+ *                                                                         *
+ *    (3)  [ ]*([0-9a-f ]+):[ \t]*([0-9a-f]+)[ \t]*(.*)$                   *
+*                 =>      /* 0x\1 */ 0x\2,  /* \3 */                       *
+ *                                                                         *
+ *   This will convert the objdump output to a nice C array with comments. *
+ *                                                                         *
  *   Copyright (C) 2010 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
  *                                                                         *
@@ -19,14 +37,13 @@
  ***************************************************************************/
 
 	.text
-	.arch m4k
 	.set noreorder
 	.set noat
 
 /* params:
  * $a0 src adr - ram + result
  * $a1 dest adr - flash
- * $a2 count (32bit words)
+ * $a2 count (32bit words). !!!MUST BE AN EVEN VALUE!!!
  * vars
  *
  * temps:
@@ -45,25 +62,25 @@ main:
 	lui		$t1, 0x5566
 	ori		$t1, 0x99AA				/* NVMKEY2 */
 	lui		$t2, 0xBF80
-	ori		$t2, 0xF400				/* NVMCON */
+	ori		$t2, 0x2930				/* NVMCON */
 	ori		$t3, $zero, 0x4003		/* NVMCON row write cmd */
 	ori		$t4, $zero, 0x8000		/* NVMCON start cmd */
 
 write_row:
-	/* can we perform a row write: 128 32bit words */
-	sltiu	$s3, $a2, 128
+	/* can we perform a row write: 64 32bit words */
+	sltiu	$s3, $a2, 64
 	bne		$s3, $zero, write_word
 	ori		$t5, $zero, 0x4000		/* NVMCON clear cmd */
 
-	/* perform row write 512 bytes */
+	/* perform row write 256 bytes */
 	sw		$a1, 32($t2)	/* set NVMADDR with dest addr - real addr */
-	sw		$a0, 64($t2)	/* set NVMSRCADDR with src addr - real addr */
+	sw		$a0, 80($t2)	/* set NVMSRCADDR with src addr - real addr */
 
 	bal		progflash
-	addiu	$a0, $a0, 512
-	addiu	$a1, $a1, 512
+	addiu	$a0, $a0, 256
+	addiu	$a1, $a1, 256
 	beq		$zero, $zero, write_row
-	addiu	$a2, $a2, -128
+	addiu	$a2, $a2, -64
 
 write_word:
 	/* write 32bit words */
@@ -72,16 +89,20 @@ write_word:
 	or		$a0, $a0, $s5			/* convert to virtual addr */
 
 	beq		$zero, $zero, next_word
-	ori		$t3, $zero, 0x4001		/* NVMCON word write cmd */
+	ori		$t3, $zero, 0x4002		/* NVMCON double-word write cmd */
 
 prog_word:
-	lw		$s4, 0($a0)		/* load data - from virtual addr */
-	sw		$s4, 48($t2)	/* set NVMDATA with data */
+	lw		$s4, 0($a0)		/* load first word - from virtual addr */
+	sw		$s4, 48($t2)	/* set NVMDATA0 with data */
+	lw		$s4, 4($a0)		/* load second word - from virtual addr */
+	sw		$s4, 64($t2)	/* set NVMDATA1 with data */
 	sw		$a1, 32($t2)	/* set NVMADDR with dest addr - real addr */
 
 	bal		progflash
-	addiu	$a0, $a0, 4
-	addiu	$a1, $a1, 4
+	addiu	$a0, $a0, 8
+	addiu	$a1, $a1, 8
+	addiu	$a2, $a2, -1
+	beq		$a2, $zero, done
 	addiu	$a2, $a2, -1
 next_word:
 	bne		$a2, $zero, prog_word
