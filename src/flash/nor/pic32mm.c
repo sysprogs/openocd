@@ -538,8 +538,59 @@ static uint16_t pic32mm_flash_write_code[] = {
 	/* 0x9d0000c2 */ 0x0c00, /* nop */
 };
 
-static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
-		uint32_t offset, uint32_t count)
+static int pic32mm_call_flash_loader(struct target *target, 
+	struct reg_param reg_params[],
+	struct working_area *source,
+	struct working_area *write_algorithm,
+	uint32_t address_in_flash,
+	uint32_t word_count)
+{
+	struct mips32_algorithm mips32_info;
+	
+	mips32_info.common_magic = MIPS32_COMMON_MAGIC;
+	mips32_info.isa_mode = MIPS32_ISA_MIPS32;
+
+	buf_set_u32(reg_params[0].value, 0, 32, Virt2Phys(source->address));
+	buf_set_u32(reg_params[1].value, 0, 32, Virt2Phys(address_in_flash));
+	buf_set_u32(reg_params[2].value, 0, 32, word_count);
+	
+	if (!word_count || (word_count & 1))
+	{
+		LOG_ERROR("unexpected word count in pic32mm_call_flash_loader(): %d", word_count);
+		return ERROR_FLASH_OPERATION_FAILED;
+	}
+
+	int retval = target_run_algorithm(target,
+		0,
+		NULL,
+		3,
+		reg_params,
+		write_algorithm->address | 0x01,
+		0,
+		10000,
+		&mips32_info);
+	
+	if (retval != ERROR_OK) {
+		LOG_ERROR("error executing pic32mm flash write algorithm");
+		return ERROR_FLASH_OPERATION_FAILED;
+	}
+
+	uint32_t status = buf_get_u32(reg_params[0].value, 0, 32);
+
+	if (status & NVMCON_NVMERR) {
+		LOG_ERROR("Flash write error NVMERR (status = 0x%08" PRIx32 ")", status);
+		return ERROR_FLASH_OPERATION_FAILED;
+	}
+
+	if (status & NVMCON_LVDERR) {
+		LOG_ERROR("Flash write error LVDERR (status = 0x%08" PRIx32 ")", status);
+		return ERROR_FLASH_OPERATION_FAILED;
+	}
+	
+	return ERROR_OK;
+}
+
+static int pic32mm_write_using_loader(struct flash_bank *bank, const uint8_t *buffer, uint32_t offset, uint32_t count)
 {
 	struct target *target = bank->target;
 	uint32_t buffer_size = 16384;
@@ -550,7 +601,6 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 	int retval = ERROR_OK;
 
 	struct pic32mm_flash_bank *pic32mm_info = bank->driver_priv;
-	struct mips32_algorithm mips32_info;
 
 	uint32_t row_size = pic32mm_info->layout.row_size_in_words * PIC32MM_FLASH_WORD_SIZE_IN_BYTES;
 	
@@ -575,6 +625,7 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 	/* memory buffer */
 	while (target_alloc_working_area_try(target, buffer_size, &source) != ERROR_OK) {
 		buffer_size /= 2;
+		buffer_size = (buffer_size / row_size) * row_size;	//Make sure it is a multiple of row size
 		if (buffer_size <= 256) {
 			/* we already allocated the writing code, but failed to get a
 			 * buffer, free the algorithm */
@@ -585,98 +636,61 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 		}
 	}
 
-	mips32_info.common_magic = MIPS32_COMMON_MAGIC;
-	mips32_info.isa_mode = MIPS32_ISA_MIPS32;
-
 	init_reg_param(&reg_params[0], "r4", 32, PARAM_IN_OUT);
 	init_reg_param(&reg_params[1], "r5", 32, PARAM_OUT);
 	init_reg_param(&reg_params[2], "r6", 32, PARAM_OUT);
 
-	int row_offset = offset % row_size;
-	uint8_t *new_buffer = NULL;
-	if (row_offset && (count >= (row_size / 4))) {
-		new_buffer = malloc(buffer_size);
-		if (new_buffer == NULL) {
-			LOG_ERROR("Out of memory");
+	uint8_t *multi_row_buffer = malloc(buffer_size);
+	
+	while (count > 0)
+	{
+		uint32_t offset_in_row = offset % row_size;
+		if (offset_in_row)
+			memset(multi_row_buffer, 0xFF, offset_in_row);
+		
+		uint32_t loadable_bytes = min(count, buffer_size - offset_in_row);	//Number of bytes from the source buffer that could fit into the row buffer
+		uint32_t programmable_bytes = loadable_bytes + offset_in_row;		//Number of bytes that should be programmed, including pre-padding. Never exceeds buffer_size.
+		memcpy(multi_row_buffer + offset_in_row, buffer, loadable_bytes);
+		
+		uint32_t post_padding = programmable_bytes % row_size;
+		if (post_padding)
+			post_padding = row_size - post_padding;							//Number of bytes after the main payload.
+		
+		if((programmable_bytes + post_padding) > buffer_size)
+		{
+			LOG_ERROR("pic32mm: Internal error: invalid post-padding");
 			return ERROR_FAIL;
 		}
-		memset(new_buffer, 0xff, row_offset);
-		address -= row_offset;
+		
+		if (post_padding)
+		{
+			memset(multi_row_buffer + programmable_bytes, 0xFF, post_padding);
+			programmable_bytes += post_padding;
+		}
+		
+		uint32_t row_offset = offset - offset_in_row;
+		
+		if ((programmable_bytes % row_size) || (row_offset % row_size))
+		{
+			LOG_ERROR("pic32mm: Internal error: multi-row buffer is not properly aligned");
+			return ERROR_FAIL;
+		}
+		
+		retval = target_write_buffer(target,
+			source->address,
+			programmable_bytes,
+			multi_row_buffer);
+		
+		if (retval != ERROR_OK)
+			break;
+		
+		retval = pic32mm_call_flash_loader(target, reg_params, source, write_algorithm, address, programmable_bytes / PIC32MM_FLASH_WORD_SIZE_IN_BYTES);
+
+		count -= loadable_bytes;
+		offset += loadable_bytes;
+		buffer += loadable_bytes;
 	}
-	else
-		row_offset = 0;
-
-	while (count > 0) {
-		uint32_t status;
-		uint32_t thisrun_count;
-
-		if (row_offset) {
-			thisrun_count = (count > ((buffer_size - row_offset) / 4)) ?
-				((buffer_size - row_offset) / 4) : count;
-
-			memcpy(new_buffer + row_offset, buffer, thisrun_count * 4);
-
-			retval = target_write_buffer(target,
-				source->address,
-				row_offset + thisrun_count * 4,
-				new_buffer);
-			if (retval != ERROR_OK)
-				break;
-		}
-		else {
-			thisrun_count = (count > (buffer_size / 4)) ?
-					(buffer_size / 4) : count;
-
-			retval = target_write_buffer(target,
-				source->address,
-				thisrun_count * 4,
-				buffer);
-			if (retval != ERROR_OK)
-				break;
-		}
-
-		buf_set_u32(reg_params[0].value, 0, 32, Virt2Phys(source->address));
-		buf_set_u32(reg_params[1].value, 0, 32, Virt2Phys(address));
-		buf_set_u32(reg_params[2].value, 0, 32, thisrun_count + row_offset / 4);
-
-		retval = target_run_algorithm(target,
-			0,
-			NULL,
-			3,
-			reg_params,
-			write_algorithm->address,
-			0,
-			10000,
-			&mips32_info);
-		if (retval != ERROR_OK) {
-			LOG_ERROR("error executing pic32mm flash write algorithm");
-			retval = ERROR_FLASH_OPERATION_FAILED;
-			break;
-		}
-
-		status = buf_get_u32(reg_params[0].value, 0, 32);
-
-		if (status & NVMCON_NVMERR) {
-			LOG_ERROR("Flash write error NVMERR (status = 0x%08" PRIx32 ")", status);
-			retval = ERROR_FLASH_OPERATION_FAILED;
-			break;
-		}
-
-		if (status & NVMCON_LVDERR) {
-			LOG_ERROR("Flash write error LVDERR (status = 0x%08" PRIx32 ")", status);
-			retval = ERROR_FLASH_OPERATION_FAILED;
-			break;
-		}
-
-		buffer += thisrun_count * 4;
-		address += thisrun_count * 4;
-		count -= thisrun_count;
-		if (row_offset) {
-			address += row_offset;
-			row_offset = 0;
-		}
-	}
-
+	
 	target_free_working_area(target, source);
 	target_free_working_area(target, write_algorithm);
 
@@ -684,7 +698,7 @@ static int pic32mm_write_block(struct flash_bank *bank, const uint8_t *buffer,
 	destroy_reg_param(&reg_params[1]);
 	destroy_reg_param(&reg_params[2]);
 
-	free(new_buffer);
+	free(multi_row_buffer);
 	return retval;
 }
 
@@ -696,87 +710,84 @@ static int pic32mm_write_dword(struct flash_bank *bank, uint32_t address, uint32
 	target_write_u32(target, PIC32MM_NVMDATA0, word0);
 	target_write_u32(target, PIC32MM_NVMDATA1, word1);
 
-	return pic32mm_nvm_exec(bank, NVMCON_OP_DWORD_PROG, 5);
+	int status = pic32mm_nvm_exec(bank, NVMCON_OP_DWORD_PROG, 5);
+	
+	if (status & NVMCON_NVMERR)
+		return ERROR_FLASH_OPERATION_FAILED;
+	if (status & NVMCON_LVDERR)
+		return ERROR_FLASH_OPERATION_FAILED;
+	
+	return ERROR_OK;
 }
 
 static int pic32mm_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t offset, uint32_t count)
 {
-	uint32_t words_remaining = (count / 8) * 2;	//PIC32MM can only write one pair of words at a time
-	uint32_t bytes_remaining = count - words_remaining * 4;
-	uint32_t address = bank->base + offset;
-	uint32_t bytes_written = 0;
-	uint32_t status;
-	int retval;
-
 	if (bank->target->state != TARGET_HALTED) {
 		LOG_ERROR("Target not halted");
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	LOG_DEBUG("writing to flash at address " TARGET_ADDR_FMT " at offset 0x%8.8" PRIx32
-			" count: 0x%8.8" PRIx32 "", bank->base, offset, count);
-
-	if (offset & 0x3) {
-		LOG_WARNING("offset 0x%" PRIx32 "breaks required 4-byte alignment", offset);
-		return ERROR_FLASH_DST_BREAKS_ALIGNMENT;
+	int retval = pic32mm_write_using_loader(bank, buffer, offset, count);
+	if (retval == ERROR_OK) 
+		return retval;
+	
+	if (retval != ERROR_TARGET_RESOURCE_NOT_AVAILABLE) {
+		LOG_ERROR("flash writing failed");
+		return retval;
 	}
+	
+	LOG_WARNING("couldn't use block writes, falling back to single memory accesses");
 
-	/* multiple words (4-byte) to be programmed? */
-	if (words_remaining > 0) {
-		/* try using a block write */
-		retval = pic32mm_write_block(bank, buffer, offset, words_remaining);
-		if (retval != ERROR_OK) {
-			if (retval == ERROR_TARGET_RESOURCE_NOT_AVAILABLE) {
-				/* if block write failed (no sufficient working area),
-				 * we use normal (slow) single dword accesses */
-				LOG_WARNING("couldn't use block writes, falling back to single memory accesses");
-			} else if (retval == ERROR_FLASH_OPERATION_FAILED) {
-				LOG_ERROR("flash writing failed");
-				return retval;
-			}
-		} else {
-			buffer += words_remaining * 4;
-			address += words_remaining * 4;
-			words_remaining = 0;
+	union
+	{
+		uint32_t u32[2];
+		uint8_t bytes[8];
+	} pair;
+	
+	//This is basically a copy of the algorithm from pic32mm_write_using_loader() that uses double words instead of rows.
+	//It's optimized for readability, not preformance, since the JTAG latencies will be orders of magnitude longer than
+	//copying a few bytes on a host machine.
+	while (count > 0)
+	{
+		uint32_t offset_in_row = offset % sizeof(pair);
+		if (offset_in_row)
+			memset(pair.bytes, 0xFF, offset_in_row);
+		
+		uint32_t loadable_bytes = min(count, sizeof(pair) - offset_in_row);	//Number of bytes from the source buffer that could fit into the row buffer
+		uint32_t programmable_bytes = loadable_bytes + offset_in_row;		//Number of bytes that should be programmed, including pre-padding. Never exceeds buffer_size.
+		memcpy(pair.bytes + offset_in_row, buffer, loadable_bytes);
+		
+		uint32_t post_padding = programmable_bytes % sizeof(pair);
+		if (post_padding)
+			post_padding = sizeof(pair) - post_padding;							//Number of bytes after the main payload.
+		
+		if((programmable_bytes + post_padding) > sizeof(pair))
+		{
+			LOG_ERROR("pic32mm: Internal error: invalid post-padding");
+			return ERROR_FAIL;
 		}
-	}
-
-	while (words_remaining > 1) {
-		uint32_t value[2];
-		memcpy(value, buffer + bytes_written, 8);
-
-		status = pic32mm_write_dword(bank, address, value[0], value[1]);
-
-		if (status & NVMCON_NVMERR) {
-			LOG_ERROR("Flash write error NVMERR (status = 0x%08" PRIx32 ")", status);
-			return ERROR_FLASH_OPERATION_FAILED;
+		
+		if (post_padding)
+		{
+			memset(pair.bytes + programmable_bytes, 0xFF, post_padding);
+			programmable_bytes += post_padding;
 		}
-
-		if (status & NVMCON_LVDERR) {
-			LOG_ERROR("Flash write error LVDERR (status = 0x%08" PRIx32 ")", status);
-			return ERROR_FLASH_OPERATION_FAILED;
+		
+		uint32_t row_offset = offset - offset_in_row;
+		
+		if ((programmable_bytes % sizeof(pair)) || (row_offset % sizeof(pair)))
+		{
+			LOG_ERROR("pic32mm: Internal error: multi-row buffer is not properly aligned");
+			return ERROR_FAIL;
 		}
+		
+		int retval = pic32mm_write_dword(bank, bank->base + row_offset, pair.u32[0], pair.u32[1]);
+		if (retval != ERROR_OK)
+			return retval;
 
-		bytes_written += 8;
-		words_remaining-=2;
-		address += 8;
-	}
-
-	if (bytes_remaining) {
-		uint32_t value[2] = { -1, -1 };
-		memcpy(value, buffer + bytes_written, bytes_remaining);
-
-		status = pic32mm_write_dword(bank, address, value[0], value[1]);
-
-		if (status & NVMCON_NVMERR) {
-			LOG_ERROR("Flash write error NVMERR (status = 0x%08" PRIx32 ")", status);
-			return ERROR_FLASH_OPERATION_FAILED;
-		}
-
-		if (status & NVMCON_LVDERR) {
-			LOG_ERROR("Flash write error LVDERR (status = 0x%08" PRIx32 ")", status);
-			return ERROR_FLASH_OPERATION_FAILED;
-		}
+		count -= loadable_bytes;
+		offset += loadable_bytes;
+		buffer += loadable_bytes;
 	}
 
 	return ERROR_OK;
@@ -962,12 +973,7 @@ COMMAND_HANDLER(pic32mm_handle_pgm_word_command)
 		return ERROR_OK;
 	}
 	
-	res = ERROR_OK;
-	status = pic32mm_write_dword(pic32mm_bank, address, (uint32_t)value, (uint32_t)(value >> 32));
-	if (status & NVMCON_NVMERR)
-		res = ERROR_FLASH_OPERATION_FAILED;
-	if (status & NVMCON_LVDERR)
-		res = ERROR_FLASH_OPERATION_FAILED;
+	res = pic32mm_write_dword(pic32mm_bank, address, (uint32_t)value, (uint32_t)(value >> 32));
 
 	if (res != ERROR_OK)
 		command_print(CMD, "pic32mm pgm word failed (status = 0x%x)", status);
