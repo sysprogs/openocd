@@ -172,6 +172,7 @@ static int pic32mm_compute_device_layout(struct target *target, struct pic32mm_d
 	
 	layout->flash_size_in_bytes = FLASHNumber * 1024;
 	layout->boot_flash_size_in_bytes = 0x1700;	//From figures 4-1, 4-2 and 4-3 of the datasheets
+	layout->boot_flash_size_in_bytes += 0xE8;	//Primary and Alternate configuration bits. See section 4.1 in DS60001387D.
 
 	layout->row_size_in_words = 64;
 	layout->page_size_in_words = 512;
@@ -664,6 +665,7 @@ static int pic32mm_write_using_loader(struct flash_bank *bank, const uint8_t *bu
 		count -= loadable_bytes;
 		offset += loadable_bytes;
 		buffer += loadable_bytes;
+		address += loadable_bytes;
 	}
 	
 	target_free_working_area(target, source);
@@ -783,7 +785,7 @@ static const char *pic32mm_find_device(struct target *target, bool log)
 		LOG_INFO("device id = 0x%08" PRIx32 " (manuf 0x%03x dev 0x%04x, ver 0x%02x)",
 			ejtag_info->idcode,
 			manufacturingID,
-			(unsigned)((ejtag_info->idcode >> 12) & 0xffff),
+			(unsigned)((ejtag_info->idcode >> 28) & 0xf),
 			devID);
 	}
 	
@@ -1053,6 +1055,56 @@ COMMAND_HANDLER(pic32mm_handle_unlock_command)
 	return ERROR_OK;
 }
 
+static int pic32mm_verify(struct flash_bank *bank,
+	const uint8_t *buffer,
+	uint32_t offset,
+	uint32_t count)
+{
+	uint8_t *tmp = (uint8_t *)malloc(count + 4);
+	if (!tmp)
+		return ENOMEM;
+	
+	uint32_t aligned_offset = offset & ~3;
+	
+	int retval = target_read_memory(bank->target, bank->base + aligned_offset, 4, (count + offset - aligned_offset + 3) / 4, tmp);
+	int status = memcmp(tmp + (offset - aligned_offset), buffer, count);
+	if (status)
+	{
+		LOG_INFO("The following FLASH bytes do not match the expected values:");
+		LOG_INFO("  Address  | Expected | Actual");
+		bool hasNonFICDDifferences = false;
+		
+		for (int i = 0; i < count; i++)
+		{
+			uint8_t expected = buffer[i];
+			uint8_t actual = tmp[offset - aligned_offset + i];
+			if (expected != actual)
+			{
+				uint32_t address = (uint32_t)(bank->base + offset + i);
+				LOG_INFO("0x%08x |   0x%02X   |   0x%02X  ", address, expected, actual);
+				
+				if(Virt2Phys(address) != 0x1FC017C8 || ((expected ^ actual) & 0x23))	//FICD register, see register 25-8 in DS70231D
+					hasNonFICDDifferences = true;
+			}
+		}
+		
+		if (!hasNonFICDDifferences)
+		{
+			//Due to unknown/undocumented reasons, programming a value of 0x(FF)F3 instead results in a value of 0x(FF)F7.
+			//Since the only difference is in the reserved bits, we ignore this error as long as there are no other errors.
+			LOG_INFO("PIC32MM: ignoring different FICD value during FLASH verification");
+			status = 0;				
+		}
+	}
+	
+	free(tmp);
+	
+	if (status == 0)
+		return ERROR_OK;
+	else
+		return ERROR_FAIL;
+}
+
 static const struct command_registration pic32mm_exec_command_handlers[] = {
 	{
 		.name = "pgm_word",
@@ -1101,6 +1153,7 @@ const struct flash_driver pic32mm_flash = {
 	.auto_probe = pic32mm_auto_probe,
 	.erase_check = default_flash_blank_check,
 	.protect_check = pic32mm_protect_check,
+	.verify = pic32mm_verify,
 	.info = pic32mm_info,
 	.free_driver_priv = default_flash_free_driver_priv,
 };
