@@ -3111,14 +3111,14 @@ static int gdb_v_packet(struct connection *connection,
 			return ERROR_SERVER_REMOTE_CLOSED;
 		}
 
-		addr = strtoul(parse, (char **)&parse, 16);
+		addr = strtoull(parse, (char **)&parse, 16);
 
 		if (*(parse++) != ',' || *parse == '\0') {
 			LOG_ERROR("incomplete vFlashErase packet received, dropping connection");
 			return ERROR_SERVER_REMOTE_CLOSED;
 		}
 
-		length = strtoul(parse, (char **)&parse, 16);
+		length = strtoull(parse, (char **)&parse, 16);
 
 		if (*parse != '\0') {
 			LOG_ERROR("incomplete vFlashErase packet received, dropping connection");
