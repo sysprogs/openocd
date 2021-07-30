@@ -121,15 +121,15 @@ static int riot_update_threads(struct rtos *rtos)
 	unsigned int tasks_found = 0;
 	const struct riot_params *param;
 
-	if (rtos == NULL)
+	if (!rtos)
 		return ERROR_FAIL;
 
-	if (rtos->rtos_specific_params == NULL)
+	if (!rtos->rtos_specific_params)
 		return ERROR_FAIL;
 
 	param = (const struct riot_params *)rtos->rtos_specific_params;
 
-	if (rtos->symbols == NULL) {
+	if (!rtos->symbols) {
 		LOG_ERROR("No symbols for RIOT");
 		return ERROR_FAIL;
 	}
@@ -202,7 +202,7 @@ static int riot_update_threads(struct rtos *rtos)
 
 	/* Allocate memory for thread description */
 	rtos->thread_details = calloc(thread_count, sizeof(struct thread_detail));
-	if (rtos->thread_details == NULL) {
+	if (!rtos->thread_details) {
 		LOG_ERROR("RIOT: out of memory");
 		return ERROR_FAIL;
 	}
@@ -255,7 +255,7 @@ static int riot_update_threads(struct rtos *rtos)
 			strdup(riot_thread_states[k].desc);
 		}
 
-		if (rtos->thread_details[tasks_found].extra_info_str == NULL) {
+		if (!rtos->thread_details[tasks_found].extra_info_str) {
 			LOG_ERROR("RIOT: out of memory");
 			retval = ERROR_FAIL;
 			goto error;
@@ -297,7 +297,7 @@ static int riot_update_threads(struct rtos *rtos)
 			strdup("Enable DEVELHELP to see task names");
 		}
 
-		if (rtos->thread_details[tasks_found].thread_name_str == NULL) {
+		if (!rtos->thread_details[tasks_found].thread_name_str) {
 			LOG_ERROR("RIOT: out of memory");
 			retval = ERROR_FAIL;
 			goto error;
@@ -321,13 +321,13 @@ static int riot_get_thread_reg_list(struct rtos *rtos, int64_t thread_id,
 	int retval;
 	const struct riot_params *param;
 
-	if (rtos == NULL)
+	if (!rtos)
 		return ERROR_FAIL;
 
 	if (thread_id == 0)
 		return ERROR_FAIL;
 
-	if (rtos->rtos_specific_params == NULL)
+	if (!rtos->rtos_specific_params)
 		return ERROR_FAIL;
 
 	param = (const struct riot_params *)rtos->rtos_specific_params;
@@ -364,7 +364,7 @@ static int riot_get_symbol_list_to_lookup(struct symbol_table_elem *symbol_list[
 {
 	*symbol_list = calloc(ARRAY_SIZE(riot_symbol_list), sizeof(struct symbol_table_elem));
 
-	if (*symbol_list == NULL) {
+	if (!*symbol_list) {
 		LOG_ERROR("RIOT: out of memory");
 		return ERROR_FAIL;
 	}
@@ -387,7 +387,7 @@ static int riot_get_symbol_list_to_lookup(struct symbol_table_elem *symbol_list[
 
 static bool riot_detect_rtos(struct target *target)
 {
-	if ((target->rtos->symbols != NULL) &&
+	if ((target->rtos->symbols) &&
 		(target->rtos->symbols[RIOT_THREADS_BASE].address != 0)) {
 		/* looks like RIOT */
 		return true;
@@ -401,7 +401,7 @@ static int riot_create(struct target *target)
 
 	/* lookup if target is supported by RIOT */
 	while ((i < RIOT_NUM_PARAMS) &&
-		(0 != strcmp(riot_params_list[i].target_name, target->type->name))) {
+		(strcmp(riot_params_list[i].target_name, target->type->name) != 0)) {
 		i++;
 	}
 	if (i >= RIOT_NUM_PARAMS) {

@@ -879,7 +879,7 @@ static int stm32x_probe(struct flash_bank *bank)
 	bank->sectors = alloc_block_array(0, stm32x_info->part_info->page_size_kb * 1024,
 			bank->num_sectors);
 
-	if (bank->sectors == NULL) {
+	if (!bank->sectors) {
 		LOG_ERROR("failed to allocate bank sectors");
 		return ERROR_FAIL;
 	}
@@ -896,7 +896,7 @@ static int stm32x_probe(struct flash_bank *bank)
 	bank->prot_blocks = alloc_block_array(0, stm32x_info->part_info->page_size_kb * wpsn * 1024,
 			bank->num_prot_blocks);
 
-	if (bank->prot_blocks == NULL) {
+	if (!bank->prot_blocks) {
 		LOG_ERROR("failed to allocate bank prot_block");
 		return ERROR_FAIL;
 	}
@@ -937,7 +937,7 @@ static int stm32x_get_info(struct flash_bank *bank, struct command_invocation *c
 			if (rev_id == info->revs[i].rev)
 				rev_str = info->revs[i].str;
 
-		if (rev_str != NULL) {
+		if (rev_str) {
 			command_print_sameline(cmd, "%s - Rev: %s",
 				stm32x_info->part_info->device_str, rev_str);
 		} else {
@@ -1003,7 +1003,7 @@ COMMAND_HANDLER(stm32x_handle_lock_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	retval = stm32x_set_rdp(bank, OPT_RDP_L1);
@@ -1023,7 +1023,7 @@ COMMAND_HANDLER(stm32x_handle_unlock_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	retval = stm32x_set_rdp(bank, OPT_RDP_L0);
@@ -1083,7 +1083,7 @@ COMMAND_HANDLER(stm32x_handle_mass_erase_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	retval = stm32x_mass_erase(bank);
@@ -1109,14 +1109,14 @@ COMMAND_HANDLER(stm32x_handle_option_read_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	uint32_t reg_offset, value;
 
 	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[1], reg_offset);
 	retval = stm32x_read_flash_reg(bank, reg_offset, &value);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	command_print(CMD, "Option Register: <0x%" PRIx32 "> = 0x%" PRIx32,
@@ -1134,7 +1134,7 @@ COMMAND_HANDLER(stm32x_handle_option_write_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	uint32_t reg_offset, value, mask = 0xffffffff;

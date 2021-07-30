@@ -150,7 +150,7 @@ static void telnet_load_history(struct telnet_connection *t_con)
 
 	char *history = get_home_dir(TELNET_HISTORY);
 
-	if (history == NULL) {
+	if (!history) {
 		LOG_INFO("unable to get user home directory, telnet history will be disabled");
 		return;
 	}
@@ -159,7 +159,7 @@ static void telnet_load_history(struct telnet_connection *t_con)
 
 	if (histfp) {
 
-		while (fgets(buffer, sizeof(buffer), histfp) != NULL) {
+		while (fgets(buffer, sizeof(buffer), histfp)) {
 
 			char *p = strchr(buffer, '\n');
 			if (p)
@@ -186,7 +186,7 @@ static void telnet_save_history(struct telnet_connection *t_con)
 
 	char *history = get_home_dir(TELNET_HISTORY);
 
-	if (history == NULL) {
+	if (!history) {
 		LOG_INFO("unable to get user home directory, telnet history will be disabled");
 		return;
 	}
@@ -199,7 +199,7 @@ static void telnet_save_history(struct telnet_connection *t_con)
 		i = t_con->current_history + 1;
 		i %= TELNET_LINE_HISTORY_SIZE;
 
-		while (t_con->history[i] == NULL && num > 0) {
+		while (!t_con->history[i] && num > 0) {
 			i++;
 			i %= TELNET_LINE_HISTORY_SIZE;
 			num--;
@@ -640,7 +640,7 @@ static int telnet_input(struct connection *connection)
 							/* save only non-blank not repeating lines in the history */
 							char *prev_line = t_con->history[(t_con->current_history > 0) ?
 									t_con->current_history - 1 : TELNET_LINE_HISTORY_SIZE-1];
-							if (*t_con->line && (prev_line == NULL ||
+							if (*t_con->line && (!prev_line ||
 									strcmp(t_con->line, prev_line))) {
 								/* if the history slot is already taken, free it */
 								free(t_con->history[t_con->next_history]);

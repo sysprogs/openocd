@@ -193,7 +193,7 @@ static int64_t zephyr_cortex_m_stack_align(struct target *target,
 		const uint8_t *stack_data,
 		const struct rtos_register_stacking *stacking, int64_t stack_ptr)
 {
-	return rtos_Cortex_M_stack_align(target, stack_data, stacking,
+	return rtos_cortex_m_stack_align(target, stack_data, stacking,
 			stack_ptr, ARM_XPSR_OFFSET);
 }
 
@@ -385,7 +385,7 @@ static const struct symbol_table_elem zephyr_symbol_list[] = {
 
 static bool zephyr_detect_rtos(struct target *target)
 {
-	if (target->rtos->symbols == NULL) {
+	if (!target->rtos->symbols) {
 		LOG_INFO("Zephyr: no symbols while detecting RTOS");
 		return false;
 	}
@@ -745,14 +745,14 @@ static int zephyr_get_thread_reg_list(struct rtos *rtos, int64_t thread_id,
 
 	LOG_INFO("Getting thread %" PRId64 " reg list", thread_id);
 
-	if (rtos == NULL)
+	if (!rtos)
 		return ERROR_FAIL;
 
 	if (thread_id == 0)
 		return ERROR_FAIL;
 
 	params = rtos->rtos_specific_params;
-	if (params == NULL)
+	if (!params)
 		return ERROR_FAIL;
 
 	addr = thread_id + params->offsets[OFFSET_T_STACK_POINTER]

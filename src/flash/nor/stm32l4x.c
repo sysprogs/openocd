@@ -1320,10 +1320,10 @@ static int stm32l4_read_idcode(struct flash_bank *bank, uint32_t *id)
 	int retval;
 
 	/* try reading possible IDCODE registers, in the following order */
-	uint32_t DBGMCU_IDCODE[] = {DBGMCU_IDCODE_L4_G4, DBGMCU_IDCODE_G0, DBGMCU_IDCODE_L5};
+	uint32_t dbgmcu_idcode[] = {DBGMCU_IDCODE_L4_G4, DBGMCU_IDCODE_G0, DBGMCU_IDCODE_L5};
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(DBGMCU_IDCODE); i++) {
-		retval = target_read_u32(bank->target, DBGMCU_IDCODE[i], id);
+	for (unsigned int i = 0; i < ARRAY_SIZE(dbgmcu_idcode); i++) {
+		retval = target_read_u32(bank->target, dbgmcu_idcode[i], id);
 		if ((retval == ERROR_OK) && ((*id & 0xfff) != 0) && ((*id & 0xfff) != 0xfff))
 			return ERROR_OK;
 	}
@@ -1350,7 +1350,6 @@ static const char *get_stm32l4_bank_type_str(struct flash_bank *bank)
 {
 	struct stm32l4_flash_bank *stm32l4_info = bank->driver_priv;
 	assert(stm32l4_info->part_info);
-	assert(stm32l4_info->probed);
 	return stm32l4_is_otp(bank) ? "OTP" :
 			stm32l4_info->dual_bank_mode ? "Flash dual" :
 			"Flash single";
@@ -1372,8 +1371,6 @@ static int stm32l4_probe(struct flash_bank *bank)
 		return retval;
 
 	const uint32_t device_id = stm32l4_info->idcode & 0xFFF;
-	const uint16_t rev_id = stm32l4_info->idcode >> 16;
-	const char *rev_str = get_stm32l4_rev_str(bank);
 
 	for (unsigned int n = 0; n < ARRAY_SIZE(stm32l4_parts); n++) {
 		if (device_id == stm32l4_parts[n].id) {
@@ -1388,11 +1385,14 @@ static int stm32l4_probe(struct flash_bank *bank)
 	}
 
 	part_info = stm32l4_info->part_info;
-	stm32l4_info->flash_regs = stm32l4_info->part_info->default_flash_regs;
+	const char *rev_str = get_stm32l4_rev_str(bank);
+	const uint16_t rev_id = stm32l4_info->idcode >> 16;
 
 	LOG_INFO("device idcode = 0x%08" PRIx32 " (%s - Rev %s : 0x%04x - %s-bank)",
 			stm32l4_info->idcode, part_info->device_str, rev_str, rev_id,
 			get_stm32l4_bank_type_str(bank));
+
+	stm32l4_info->flash_regs = stm32l4_info->part_info->default_flash_regs;
 
 	/* read flash option register */
 	retval = stm32l4_read_flash_reg_by_index(bank, STM32_FLASH_OPTR_INDEX, &options);
@@ -1603,7 +1603,7 @@ static int stm32l4_probe(struct flash_bank *bank)
 	bank->size = (flash_size_kb + gap_size_kb) * 1024;
 	bank->num_sectors = num_pages;
 	bank->sectors = malloc(sizeof(struct flash_sector) * bank->num_sectors);
-	if (bank->sectors == NULL) {
+	if (!bank->sectors) {
 		LOG_ERROR("failed to allocate bank sectors");
 		return ERROR_FAIL;
 	}
@@ -1708,7 +1708,7 @@ COMMAND_HANDLER(stm32l4_handle_mass_erase_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	retval = stm32l4_mass_erase(bank);
@@ -1734,7 +1734,7 @@ COMMAND_HANDLER(stm32l4_handle_option_read_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	uint32_t reg_offset, reg_addr;
@@ -1744,7 +1744,7 @@ COMMAND_HANDLER(stm32l4_handle_option_read_command)
 	reg_addr = stm32l4_get_flash_reg(bank, reg_offset);
 
 	retval = stm32l4_read_flash_reg(bank, reg_offset, &value);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	command_print(CMD, "Option Register: <0x%" PRIx32 "> = 0x%" PRIx32 "", reg_addr, value);
@@ -1761,7 +1761,7 @@ COMMAND_HANDLER(stm32l4_handle_option_write_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	uint32_t reg_offset;
@@ -1788,15 +1788,15 @@ COMMAND_HANDLER(stm32l4_handle_option_load_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	retval = stm32l4_unlock_reg(bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	retval = stm32l4_unlock_option_reg(bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	/* Set OBL_LAUNCH bit in CR -> system reset and option bytes reload,
@@ -1824,7 +1824,7 @@ COMMAND_HANDLER(stm32l4_handle_lock_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	if (stm32l4_is_otp(bank)) {
@@ -1859,7 +1859,7 @@ COMMAND_HANDLER(stm32l4_handle_unlock_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	if (stm32l4_is_otp(bank)) {
@@ -1891,7 +1891,7 @@ COMMAND_HANDLER(stm32l4_handle_wrp_info_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	if (stm32l4_is_otp(bank)) {
@@ -1963,7 +1963,7 @@ COMMAND_HANDLER(stm32l4_handle_otp_command)
 
 	struct flash_bank *bank;
 	int retval = CALL_COMMAND_HANDLER(flash_command_get_bank, 0, &bank);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	if (!stm32l4_is_otp(bank)) {

@@ -272,7 +272,7 @@ static int parport_init(void)
 
 	cur_cable = cables;
 
-	if (parport_cable == NULL) {
+	if (!parport_cable) {
 		parport_cable = strdup("wiggler");
 		LOG_WARNING("No parport cable specified, using default 'wiggler'");
 	}
@@ -448,7 +448,7 @@ COMMAND_HANDLER(parport_handle_parport_toggling_time_command)
 		uint32_t ns;
 		int retval = parse_u32(CMD_ARGV[0], &ns);
 
-		if (ERROR_OK != retval)
+		if (retval != ERROR_OK)
 			return retval;
 
 		if (ns == 0) {

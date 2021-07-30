@@ -704,7 +704,7 @@ static int update_halt_gdb(struct target *target)
 	}
 
 	/* after all targets were updated, poll the gdb serving target */
-	if (gdb_target != NULL && gdb_target != target)
+	if (gdb_target && gdb_target != target)
 		cortex_a_poll(gdb_target);
 	return retval;
 }
@@ -726,7 +726,7 @@ static int cortex_a_poll(struct target *target)
 	/*  the next polling trigger an halt event sent to gdb */
 	if ((target->state == TARGET_HALTED) && (target->smp) &&
 		(target->gdb_service) &&
-		(target->gdb_service->target == NULL)) {
+		(!target->gdb_service->target)) {
 		target->gdb_service->target =
 			get_cortex_a(target, target->gdb_service->core[1]);
 		target_call_event_callbacks(target, TARGET_EVENT_HALTED);
@@ -1137,7 +1137,7 @@ static int cortex_a_set_dscr_bits(struct target *target,
 	/* Read DSCR */
 	int retval = mem_ap_read_atomic_u32(armv7a->debug_ap,
 			armv7a->debug_base + CPUDBG_DSCR, &dscr);
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	/* clear bitfield */
@@ -1196,7 +1196,7 @@ static int cortex_a_step(struct target *target, int current, target_addr_t addre
 	/* Disable interrupts during single step if requested */
 	if (cortex_a->isrmasking_mode == CORTEX_A_ISRMASK_ON) {
 		retval = cortex_a_set_dscr_bits(target, DSCR_INT_DIS, DSCR_INT_DIS);
-		if (ERROR_OK != retval)
+		if (retval != ERROR_OK)
 			return retval;
 	}
 
@@ -1227,7 +1227,7 @@ static int cortex_a_step(struct target *target, int current, target_addr_t addre
 	/* Re-enable interrupts if they were disabled */
 	if (cortex_a->isrmasking_mode == CORTEX_A_ISRMASK_ON) {
 		retval = cortex_a_set_dscr_bits(target, DSCR_INT_DIS, 0);
-		if (ERROR_OK != retval)
+		if (retval != ERROR_OK)
 			return retval;
 	}
 
@@ -1293,12 +1293,12 @@ static int cortex_a_set_breakpoint(struct target *target,
 		brp_list[brp_i].value = (breakpoint->address & 0xFFFFFFFC);
 		brp_list[brp_i].control = control;
 		retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-				+ CPUDBG_BVR_BASE + 4 * brp_list[brp_i].BRPn,
+				+ CPUDBG_BVR_BASE + 4 * brp_list[brp_i].brpn,
 				brp_list[brp_i].value);
 		if (retval != ERROR_OK)
 			return retval;
 		retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-				+ CPUDBG_BCR_BASE + 4 * brp_list[brp_i].BRPn,
+				+ CPUDBG_BCR_BASE + 4 * brp_list[brp_i].brpn,
 				brp_list[brp_i].control);
 		if (retval != ERROR_OK)
 			return retval;
@@ -1387,12 +1387,12 @@ static int cortex_a_set_context_breakpoint(struct target *target,
 	brp_list[brp_i].value = (breakpoint->asid);
 	brp_list[brp_i].control = control;
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_BVR_BASE + 4 * brp_list[brp_i].BRPn,
+			+ CPUDBG_BVR_BASE + 4 * brp_list[brp_i].brpn,
 			brp_list[brp_i].value);
 	if (retval != ERROR_OK)
 		return retval;
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_BCR_BASE + 4 * brp_list[brp_i].BRPn,
+			+ CPUDBG_BCR_BASE + 4 * brp_list[brp_i].brpn,
 			brp_list[brp_i].control);
 	if (retval != ERROR_OK)
 		return retval;
@@ -1408,11 +1408,11 @@ static int cortex_a_set_hybrid_breakpoint(struct target *target, struct breakpoi
 	int retval = ERROR_FAIL;
 	int brp_1 = 0;	/* holds the contextID pair */
 	int brp_2 = 0;	/* holds the IVA pair */
-	uint32_t control_CTX, control_IVA;
-	uint8_t CTX_byte_addr_select = 0x0F;
-	uint8_t IVA_byte_addr_select = 0x0F;
-	uint8_t CTX_machmode = 0x03;
-	uint8_t IVA_machmode = 0x01;
+	uint32_t control_ctx, control_iva;
+	uint8_t ctx_byte_addr_select = 0x0F;
+	uint8_t iva_byte_addr_select = 0x0F;
+	uint8_t ctx_machmode = 0x03;
+	uint8_t iva_machmode = 0x01;
 	struct cortex_a_common *cortex_a = target_to_cortex_a(target);
 	struct armv7a_common *armv7a = &cortex_a->armv7a_common;
 	struct cortex_a_brp *brp_list = cortex_a->brp_list;
@@ -1426,7 +1426,7 @@ static int cortex_a_set_hybrid_breakpoint(struct target *target, struct breakpoi
 		(brp_list[brp_1].type != BRP_CONTEXT)) && (brp_1 < cortex_a->brp_num))
 		brp_1++;
 
-	printf("brp(CTX) found num: %d\n", brp_1);
+	LOG_DEBUG("brp(CTX) found num: %d", brp_1);
 	if (brp_1 >= cortex_a->brp_num) {
 		LOG_ERROR("ERROR Can not find free Breakpoint Register Pair");
 		return ERROR_FAIL;
@@ -1436,7 +1436,7 @@ static int cortex_a_set_hybrid_breakpoint(struct target *target, struct breakpoi
 		(brp_list[brp_2].type != BRP_NORMAL)) && (brp_2 < cortex_a->brp_num))
 		brp_2++;
 
-	printf("brp(IVA) found num: %d\n", brp_2);
+	LOG_DEBUG("brp(IVA) found num: %d", brp_2);
 	if (brp_2 >= cortex_a->brp_num) {
 		LOG_ERROR("ERROR Can not find free Breakpoint Register Pair");
 		return ERROR_FAIL;
@@ -1444,39 +1444,39 @@ static int cortex_a_set_hybrid_breakpoint(struct target *target, struct breakpoi
 
 	breakpoint->set = brp_1 + 1;
 	breakpoint->linked_brp = brp_2;
-	control_CTX = ((CTX_machmode & 0x7) << 20)
+	control_ctx = ((ctx_machmode & 0x7) << 20)
 		| (brp_2 << 16)
 		| (0 << 14)
-		| (CTX_byte_addr_select << 5)
+		| (ctx_byte_addr_select << 5)
 		| (3 << 1) | 1;
 	brp_list[brp_1].used = true;
 	brp_list[brp_1].value = (breakpoint->asid);
-	brp_list[brp_1].control = control_CTX;
+	brp_list[brp_1].control = control_ctx;
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_BVR_BASE + 4 * brp_list[brp_1].BRPn,
+			+ CPUDBG_BVR_BASE + 4 * brp_list[brp_1].brpn,
 			brp_list[brp_1].value);
 	if (retval != ERROR_OK)
 		return retval;
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_BCR_BASE + 4 * brp_list[brp_1].BRPn,
+			+ CPUDBG_BCR_BASE + 4 * brp_list[brp_1].brpn,
 			brp_list[brp_1].control);
 	if (retval != ERROR_OK)
 		return retval;
 
-	control_IVA = ((IVA_machmode & 0x7) << 20)
+	control_iva = ((iva_machmode & 0x7) << 20)
 		| (brp_1 << 16)
-		| (IVA_byte_addr_select << 5)
+		| (iva_byte_addr_select << 5)
 		| (3 << 1) | 1;
 	brp_list[brp_2].used = true;
 	brp_list[brp_2].value = (breakpoint->address & 0xFFFFFFFC);
-	brp_list[brp_2].control = control_IVA;
+	brp_list[brp_2].control = control_iva;
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_BVR_BASE + 4 * brp_list[brp_2].BRPn,
+			+ CPUDBG_BVR_BASE + 4 * brp_list[brp_2].brpn,
 			brp_list[brp_2].value);
 	if (retval != ERROR_OK)
 		return retval;
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_BCR_BASE + 4 * brp_list[brp_2].BRPn,
+			+ CPUDBG_BCR_BASE + 4 * brp_list[brp_2].brpn,
 			brp_list[brp_2].control);
 	if (retval != ERROR_OK)
 		return retval;
@@ -1510,12 +1510,12 @@ static int cortex_a_unset_breakpoint(struct target *target, struct breakpoint *b
 			brp_list[brp_i].value = 0;
 			brp_list[brp_i].control = 0;
 			retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-					+ CPUDBG_BCR_BASE + 4 * brp_list[brp_i].BRPn,
+					+ CPUDBG_BCR_BASE + 4 * brp_list[brp_i].brpn,
 					brp_list[brp_i].control);
 			if (retval != ERROR_OK)
 				return retval;
 			retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-					+ CPUDBG_BVR_BASE + 4 * brp_list[brp_i].BRPn,
+					+ CPUDBG_BVR_BASE + 4 * brp_list[brp_i].brpn,
 					brp_list[brp_i].value);
 			if (retval != ERROR_OK)
 				return retval;
@@ -1529,12 +1529,12 @@ static int cortex_a_unset_breakpoint(struct target *target, struct breakpoint *b
 			brp_list[brp_j].value = 0;
 			brp_list[brp_j].control = 0;
 			retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-					+ CPUDBG_BCR_BASE + 4 * brp_list[brp_j].BRPn,
+					+ CPUDBG_BCR_BASE + 4 * brp_list[brp_j].brpn,
 					brp_list[brp_j].control);
 			if (retval != ERROR_OK)
 				return retval;
 			retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-					+ CPUDBG_BVR_BASE + 4 * brp_list[brp_j].BRPn,
+					+ CPUDBG_BVR_BASE + 4 * brp_list[brp_j].brpn,
 					brp_list[brp_j].value);
 			if (retval != ERROR_OK)
 				return retval;
@@ -1554,12 +1554,12 @@ static int cortex_a_unset_breakpoint(struct target *target, struct breakpoint *b
 			brp_list[brp_i].value = 0;
 			brp_list[brp_i].control = 0;
 			retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-					+ CPUDBG_BCR_BASE + 4 * brp_list[brp_i].BRPn,
+					+ CPUDBG_BCR_BASE + 4 * brp_list[brp_i].brpn,
 					brp_list[brp_i].control);
 			if (retval != ERROR_OK)
 				return retval;
 			retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-					+ CPUDBG_BVR_BASE + 4 * brp_list[brp_i].BRPn,
+					+ CPUDBG_BVR_BASE + 4 * brp_list[brp_i].brpn,
 					brp_list[brp_i].value);
 			if (retval != ERROR_OK)
 				return retval;
@@ -1757,13 +1757,13 @@ static int cortex_a_set_watchpoint(struct target *target, struct watchpoint *wat
 	wrp_list[wrp_i].control = control;
 
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_WVR_BASE + 4 * wrp_list[wrp_i].WRPn,
+			+ CPUDBG_WVR_BASE + 4 * wrp_list[wrp_i].wrpn,
 			wrp_list[wrp_i].value);
 	if (retval != ERROR_OK)
 		return retval;
 
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_WCR_BASE + 4 * wrp_list[wrp_i].WRPn,
+			+ CPUDBG_WCR_BASE + 4 * wrp_list[wrp_i].wrpn,
 			wrp_list[wrp_i].control);
 	if (retval != ERROR_OK)
 		return retval;
@@ -1806,12 +1806,12 @@ static int cortex_a_unset_watchpoint(struct target *target, struct watchpoint *w
 	wrp_list[wrp_i].value = 0;
 	wrp_list[wrp_i].control = 0;
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_WCR_BASE + 4 * wrp_list[wrp_i].WRPn,
+			+ CPUDBG_WCR_BASE + 4 * wrp_list[wrp_i].wrpn,
 			wrp_list[wrp_i].control);
 	if (retval != ERROR_OK)
 		return retval;
 	retval = cortex_a_dap_write_memap_register_u32(target, armv7a->debug_base
-			+ CPUDBG_WVR_BASE + 4 * wrp_list[wrp_i].WRPn,
+			+ CPUDBG_WVR_BASE + 4 * wrp_list[wrp_i].wrpn,
 			wrp_list[wrp_i].value);
 	if (retval != ERROR_OK)
 		return retval;
@@ -2906,7 +2906,7 @@ static int cortex_a_examine_first(struct target *target)
 	armv7a->debug_ap->memaccess_tck = 80;
 
 	if (!target->dbgbase_set) {
-		uint32_t dbgbase;
+		target_addr_t dbgbase;
 		/* Get ROM Table base */
 		uint32_t apid;
 		int32_t coreidx = target->coreid;
@@ -2923,7 +2923,7 @@ static int cortex_a_examine_first(struct target *target)
 				  target->cmd_name);
 			return retval;
 		}
-		LOG_DEBUG("Detected core %" PRId32 " dbgbase: %08" PRIx32,
+		LOG_DEBUG("Detected core %" PRId32 " dbgbase: " TARGET_ADDR_FMT,
 			  target->coreid, armv7a->debug_base);
 	} else
 		armv7a->debug_base = target->dbgbase;
@@ -3039,7 +3039,7 @@ static int cortex_a_examine_first(struct target *target)
 			cortex_a->brp_list[i].type = BRP_CONTEXT;
 		cortex_a->brp_list[i].value = 0;
 		cortex_a->brp_list[i].control = 0;
-		cortex_a->brp_list[i].BRPn = i;
+		cortex_a->brp_list[i].brpn = i;
 	}
 
 	LOG_DEBUG("Configured %i hw breakpoints", cortex_a->brp_num);
@@ -3053,7 +3053,7 @@ static int cortex_a_examine_first(struct target *target)
 		cortex_a->wrp_list[i].used = false;
 		cortex_a->wrp_list[i].value = 0;
 		cortex_a->wrp_list[i].control = 0;
-		cortex_a->wrp_list[i].WRPn = i;
+		cortex_a->wrp_list[i].wrpn = i;
 	}
 
 	LOG_DEBUG("Configured %i hw watchpoints", cortex_a->wrp_num);
@@ -3125,13 +3125,13 @@ static int cortex_a_target_create(struct target *target, Jim_Interp *interp)
 	struct cortex_a_common *cortex_a;
 	struct adiv5_private_config *pc;
 
-	if (target->private_config == NULL)
+	if (!target->private_config)
 		return ERROR_FAIL;
 
 	pc = (struct adiv5_private_config *)target->private_config;
 
 	cortex_a = calloc(1, sizeof(struct cortex_a_common));
-	if (cortex_a == NULL) {
+	if (!cortex_a) {
 		LOG_ERROR("Out of memory");
 		return ERROR_FAIL;
 	}
@@ -3152,7 +3152,7 @@ static int cortex_r4_target_create(struct target *target, Jim_Interp *interp)
 		return ERROR_FAIL;
 
 	cortex_a = calloc(1, sizeof(struct cortex_a_common));
-	if (cortex_a == NULL) {
+	if (!cortex_a) {
 		LOG_ERROR("Out of memory");
 		return ERROR_FAIL;
 	}
@@ -3267,7 +3267,7 @@ COMMAND_HANDLER(handle_cortex_a_mask_interrupts_command)
 
 	if (CMD_ARGC > 0) {
 		n = jim_nvp_name2value_simple(nvp_maskisr_modes, CMD_ARGV[0]);
-		if (n->name == NULL) {
+		if (!n->name) {
 			LOG_ERROR("Unknown parameter: %s - should be off or on", CMD_ARGV[0]);
 			return ERROR_COMMAND_SYNTAX_ERROR;
 		}
@@ -3295,7 +3295,7 @@ COMMAND_HANDLER(handle_cortex_a_dacrfixup_command)
 
 	if (CMD_ARGC > 0) {
 		n = jim_nvp_name2value_simple(nvp_dacrfixup_modes, CMD_ARGV[0]);
-		if (n->name == NULL)
+		if (!n->name)
 			return ERROR_COMMAND_SYNTAX_ERROR;
 		cortex_a->dacrfixup_mode = n->value;
 

@@ -70,7 +70,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/cmsis-dap.cfg -c "adapter speed 3000" -f target/bluenrg-x.cfg -c init</Arguments>
+            <Arguments>-f interface/ftdi/olimex-arm-usb-ocd-h.cfg -f target/pic32mm.cfg -c "bindto 0.0.0.0" -c "adapter speed 3000" -c init -c "reset init"</Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>
@@ -171,6 +171,8 @@
       <ExamineRegistersInRawFormat>true</ExamineRegistersInRawFormat>
       <DisableSignals>false</DisableSignals>
       <EnableAsyncExecutionMode>false</EnableAsyncExecutionMode>
+      <AsyncModeSupportsBreakpoints>true</AsyncModeSupportsBreakpoints>
+      <TemporaryBreakConsolidationTimeout>0</TemporaryBreakConsolidationTimeout>
       <EnableNonStopMode>false</EnableNonStopMode>
       <MaxBreakpointLimit>0</MaxBreakpointLimit>
       <EnableVerboseMode>true</EnableVerboseMode>

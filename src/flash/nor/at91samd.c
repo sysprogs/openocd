@@ -385,7 +385,7 @@ static const struct samd_part *samd_find_part(uint32_t id)
 {
 	uint8_t devsel = SAMD_GET_DEVSEL(id);
 	const struct samd_family *family = samd_find_family(id);
-	if (family == NULL)
+	if (!family)
 		return NULL;
 
 	for (unsigned i = 0; i < family->num_parts; i++) {
@@ -452,7 +452,7 @@ static int samd_probe(struct flash_bank *bank)
 	}
 
 	part = samd_find_part(id);
-	if (part == NULL) {
+	if (!part) {
 		LOG_ERROR("Couldn't find part corresponding to DID %08" PRIx32, id);
 		return ERROR_FAIL;
 	}
@@ -606,7 +606,7 @@ static int samd_get_reservedmask(struct target *target, uint64_t *mask)
 	}
 	const struct samd_family *family;
 	family = samd_find_family(id);
-	if (family == NULL) {
+	if (!family) {
 		LOG_ERROR("Couldn't determine device family");
 		return ERROR_FAIL;
 	}
@@ -1064,7 +1064,7 @@ static COMMAND_HELPER(get_u64_from_hexarg, unsigned int num, uint64_t *value)
 		char *check = NULL;
 		*value = strtoull(&(CMD_ARGV[num][2]), &check, 16);
 		if ((value == 0 && errno == ERANGE) ||
-			check == NULL || *check != 0) {
+			!check || *check != 0) {
 			command_print(CMD, "Invalid 64-bit hex value in argument %d.",
 				num + 1);
 			return ERROR_COMMAND_SYNTAX_ERROR;

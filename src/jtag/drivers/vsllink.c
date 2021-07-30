@@ -105,7 +105,7 @@ static int vsllink_execute_queue(void)
 		" vsllink "
 		"-------------------------------------");
 
-	while (cmd != NULL) {
+	while (cmd) {
 		switch (cmd->type) {
 			case JTAG_RUNTEST:
 				LOG_DEBUG_IO("runtest %i cycles, end in %s",
@@ -280,14 +280,14 @@ static int vsllink_quit(void)
 static int vsllink_interface_init(void)
 {
 	vsllink_handle = malloc(sizeof(struct vsllink));
-	if (NULL == vsllink_handle) {
+	if (!vsllink_handle) {
 		LOG_ERROR("unable to allocate memory");
 		return ERROR_FAIL;
 	}
 
 	libusb_init(&vsllink_handle->libusb_ctx);
 
-	if (ERROR_OK != vsllink_usb_open(vsllink_handle)) {
+	if (vsllink_usb_open(vsllink_handle) != ERROR_OK) {
 		LOG_ERROR("Can't find USB JTAG Interface!"
 			"Please check connection and permissions.");
 		return ERROR_JTAG_INIT_FAILED;
@@ -297,7 +297,7 @@ static int vsllink_interface_init(void)
 		versaloon_interface.usb_setting.pid);
 	versaloon_usb_device_handle = vsllink_handle->usb_device_handle;
 
-	if (ERROR_OK != versaloon_interface.init())
+	if (versaloon_interface.init() != ERROR_OK)
 		return ERROR_FAIL;
 	if (versaloon_interface.usb_setting.buf_size < 32) {
 		versaloon_interface.fini();
@@ -310,7 +310,7 @@ static int vsllink_interface_init(void)
 static int vsllink_init(void)
 {
 	int retval = vsllink_interface_init();
-	if (ERROR_OK != retval)
+	if (retval != ERROR_OK)
 		return retval;
 
 	versaloon_interface.adaptors.gpio.init(0);
@@ -333,7 +333,7 @@ static int vsllink_init(void)
 		tdi_buffer = malloc(tap_buffer_size);
 		tdo_buffer = malloc(tap_buffer_size);
 		tms_buffer = malloc(tap_buffer_size);
-		if ((NULL == tdi_buffer) || (NULL == tdo_buffer) || (NULL == tms_buffer)) {
+		if ((!tdi_buffer) || (!tdo_buffer) || (!tms_buffer)) {
 			vsllink_quit();
 			return ERROR_FAIL;
 		}
@@ -344,7 +344,7 @@ static int vsllink_init(void)
 			GPIO_TRST, GPIO_SRST, GPIO_SRST);
 	}
 
-	if (ERROR_OK != versaloon_interface.adaptors.peripheral_commit())
+	if (versaloon_interface.adaptors.peripheral_commit() != ERROR_OK)
 		return ERROR_FAIL;
 
 	vsllink_reset(0, 0);
@@ -785,7 +785,7 @@ static int vsllink_check_usb_strings(
 	char desc_string[256];
 	int retval;
 
-	if (NULL != versaloon_interface.usb_setting.serialstring) {
+	if (versaloon_interface.usb_setting.serialstring) {
 		retval = libusb_get_string_descriptor_ascii(usb_device_handle,
 			usb_desc->iSerialNumber, (unsigned char *)desc_string,
 			sizeof(desc_string));
@@ -803,7 +803,7 @@ static int vsllink_check_usb_strings(
 	if (retval < 0)
 		return ERROR_FAIL;
 
-	if (strstr(desc_string, "Versaloon") == NULL)
+	if (!strstr(desc_string, "Versaloon"))
 		return ERROR_FAIL;
 
 	return ERROR_OK;
@@ -838,7 +838,7 @@ static int vsllink_usb_open(struct vsllink *vsllink)
 			continue;
 
 		retval = vsllink_check_usb_strings(usb_device_handle, &usb_desc);
-		if (ERROR_OK == retval)
+		if (retval == ERROR_OK)
 			break;
 
 		libusb_close(usb_device_handle);

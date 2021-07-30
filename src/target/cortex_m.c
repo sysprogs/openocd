@@ -169,7 +169,7 @@ static int cortex_m_store_core_reg_u32(struct target *target,
 	if (retval != ERROR_OK)
 		return retval;
 
-	retval = mem_ap_write_atomic_u32(armv7m->debug_ap, DCB_DCRSR, regsel | DCRSR_WnR);
+	retval = mem_ap_write_atomic_u32(armv7m->debug_ap, DCB_DCRSR, regsel | DCRSR_WNR);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -2253,9 +2253,9 @@ int cortex_m_examine(struct target *target)
 	struct adiv5_dap *swjdp = cortex_m->armv7m.arm.dap;
 	struct armv7m_common *armv7m = target_to_armv7m(target);
 
-	/* stlink shares the examine handler but does not support
+	/* hla_target shares the examine handler but does not support
 	 * all its calls */
-	if (!armv7m->stlink) {
+	if (!armv7m->is_hla_target) {
 		if (cortex_m->apsel == DP_APSEL_INVALID) {
 			/* Search for the MEM-AP */
 			retval = cortex_m_find_mem_ap(swjdp, &armv7m->debug_ap);
@@ -2355,7 +2355,7 @@ int cortex_m_examine(struct target *target)
 			for (size_t idx = ARMV8M_FIRST_REG; idx <= ARMV8M_LAST_REG; idx++)
 				armv7m->arm.core_cache->reg_list[idx].exist = false;
 
-		if (!armv7m->stlink) {
+		if (!armv7m->is_hla_target) {
 			if (cortex_m->core_info->flags & CORTEX_M_F_TAR_AUTOINCR_BLOCK_4K)
 				/* Cortex-M3/M4 have 4096 bytes autoincrement range,
 				 * s. ARM IHI 0031C: MEM-AP 7.2.2 */
@@ -2546,7 +2546,7 @@ static int cortex_m_target_create(struct target *target, Jim_Interp *interp)
 		return ERROR_FAIL;
 
 	struct cortex_m_common *cortex_m = calloc(1, sizeof(struct cortex_m_common));
-	if (cortex_m == NULL) {
+	if (!cortex_m) {
 		LOG_ERROR("No memory creating target");
 		return ERROR_FAIL;
 	}
@@ -2693,7 +2693,7 @@ COMMAND_HANDLER(handle_cortex_m_mask_interrupts_command)
 
 	if (CMD_ARGC > 0) {
 		n = jim_nvp_name2value_simple(nvp_maskisr_modes, CMD_ARGV[0]);
-		if (n->name == NULL)
+		if (!n->name)
 			return ERROR_COMMAND_SYNTAX_ERROR;
 		cortex_m->isrmasking_mode = n->value;
 		cortex_m_set_maskints_for_halt(target);

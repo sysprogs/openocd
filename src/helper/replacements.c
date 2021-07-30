@@ -33,7 +33,7 @@
 void *clear_malloc(size_t size)
 {
 	void *t = malloc(size);
-	if (t != NULL)
+	if (t)
 		memset(t, 0x00, size);
 	return t;
 }
@@ -41,7 +41,7 @@ void *clear_malloc(size_t size)
 void *fill_malloc(size_t size)
 {
 	void *t = malloc(size);
-	if (t != NULL) {
+	if (t) {
 		/* We want to initialize memory to some known bad state.
 		 * 0 and 0xff yields 0 and -1 as integers, which often
 		 * have meaningful values. 0x5555... is not often a valid
@@ -124,7 +124,7 @@ char *strndup(const char *s, size_t n)
 	size_t len = strnlen(s, n);
 	char *new = malloc(len + 1);
 
-	if (new == NULL)
+	if (!new)
 		return NULL;
 
 	new[len] = '\0';
@@ -145,10 +145,10 @@ int win_select(int max_fd, fd_set *rfds, fd_set *wfds, fd_set *efds, struct time
 	struct timeval tvslice;
 	int retcode;
 
-#define SAFE_FD_ISSET(fd, set)  (set != NULL && FD_ISSET(fd, set))
+#define SAFE_FD_ISSET(fd, set)  (set && FD_ISSET(fd, set))
 
 	/* calculate how long we need to wait in milliseconds */
-	if (tv == NULL)
+	if (!tv)
 		ms_total = INFINITE;
 	else {
 		ms_total = tv->tv_sec * 1000;
@@ -233,16 +233,16 @@ int win_select(int max_fd, fd_set *rfds, fd_set *wfds, fd_set *efds, struct time
 				if (retcode < 0)
 					retcode = 0;
 				for (i = 0; i < n_handles; i++) {
-					if (WAIT_OBJECT_0 == WaitForSingleObject(handles[i], 0)) {
+					if (WaitForSingleObject(handles[i], 0) == WAIT_OBJECT_0) {
 						if (SAFE_FD_ISSET(handle_slot_to_fd[i], rfds)) {
-							DWORD dwBytes;
+							DWORD bytes;
 							intptr_t handle = (intptr_t) _get_osfhandle(
 									handle_slot_to_fd[i]);
 
 							if (PeekNamedPipe((HANDLE)handle, NULL, 0,
-								    NULL, &dwBytes, NULL)) {
+								    NULL, &bytes, NULL)) {
 								/* check to see if gdb pipe has data available */
-								if (dwBytes) {
+								if (bytes) {
 									FD_SET(handle_slot_to_fd[i], &aread);
 									retcode++;
 								}
