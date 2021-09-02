@@ -127,14 +127,6 @@
       <PlatformName>Mainstream</PlatformName>
     </VisualGDBConfiguration>
     <VisualGDBConfiguration>
-      <PlatformName>HLA_Multicore</PlatformName>
-      <MergeableBuildSettingsExtension xsi:type="com.visualgdb.build.cmake.mergeable">
-        <AdditionalDefinitions>
-          <string>HLA_MULTICORE</string>
-        </AdditionalDefinitions>
-      </MergeableBuildSettingsExtension>
-    </VisualGDBConfiguration>
-    <VisualGDBConfiguration>
       <Name>Debug</Name>
     </VisualGDBConfiguration>
     <VisualGDBConfiguration>
