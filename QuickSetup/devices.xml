@@ -722,5 +722,17 @@
 		<ScriptFile>target/rp2040.cfg</ScriptFile>
 		<SuggestedTransport>swd</SuggestedTransport>
 	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>PIC32MX</ID>
+		<Name>PIC32MX</Name>
+		<MatchRegex>^PIC32MX.*</MatchRegex>
+		<ScriptFile>target/pic32mx.cfg</ScriptFile>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>PIC32MM</ID>
+		<Name>PIC32MM</Name>
+		<MatchRegex>^PIC32MM.*</MatchRegex>
+		<ScriptFile>target/pic32mm.cfg</ScriptFile>
+	</TargetDeviceFamily>
 	
 </ArrayOfTargetDeviceFamily>
