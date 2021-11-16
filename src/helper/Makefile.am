@@ -1,7 +1,5 @@
 noinst_LTLIBRARIES += %D%/libhelper.la
 
-%C%_libhelper_la_CPPFLAGS = $(AM_CPPFLAGS) $(LIBUSB1_CFLAGS)
-
 %C%_libhelper_la_SOURCES = \
 	%D%/binarybuffer.c \
 	%D%/options.c \
@@ -15,6 +13,7 @@ noinst_LTLIBRARIES += %D%/libhelper.la
 	%D%/util.c \
 	%D%/jep106.c \
 	%D%/jim-nvp.c \
+	%D%/align.h \
 	%D%/binarybuffer.h \
 	%D%/bits.h \
 	%D%/configuration.h \
@@ -30,12 +29,6 @@ noinst_LTLIBRARIES += %D%/libhelper.la
 	%D%/jep106.h \
 	%D%/jep106.inc \
 	%D%/jim-nvp.h
-
-%C%_libhelper_la_CFLAGS = $(AM_CFLAGS)
-if IS_MINGW
-# FD_* macros are sloppy with their signs on MinGW32 platform
-%C%_libhelper_la_CFLAGS += -Wno-sign-compare
-endif
 
 STARTUP_TCL_SRCS += %D%/startup.tcl
 EXTRA_DIST += \

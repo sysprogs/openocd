@@ -69,7 +69,7 @@
 #endif
 
 /* project specific includes */
-#include <jtag/drivers/jtag_usb_common.h>
+#include <jtag/adapter.h>
 #include <jtag/interface.h>
 #include <jtag/swd.h>
 #include <transport/transport.h>
@@ -672,7 +672,7 @@ static int ftdi_initialize(void)
 
 	for (int i = 0; ftdi_vid[i] || ftdi_pid[i]; i++) {
 		mpsse_ctx = mpsse_open(&ftdi_vid[i], &ftdi_pid[i], ftdi_device_desc,
-				ftdi_serial, jtag_usb_get_location(), ftdi_channel);
+				ftdi_serial, adapter_usb_get_location(), ftdi_channel);
 		if (mpsse_ctx)
 			break;
 	}
@@ -699,7 +699,7 @@ static int ftdi_initialize(void)
 
 	mpsse_loopback_config(mpsse_ctx, false);
 
-	freq = mpsse_set_frequency(mpsse_ctx, jtag_get_speed_khz() * 1000);
+	freq = mpsse_set_frequency(mpsse_ctx, adapter_get_speed_khz() * 1000);
 
 	return mpsse_flush(mpsse_ctx);
 }

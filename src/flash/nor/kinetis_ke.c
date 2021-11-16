@@ -41,6 +41,7 @@
 #include "imp.h"
 #include <helper/binarybuffer.h>
 #include <target/algorithm.h>
+#include <target/arm_adi_v5.h>
 #include <target/armv7m.h>
 #include <target/cortex_m.h>
 
@@ -999,8 +1000,6 @@ static int kinetis_ke_erase(struct flash_bank *bank, unsigned int first,
 			LOG_WARNING("erase sector %u failed", i);
 			return ERROR_FLASH_OPERATION_FAILED;
 		}
-
-		bank->sectors[i].is_erased = 1;
 
 		if (i == 2)
 			fcf_erased = true;

@@ -9,7 +9,14 @@ foreach(jim_src ${jimtcl_generated_sources} initjimsh.c)
 endforeach(jim_src)
 
 INCLUDE (CheckIncludeFiles)
-SET(JIM_VERSION 76)
+
+set(JIM_VERSION_REGEX "define[ \t]+JIM_VERSION[ \t]+([0-9]+)$")
+file(STRINGS ../jimtcl/auto.def JIM_VERSION_DEF REGEX "${JIM_VERSION_REGEX}")
+string(REGEX REPLACE "${JIM_VERSION_REGEX}" "\\1" JIM_VERSION "${JIM_VERSION_DEF}")
+
+if(NOT JIM_VERSION)
+	message(FATAL_ERROR "Could not determine the jimtcl version from auto.def")
+endif()
 
 if (WIN32)
     set(TCL_PLATFORM_OS "mingw")

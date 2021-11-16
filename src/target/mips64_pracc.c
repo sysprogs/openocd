@@ -20,7 +20,8 @@
 #include "mips64.h"
 #include "mips64_pracc.h"
 
-#include "time_support.h"
+#include <helper/time_support.h>
+#include <jtag/adapter.h>
 
 #define STACK_DEPTH	32
 
@@ -213,7 +214,7 @@ int mips64_pracc_exec(struct mips_ejtag *ejtag_info,
 		      unsigned num_param_out, uint64_t *param_out)
 {
 	uint32_t ejtag_ctrl;
-	uint64_t address = 0, address_prev = 0, data;
+	uint64_t address = 0, address_prev = 0;
 	struct mips64_pracc_context ctx;
 	int retval;
 	int pass = 0;
@@ -243,7 +244,7 @@ int mips64_pracc_exec(struct mips_ejtag *ejtag_info,
 			address_prev = address;
 		else
 			address_prev = 0;
-		address32 = data = 0;
+		address32 = 0;
 
 		mips_ejtag_set_instr(ejtag_info, EJTAG_INST_ADDRESS);
 		mips_ejtag_drscan_32(ejtag_info, &address32);
@@ -1358,8 +1359,6 @@ int mips64_pracc_fastdata_xfer(struct mips_ejtag *ejtag_info,
 			  0, NULL, 0, NULL);
 
 	/* next fetch to dmseg should be in FASTDATA_AREA, check */
-	address = 0;
-
 	mips_ejtag_set_instr(ejtag_info, EJTAG_INST_ADDRESS);
 	retval = mips_ejtag_drscan_32(ejtag_info, &address32);
 	if (retval != ERROR_OK)
@@ -1388,7 +1387,7 @@ int mips64_pracc_fastdata_xfer(struct mips_ejtag *ejtag_info,
 	/* like in legacy code */
 	unsigned num_clocks = 0;
 	if (ejtag_info->mode != 0)
-		num_clocks = ((uint64_t)(ejtag_info->scan_delay) * jtag_get_speed_khz() + 500000) / 1000000;
+		num_clocks = ((uint64_t)(ejtag_info->scan_delay) * adapter_get_speed_khz() + 500000) / 1000000;
 	LOG_DEBUG("num_clocks=%d", num_clocks);
 	for (i = 0; i < count; i++) {
 		jtag_add_clocks(num_clocks);
@@ -1411,7 +1410,6 @@ int mips64_pracc_fastdata_xfer(struct mips_ejtag *ejtag_info,
 		return retval;
 	}
 
-	address = 0;
 	mips_ejtag_set_instr(ejtag_info, EJTAG_INST_ADDRESS);
 	retval = mips_ejtag_drscan_32(ejtag_info, &address32);
 	if (retval != ERROR_OK) {

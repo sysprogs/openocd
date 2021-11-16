@@ -41,6 +41,7 @@
 #include "config.h"
 #endif
 
+#include <helper/align.h>
 #include <helper/time_support.h>
 #include <jtag/jtag.h>
 #include <flash/nor/core.h>
@@ -154,9 +155,10 @@ static struct target_type *target_types[] = {
 struct target *all_targets;
 static struct target_event_callback *target_event_callbacks;
 static struct target_timer_callback *target_timer_callbacks;
+static int64_t target_timer_next_event_value;
 static LIST_HEAD(target_reset_callback_list);
 static LIST_HEAD(target_trace_callback_list);
-static const int polling_interval = 100;
+static const int polling_interval = TARGET_DEFAULT_POLLING_INTERVAL;
 
 static const struct jim_nvp nvp_assert[] = {
 	{ .name = "assert", NVP_ASSERT },
@@ -715,6 +717,15 @@ static int no_mmu(struct target *target, int *enabled)
 	return ERROR_OK;
 }
 
+/**
+ * Reset the @c examined flag for the given target.
+ * Pure paranoia -- targets are zeroed on allocation.
+ */
+static inline void target_reset_examined(struct target *target)
+{
+	target->examined = false;
+}
+
 static int default_examine(struct target *target)
 {
 	target_set_examined(target);
@@ -735,10 +746,12 @@ int target_examine_one(struct target *target)
 
 	int retval = target->type->examine(target);
 	if (retval != ERROR_OK) {
+		target_reset_examined(target);
 		target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_FAIL);
 		return retval;
 	}
 
+	target_set_examined(target);
 	target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_END);
 
 	return ERROR_OK;
@@ -1004,7 +1017,7 @@ int target_run_flash_async_algorithm(struct target *target,
 	uint32_t rp = fifo_start_addr;
 
 	/* validate block_size is 2^n */
-	assert(!block_size || !(block_size & (block_size - 1)));
+	assert(IS_PWR_OF_2(block_size));
 
 	retval = target_write_u32(target, wp_addr, wp);
 	if (retval != ERROR_OK)
@@ -1045,7 +1058,7 @@ int target_run_flash_async_algorithm(struct target *target,
 			break;
 		}
 
-		if (((rp - fifo_start_addr) & (block_size - 1)) || rp < fifo_start_addr || rp >= fifo_end_addr) {
+		if (!IS_ALIGNED(rp - fifo_start_addr, block_size) || rp < fifo_start_addr || rp >= fifo_end_addr) {
 			LOG_ERROR("corrupted fifo read pointer 0x%" PRIx32, rp);
 			break;
 		}
@@ -1163,7 +1176,7 @@ int target_run_read_async_algorithm(struct target *target,
 	uint32_t rp = fifo_start_addr;
 
 	/* validate block_size is 2^n */
-	assert(!block_size || !(block_size & (block_size - 1)));
+	assert(IS_PWR_OF_2(block_size));
 
 	retval = target_write_u32(target, wp_addr, wp);
 	if (retval != ERROR_OK)
@@ -1200,7 +1213,7 @@ int target_run_read_async_algorithm(struct target *target,
 			break;
 		}
 
-		if (((wp - fifo_start_addr) & (block_size - 1)) || wp < fifo_start_addr || wp >= fifo_end_addr) {
+		if (!IS_ALIGNED(wp - fifo_start_addr, block_size) || wp < fifo_start_addr || wp >= fifo_end_addr) {
 			LOG_ERROR("corrupted fifo write pointer 0x%" PRIx32, wp);
 			break;
 		}
@@ -1530,15 +1543,6 @@ static int target_profiling(struct target *target, uint32_t *samples,
 			num_samples, seconds);
 }
 
-/**
- * Reset the @c examined flag for the given target.
- * Pure paranoia -- targets are zeroed on allocation.
- */
-static void target_reset_examined(struct target *target)
-{
-	target->examined = false;
-}
-
 static int handle_target(void *priv);
 
 static int target_init_one(struct command_context *cmd_ctx,
@@ -1743,8 +1747,8 @@ int target_register_timer_callback(int (*callback)(void *priv),
 	(*callbacks_p)->time_ms = time_ms;
 	(*callbacks_p)->removed = false;
 
-	gettimeofday(&(*callbacks_p)->when, NULL);
-	timeval_add_time(&(*callbacks_p)->when, 0, time_ms * 1000);
+	(*callbacks_p)->when = timeval_ms() + time_ms;
+	target_timer_next_event_value = MIN(target_timer_next_event_value, (*callbacks_p)->when);
 
 	(*callbacks_p)->priv = priv;
 	(*callbacks_p)->next = NULL;
@@ -1878,15 +1882,14 @@ int target_call_trace_callbacks(struct target *target, size_t len, uint8_t *data
 }
 
 static int target_timer_callback_periodic_restart(
-		struct target_timer_callback *cb, struct timeval *now)
+		struct target_timer_callback *cb, int64_t *now)
 {
-	cb->when = *now;
-	timeval_add_time(&cb->when, 0, cb->time_ms * 1000L);
+	cb->when = *now + cb->time_ms;
 	return ERROR_OK;
 }
 
 static int target_call_timer_callback(struct target_timer_callback *cb,
-		struct timeval *now)
+		int64_t *now)
 {
 	cb->callback(cb->priv);
 
@@ -1908,8 +1911,12 @@ static int target_call_timer_callbacks_check_time(int checktime)
 
 	keep_alive();
 
-	struct timeval now;
-	gettimeofday(&now, NULL);
+	int64_t now = timeval_ms();
+
+	/* Initialize to a default value that's a ways into the future.
+	 * The loop below will make it closer to now if there are
+	 * callbacks that want to be called sooner. */
+	target_timer_next_event_value = now + 1000;
 
 	/* Store an address of the place containing a pointer to the
 	 * next item; initially, that's a standalone "root of the
@@ -1925,10 +1932,13 @@ static int target_call_timer_callbacks_check_time(int checktime)
 
 		bool call_it = (*callback)->callback &&
 			((!checktime && (*callback)->type == TARGET_TIMER_TYPE_PERIODIC) ||
-			 timeval_compare(&now, &(*callback)->when) >= 0);
+			 now >= (*callback)->when);
 
 		if (call_it)
 			target_call_timer_callback(*callback, &now);
+
+		if (!(*callback)->removed && (*callback)->when < target_timer_next_event_value)
+			target_timer_next_event_value = (*callback)->when;
 
 		callback = &(*callback)->next;
 	}
@@ -1937,15 +1947,20 @@ static int target_call_timer_callbacks_check_time(int checktime)
 	return ERROR_OK;
 }
 
-int target_call_timer_callbacks(void)
+int target_call_timer_callbacks()
 {
 	return target_call_timer_callbacks_check_time(1);
 }
 
 /* invoke periodic callbacks immediately */
-int target_call_timer_callbacks_now(void)
+int target_call_timer_callbacks_now()
 {
 	return target_call_timer_callbacks_check_time(0);
+}
+
+int64_t target_timer_next_event(void)
+{
+	return target_timer_next_event_value;
 }
 
 /* Prints the working area layout for debug purposes */
@@ -3052,7 +3067,7 @@ static int handle_target(void *priv)
 				/* Target examination could have failed due to unstable connection,
 				 * but we set the examined flag anyway to repoll it later */
 				if (retval != ERROR_OK) {
-					target->examined = true;
+					target_set_examined(target);
 					LOG_USER("Examination failed, GDB will be halted. Polling again in %dms",
 						 target->backoff.times * polling_interval);
 					return retval;
@@ -5080,7 +5095,7 @@ no_params:
 				if (goi->isconfigure) {
 					/* START_DEPRECATED_TPIU */
 					if (n->value == TARGET_EVENT_TRACE_CONFIG)
-						LOG_INFO("DEPRECATED target event %s", n->name);
+						LOG_INFO("DEPRECATED target event %s; use TPIU events {pre,post}-{enable,disable}", n->name);
 					/* END_DEPRECATED_TPIU */
 
 					bool replace = true;
@@ -5405,8 +5420,13 @@ static int jim_target_examine(Jim_Interp *interp, int argc, Jim_Obj *const *argv
 	}
 
 	int e = target->type->examine(target);
-	if (e != ERROR_OK)
+	if (e != ERROR_OK) {
+		target_reset_examined(target);
 		return JIM_ERR;
+	}
+
+	target_set_examined(target);
+
 	return JIM_OK;
 }
 
@@ -5812,7 +5832,7 @@ static int target_create(struct jim_getopt_info *goi)
 	/* COMMAND */
 	jim_getopt_obj(goi, &new_cmd);
 	/* does this command exist? */
-	cmd = Jim_GetCommand(goi->interp, new_cmd, JIM_ERRMSG);
+	cmd = Jim_GetCommand(goi->interp, new_cmd, JIM_NONE);
 	if (cmd) {
 		cp = Jim_GetString(new_cmd, NULL);
 		Jim_SetResultFormatted(goi->interp, "Command/target: %s Exists", cp);
@@ -6075,10 +6095,10 @@ static int jim_target_smp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	int i;
 	const char *targetname;
 	int retval, len;
-	struct target *target = (struct target *) NULL;
+	struct target *target = NULL;
 	struct target_list *head, *curr, *new;
-	curr = (struct target_list *) NULL;
-	head = (struct target_list *) NULL;
+	curr = NULL;
+	head = NULL;
 
 	retval = 0;
 	LOG_DEBUG("%d", argc);
@@ -6095,8 +6115,8 @@ static int jim_target_smp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 		if (target) {
 			new = malloc(sizeof(struct target_list));
 			new->target = target;
-			new->next = (struct target_list *)NULL;
-			if (head == (struct target_list *)NULL) {
+			new->next = NULL;
+			if (!head) {
 				head = new;
 				curr = head;
 			} else {
@@ -6108,7 +6128,7 @@ static int jim_target_smp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	/*  now parse the list of cpu and put the target in smp mode*/
 	curr = head;
 
-	while (curr != (struct target_list *)NULL) {
+	while (curr) {
 		target = curr->target;
 		target->smp = 1;
 		target->head = head;

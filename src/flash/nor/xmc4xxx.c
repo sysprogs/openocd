@@ -577,8 +577,6 @@ static int xmc4xxx_erase(struct flash_bank *bank, unsigned int first,
 
 		if (res != ERROR_OK)
 			goto clear_status_and_exit;
-
-		bank->sectors[i].is_erased = 1;
 	}
 
 clear_status_and_exit:
@@ -1270,12 +1268,12 @@ COMMAND_HANDLER(xmc4xxx_handle_flash_password_command)
 	errno = 0;
 
 	/* We skip over the flash bank */
-	fb->pw1 = strtol(CMD_ARGV[1], NULL, 16);
+	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[1], fb->pw1);
 
 	if (errno)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	fb->pw2 = strtol(CMD_ARGV[2], NULL, 16);
+	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[2], fb->pw2);
 
 	if (errno)
 		return ERROR_COMMAND_SYNTAX_ERROR;

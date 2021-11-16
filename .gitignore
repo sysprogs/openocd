@@ -105,3 +105,8 @@ VisualGDBCache
 VisualGDB
 toolchain.cmake
 /*.user
+
+# GNU Global tag files
+GPATH
+GRTAGS
+GTAGS

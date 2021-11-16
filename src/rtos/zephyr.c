@@ -189,9 +189,9 @@ enum zephyr_symbol_values {
 	ZEPHYR_VAL_COUNT
 };
 
-static int64_t zephyr_cortex_m_stack_align(struct target *target,
+static target_addr_t zephyr_cortex_m_stack_align(struct target *target,
 		const uint8_t *stack_data,
-		const struct rtos_register_stacking *stacking, int64_t stack_ptr)
+		const struct rtos_register_stacking *stacking, target_addr_t stack_ptr)
 {
 	return rtos_cortex_m_stack_align(target, stack_data, stacking,
 			stack_ptr, ARM_XPSR_OFFSET);
@@ -334,6 +334,14 @@ static int zephyr_get_arm_state(struct rtos *rtos, target_addr_t *addr,
 static struct zephyr_params zephyr_params_list[] = {
 	{
 		.target_name = "cortex_m",
+		.pointer_width = 4,
+		.callee_saved_stacking = &arm_callee_saved_stacking,
+		.cpu_saved_nofp_stacking = &arm_cpu_saved_nofp_stacking,
+		.cpu_saved_fp_stacking = &arm_cpu_saved_fp_stacking,
+		.get_cpu_state = &zephyr_get_arm_state,
+	},
+	{
+		.target_name = "cortex_r4",
 		.pointer_width = 4,
 		.callee_saved_stacking = &arm_callee_saved_stacking,
 		.cpu_saved_nofp_stacking = &arm_cpu_saved_nofp_stacking,

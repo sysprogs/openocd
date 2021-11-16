@@ -236,7 +236,7 @@ int rtos_qsymbol(struct connection *connection, char const *packet, int packet_s
 	uint64_t addr = 0;
 	size_t reply_len;
 	char reply[GDB_BUFFER_SIZE + 1], cur_sym[GDB_BUFFER_SIZE / 2 + 1] = ""; /* Extra byte for null-termination */
-	struct symbol_table_elem *next_sym = NULL;
+	struct symbol_table_elem *next_sym;
 	struct target *target = get_target_from_connection(connection);
 	struct rtos *os = target->rtos;
 
@@ -268,7 +268,16 @@ int rtos_qsymbol(struct connection *connection, char const *packet, int packet_s
 			cur_sym[0] = '\x00';
 		}
 	}
+
+	LOG_DEBUG("RTOS: Address of symbol '%s' is 0x%" PRIx64, cur_sym, addr);
+
 	next_sym = next_symbol(os, cur_sym, addr);
+
+	/* Should never happen unless the debugger misbehaves */
+	if (!next_sym) {
+		LOG_WARNING("RTOS: Debugger sent us qSymbol with '%s' that we did not ask for", cur_sym);
+		goto done;
+	}
 
 	if (!next_sym->symbol_name) {
 		/* No more symbols need looking up */
@@ -292,6 +301,8 @@ int rtos_qsymbol(struct connection *connection, char const *packet, int packet_s
 		LOG_ERROR("ERROR: RTOS symbol '%s' name is too long for GDB!", next_sym->symbol_name);
 		goto done;
 	}
+
+	LOG_DEBUG("RTOS: Requesting symbol lookup of '%s' from the debugger", next_sym->symbol_name);
 
 	reply_len = snprintf(reply, sizeof(reply), "qSymbol:");
 	reply_len += hexify(reply + reply_len,
@@ -607,7 +618,7 @@ int rtos_generic_stack_read(struct target *target,
 		LOG_OUTPUT("\r\n");
 #endif
 
-	int64_t new_stack_ptr;
+	target_addr_t new_stack_ptr;
 	if (stacking->calculate_process_stack) {
 		new_stack_ptr = stacking->calculate_process_stack(target,
 				stack_data, stacking, stack_ptr);

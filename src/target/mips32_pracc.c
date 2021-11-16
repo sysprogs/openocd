@@ -68,7 +68,9 @@
 #include "config.h"
 #endif
 
+#include <helper/align.h>
 #include <helper/time_support.h>
+#include <jtag/adapter.h>
 
 #include "mips32.h"
 #include "mips32_pracc.h"
@@ -379,7 +381,7 @@ int mips32_pracc_queue_exec(struct mips_ejtag *ejtag_info, struct pracc_queue_in
 	}
 
 	unsigned num_clocks =
-		((uint64_t)(ejtag_info->scan_delay) * jtag_get_speed_khz() + 500000) / 1000000;
+		((uint64_t)(ejtag_info->scan_delay) * adapter_get_speed_khz() + 500000) / 1000000;
 
 	uint32_t ejtag_ctrl = ejtag_info->ejtag_ctrl & ~EJTAG_CTRL_PRACC;
 	mips_ejtag_set_instr(ejtag_info, EJTAG_INST_ALL);
@@ -658,7 +660,7 @@ static int mips32_pracc_synchronize_cache(struct mips_ejtag *ejtag_info,
 		goto exit;  /* Nothing to do */
 
 	/* make sure clsiz is power of 2 */
-	if (clsiz & (clsiz - 1)) {
+	if (!IS_PWR_OF_2(clsiz)) {
 		LOG_DEBUG("clsiz must be power of 2");
 		ctx.retval = ERROR_FAIL;
 		goto exit;
@@ -1009,7 +1011,7 @@ int mips32_pracc_fastdata_xfer(struct mips_ejtag *ejtag_info, struct working_are
 
 	unsigned num_clocks = 0;	/* like in legacy code */
 	if (ejtag_info->mode != 0)
-		num_clocks = ((uint64_t)(ejtag_info->scan_delay) * jtag_get_speed_khz() + 500000) / 1000000;
+		num_clocks = ((uint64_t)(ejtag_info->scan_delay) * adapter_get_speed_khz() + 500000) / 1000000;
 
 	for (int i = 0; i < count; i++) {
 		jtag_add_clocks(num_clocks);

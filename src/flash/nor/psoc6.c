@@ -24,11 +24,12 @@
 #include <time.h>
 
 #include "imp.h"
+#include "helper/time_support.h"
+#include "target/arm_adi_v5.h"
 #include "target/target.h"
 #include "target/cortex_m.h"
 #include "target/breakpoints.h"
 #include "target/target_type.h"
-#include "time_support.h"
 #include "target/algorithm.h"
 
 /**************************************************************************************************
@@ -491,8 +492,7 @@ static const char *protection_to_str(uint8_t protection)
 /** ***********************************************************************************************
  * @brief psoc6_get_info Displays human-readable information about acquired device
  * @param bank current flash bank
- * @param buf pointer to buffer for human-readable text
- * @param buf_size size of the buffer
+ * @param cmd pointer to command invocation instance
  * @return ERROR_OK in case of success, ERROR_XXX code otherwise
  *************************************************************************************************/
 static int psoc6_get_info(struct flash_bank *bank, struct command_invocation *cmd)
@@ -744,9 +744,6 @@ static int psoc6_erase(struct flash_bank *bank, unsigned int first,
 			if (hr != ERROR_OK)
 				goto exit_free_wa;
 
-			for (unsigned int i = first; i < first + rows_in_sector; i++)
-				bank->sectors[i].is_erased = 1;
-
 			first += rows_in_sector;
 		} else {
 			/* Perform Row Erase otherwise */
@@ -754,7 +751,6 @@ static int psoc6_erase(struct flash_bank *bank, unsigned int first,
 			if (hr != ERROR_OK)
 				goto exit_free_wa;
 
-			bank->sectors[first].is_erased = 1;
 			first += 1;
 		}
 	}

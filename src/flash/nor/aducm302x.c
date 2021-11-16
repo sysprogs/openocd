@@ -25,6 +25,7 @@
 #include <target/algorithm.h>
 #include <target/armv7m.h>
 #include <helper/time_support.h>
+#include <helper/binarybuffer.h>
 
 
 /* ADuCM302x ID registers */

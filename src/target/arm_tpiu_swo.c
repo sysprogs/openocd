@@ -155,7 +155,7 @@ static int arm_tpiu_swo_poll_trace(void *priv)
 	if (obj->out_filename && obj->out_filename[0] == ':')
 		list_for_each_entry(c, &obj->connections, lh)
 			if (connection_write(c->connection, buf, size) != (int)size)
-				retval = ERROR_FAIL;
+				LOG_ERROR("Error writing to connection"); /* FIXME: which connection? */
 
 	return ERROR_OK;
 }
@@ -678,6 +678,10 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 
 	if (obj->pin_protocol == TPIU_SPPR_PROTOCOL_SYNC) {
 		retval = wrap_read_u32(target, tpiu_ap, obj->spot.base + TPIU_SSPSR_OFFSET, &value);
+		if (retval != ERROR_OK) {
+			LOG_ERROR("Cannot read TPIU register SSPSR");
+			return JIM_ERR;
+		}
 		if (!(value & BIT(obj->port_width - 1))) {
 			LOG_ERROR("TPIU does not support port-width of %d bits", obj->port_width);
 			return JIM_ERR;
@@ -764,6 +768,10 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 
 	arm_tpiu_swo_handle_event(obj, TPIU_SWO_EVENT_POST_ENABLE);
 
+	/* START_DEPRECATED_TPIU */
+	target_handle_event(target, TARGET_EVENT_TRACE_CONFIG);
+	/* END_DEPRECATED_TPIU */
+
 	obj->enabled = true;
 	return JIM_OK;
 
@@ -817,6 +825,13 @@ static int jim_arm_tpiu_swo_disable(Jim_Interp *interp, int argc, Jim_Obj *const
 	}
 
 	arm_tpiu_swo_handle_event(obj, TPIU_SWO_EVENT_POST_DISABLE);
+
+	/* START_DEPRECATED_TPIU */
+	struct command_context *cmd_ctx = current_command_context(interp);
+	struct target *target = get_current_target(cmd_ctx);
+	target_handle_event(target, TARGET_EVENT_TRACE_CONFIG);
+	/* END_DEPRECATED_TPIU */
+
 	return JIM_OK;
 }
 
@@ -869,7 +884,7 @@ static int arm_tpiu_swo_create(Jim_Interp *interp, struct arm_tpiu_swo_object *o
 	assert(cmd_ctx);
 
 	/* does this command exist? */
-	cmd = Jim_GetCommand(interp, Jim_NewStringObj(interp, obj->name, -1), JIM_ERRMSG);
+	cmd = Jim_GetCommand(interp, Jim_NewStringObj(interp, obj->name, -1), JIM_NONE);
 	if (cmd) {
 		Jim_SetResultFormatted(interp, "Command: %s Exists", obj->name);
 		return JIM_ERR;
@@ -1112,7 +1127,6 @@ COMMAND_HANDLER(handle_tpiu_deprecated_config_command)
 	if (retval != ERROR_OK)
 		return retval;
 
-	target_handle_event(target, TARGET_EVENT_TRACE_CONFIG);
 	return ERROR_OK;
 }
 

@@ -47,7 +47,6 @@ add_library(ocdjtagdrivers STATIC
 	drivers/cmsis_dap_usb_hid.c
 	drivers/xds110.c
 	drivers/picoprobe.c
-	drivers/jtag_usb_common.c
 	drivers/libusb_helper.c)
 	
 add_library(ocdjlink STATIC
