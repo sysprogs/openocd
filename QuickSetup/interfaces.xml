@@ -429,6 +429,6 @@
 		  </UsbIdentity>
 		</UsbIdentities>
 		<UniversalDriverId>com.sysprogs.libusb.mini</UniversalDriverId>
-		<SerialNumberCommand>picoprobe_serial</SerialNumberCommand>
+		<SerialNumberCommand>pico_serialnum</SerialNumberCommand>
 	</ProgrammingInterface>	
 </ArrayOfProgrammingInterface>
