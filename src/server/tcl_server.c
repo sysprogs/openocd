@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2010 Øyvind Harboe                                      *
  *   oyvind.harboe@zylin.com                                               *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -276,6 +265,15 @@ static int tcl_closed(struct connection *connection)
 	return ERROR_OK;
 }
 
+static const struct service_driver tcl_service_driver = {
+	.name = "tcl",
+	.new_connection_during_keep_alive_handler = NULL,
+	.new_connection_handler = tcl_new_connection,
+	.input_handler = tcl_input,
+	.connection_closed_handler = tcl_closed,
+	.keep_client_alive_handler = NULL,
+};
+
 int tcl_init(void)
 {
 	if (strcmp(tcl_port, "disabled") == 0) {
@@ -283,9 +281,7 @@ int tcl_init(void)
 		return ERROR_OK;
 	}
 
-	return add_service("tcl", tcl_port, CONNECTION_LIMIT_UNLIMITED,
-		&tcl_new_connection, &tcl_input,
-		&tcl_closed, NULL);
+	return add_service(&tcl_service_driver, tcl_port, CONNECTION_LIMIT_UNLIMITED, NULL);
 }
 
 COMMAND_HANDLER(handle_tcl_port_command)

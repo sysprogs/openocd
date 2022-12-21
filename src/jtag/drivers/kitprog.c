@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2007 by Juergen Stuber <juergen@jstuber.net>            *
  *   based on Dominic Rath's and Benedikt Sauter's usbprog.c               *
@@ -16,19 +18,6 @@
  *                                                                         *
  *   Copyright (C) 2015-2017 by Forest Crossman                            *
  *   cyrozap@gmail.com                                                     *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -90,8 +79,24 @@
 #define HID_COMMAND_CONFIGURE  0x8f
 #define HID_COMMAND_BOOTLOADER 0xa0
 
-/* 512 bytes seems to work reliably */
-#define SWD_MAX_BUFFER_LENGTH 512
+/* 512 bytes seemed to work reliably.
+ * It works with both full queue of mostly reads or mostly writes.
+ *
+ * Unfortunately the commit 88f429ead019fd6df96ec15f0d897385f3cef0d0
+ * 5321: target/cortex_m: faster reading of all CPU registers
+ * revealed a serious Kitprog firmware problem:
+ * If the queue contains more than 63 transactions in the repeated pattern
+ * one write, two reads, the firmware fails badly.
+ * Sending 64 transactions makes the adapter to loose the connection with the
+ * device. Sending 65 or more transactions causes the adapter to stop
+ * receiving USB HID commands, next kitprog_hid_command() stops in hid_write().
+ *
+ * The problem was detected with KitProg v2.12 and v2.16.
+ * We can guess the problem is something like a buffer or stack overflow.
+ *
+ * Use shorter buffer as a workaround. 300 bytes (= 60 transactions) works.
+ */
+#define SWD_MAX_BUFFER_LENGTH 300
 
 struct kitprog {
 	hid_device *hid_handle;
@@ -114,7 +119,6 @@ struct pending_transfer_result {
 	void *buffer;
 };
 
-static char *kitprog_serial;
 static bool kitprog_init_acquire_psoc;
 
 static int pending_transfer_count, pending_queue_len;
@@ -230,7 +234,6 @@ static int kitprog_quit(void)
 	free(kitprog_handle->packet_buffer);
 	free(kitprog_handle->serial);
 	free(kitprog_handle);
-	free(kitprog_serial);
 	free(pending_transfers);
 
 	return ERROR_OK;
@@ -272,8 +275,7 @@ static int kitprog_usb_open(void)
 	const uint16_t vids[] = { VID, 0 };
 	const uint16_t pids[] = { PID, 0 };
 
-	if (jtag_libusb_open(vids, pids, kitprog_serial,
-			&kitprog_handle->usb_handle, NULL) != ERROR_OK) {
+	if (jtag_libusb_open(vids, pids, &kitprog_handle->usb_handle, NULL) != ERROR_OK) {
 		LOG_ERROR("Failed to open or find the device");
 		return ERROR_FAIL;
 	}
@@ -335,9 +337,13 @@ static int kitprog_hid_command(uint8_t *command, size_t command_length,
 		return ERROR_FAIL;
 	}
 
-	ret = hid_read(kitprog_handle->hid_handle, data, data_length);
-	if (ret < 0) {
-		LOG_DEBUG("HID read returned %i", ret);
+	ret = hid_read_timeout(kitprog_handle->hid_handle,
+							data, data_length, LIBUSB_TIMEOUT_MS);
+	if (ret == 0) {
+		LOG_ERROR("HID read timed out");
+		return ERROR_TIMEOUT_REACHED;
+	} else if (ret < 0) {
+		LOG_ERROR("HID read error %ls", hid_error(kitprog_handle->hid_handle));
 		return ERROR_FAIL;
 	}
 
@@ -851,22 +857,6 @@ COMMAND_HANDLER(kitprog_handle_acquire_psoc_command)
 	return retval;
 }
 
-COMMAND_HANDLER(kitprog_handle_serial_command)
-{
-	if (CMD_ARGC == 1) {
-		kitprog_serial = strdup(CMD_ARGV[0]);
-		if (!kitprog_serial) {
-			LOG_ERROR("Failed to allocate memory for the serial number");
-			return ERROR_FAIL;
-		}
-	} else {
-		LOG_ERROR("expected exactly one argument to kitprog_serial <serial-number>");
-		return ERROR_FAIL;
-	}
-
-	return ERROR_OK;
-}
-
 COMMAND_HANDLER(kitprog_handle_init_acquire_psoc_command)
 {
 	kitprog_init_acquire_psoc = true;
@@ -899,13 +889,6 @@ static const struct command_registration kitprog_command_handlers[] = {
 		.help = "perform KitProg management",
 		.usage = "<cmd>",
 		.chain = kitprog_subcommand_handlers,
-	},
-	{
-		.name = "kitprog_serial",
-		.handler = &kitprog_handle_serial_command,
-		.mode = COMMAND_CONFIG,
-		.help = "set the serial number of the adapter",
-		.usage = "serial_string",
 	},
 	{
 		.name = "kitprog_init_acquire_psoc",

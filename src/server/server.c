@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
@@ -7,19 +9,6 @@
  *                                                                         *
  *   Copyright (C) 2008 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -205,13 +194,8 @@ static void free_service(struct service *c)
 	free(c);
 }
 
-int add_service(char *name,
-	const char *port,
-	int max_connections,
-	new_connection_handler_t new_connection_handler,
-	input_handler_t input_handler,
-	connection_closed_handler_t connection_closed_handler,
-	void *priv)
+int add_service(const struct service_driver *driver, const char *port,
+		int max_connections, void *priv)
 {
 	struct service *c, **p;
 	struct hostent *hp;
@@ -219,14 +203,16 @@ int add_service(char *name,
 
 	c = malloc(sizeof(struct service));
 
-	c->name = strdup(name);
+	c->name = strdup(driver->name);
 	c->port = strdup(port);
 	c->max_connections = 1;	/* Only TCP/IP ports can support more than one connection */
 	c->fd = -1;
 	c->connections = NULL;
-	c->new_connection = new_connection_handler;
-	c->input = input_handler;
-	c->connection_closed = connection_closed_handler;
+	c->new_connection_during_keep_alive = driver->new_connection_during_keep_alive_handler;
+	c->new_connection = driver->new_connection_handler;
+	c->input = driver->input_handler;
+	c->connection_closed = driver->connection_closed_handler;
+	c->keep_client_alive = driver->keep_client_alive_handler;
 	c->priv = priv;
 	c->next = NULL;
 	long portnumber;
@@ -278,7 +264,7 @@ int add_service(char *name,
 		c->sin.sin_port = htons(c->portnumber);
 
 		if (bind(c->fd, (struct sockaddr *)&c->sin, sizeof(c->sin)) == -1) {
-			LOG_ERROR("couldn't bind %s to socket on port %d: %s", name, c->portnumber, strerror(errno));
+			LOG_ERROR("couldn't bind %s to socket on port %d: %s", c->name, c->portnumber, strerror(errno));
 			close_socket(c->fd);
 			free_service(c);
 			return ERROR_FAIL;
@@ -309,7 +295,7 @@ int add_service(char *name,
 		socklen_t addr_in_size = sizeof(addr_in);
 		if (getsockname(c->fd, (struct sockaddr *)&addr_in, &addr_in_size) == 0)
 			LOG_INFO("Listening on port %hu for %s connections",
-				 ntohs(addr_in.sin_port), name);
+				 ntohs(addr_in.sin_port), c->name);
 	} else if (c->type == CONNECTION_STDINOUT) {
 		c->fd = fileno(stdin);
 
@@ -424,6 +410,14 @@ static int remove_services(void)
 	return ERROR_OK;
 }
 
+void server_keep_clients_alive(void)
+{
+	for (struct service *s = services; s; s = s->next)
+		if (s->keep_client_alive)
+			for (struct connection *c = s->connections; c; c = c->next)
+				s->keep_client_alive(c);
+}
+
 int server_loop(struct command_context *command_context)
 {
 	struct service *service;
@@ -479,7 +473,7 @@ int server_loop(struct command_context *command_context)
 			tv.tv_usec = 0;
 			retval = socket_select(fd_max + 1, &read_fds, NULL, NULL, &tv);
 		} else {
-			/* Every 100ms, can be changed with "poll_period" command */
+			/* Timeout socket_select() when a target timer expires or every polling_period */
 			int timeout_ms = next_event - timeval_ms();
 			if (timeout_ms < 0)
 				timeout_ms = 0;
@@ -487,10 +481,7 @@ int server_loop(struct command_context *command_context)
 				timeout_ms = polling_period;
 			tv.tv_usec = timeout_ms * 1000;
 			/* Only while we're sleeping we'll let others run */
-			openocd_sleep_prelude();
-			kept_alive();
 			retval = socket_select(fd_max + 1, &read_fds, NULL, NULL, &tv);
-			openocd_sleep_postlude();
 		}
 
 		if (retval == -1) {
@@ -516,9 +507,12 @@ int server_loop(struct command_context *command_context)
 		}
 
 		if (retval == 0) {
-			/* We only execute these callbacks when there was nothing to do or we timed
-			 *out */
-			target_call_timer_callbacks_now();
+			/* Execute callbacks of expired timers when
+			 * - there was nothing to do if poll_ok was true
+			 * - socket_select() timed out if poll_ok was false, now one or more
+			 *   timers expired or the polling period elapsed
+			 */
+			target_call_timer_callbacks();
 			next_event = target_timer_next_event();
 			process_jim_events(command_context);
 
@@ -753,12 +747,19 @@ int connection_read(struct connection *connection, void *data, int len)
 		return read(connection->fd, data, len);
 }
 
+bool openocd_is_shutdown_pending(void)
+{
+	return shutdown_openocd != CONTINUE_MAIN_LOOP;
+}
+
 /* tell the server we want to shut down */
 COMMAND_HANDLER(handle_shutdown_command)
 {
 	LOG_USER("shutdown command invoked");
 
 	shutdown_openocd = SHUTDOWN_REQUESTED;
+
+	command_run_line(CMD_CTX, "_run_pre_shutdown_commands");
 
 	if (CMD_ARGC == 1) {
 		if (!strcmp(CMD_ARGV[0], "error")) {

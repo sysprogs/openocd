@@ -1,22 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2015 by Uwe Bonnes                                      *
  *   bon@elektron.ikp.physik.tu-darmstadt.de                               *
  *                                                                         *
  *   Copyright (C) 2019 by Tarek Bochkati for STMicroelectronics           *
  *   tarek.bouchkati@gmail.com                                             *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -300,7 +289,7 @@ static const struct stm32l4_rev stm32l45_l46xx_revs[] = {
 	{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x2001, "Y" },
 };
 
-static const struct stm32l4_rev stm32l41_L42xx_revs[] = {
+static const struct stm32l4_rev stm32l41_l42xx_revs[] = {
 	{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x2001, "Y" },
 };
 
@@ -431,8 +420,8 @@ static const struct stm32l4_part_info stm32l4_parts[] = {
 	},
 	{
 	  .id                    = DEVID_STM32L41_L42XX,
-	  .revs                  = stm32l41_L42xx_revs,
-	  .num_revs              = ARRAY_SIZE(stm32l41_L42xx_revs),
+	  .revs                  = stm32l41_l42xx_revs,
+	  .num_revs              = ARRAY_SIZE(stm32l41_l42xx_revs),
 	  .device_str            = "STM32L41/L42xx",
 	  .max_flash_size_kb     = 128,
 	  .flags                 = F_NONE,
@@ -1078,7 +1067,7 @@ static int stm32l4_get_all_wrpxy(struct flash_bank *bank, enum stm32_bank_id dev
 	if (dev_bank_id != STM32_BANK1 && stm32l4_info->dual_bank_mode)
 		wrp2y_sectors_offset = stm32l4_info->bank1_sectors;
 
-	if (wrp2y_sectors_offset > -1) {
+	if (wrp2y_sectors_offset >= 0) {
 		/* get WRP2AR */
 		ret = stm32l4_get_one_wrpxy(bank, &wrpxy[(*n_wrp)++], STM32_FLASH_WRP2AR_INDEX, wrp2y_sectors_offset);
 		if (ret != ERROR_OK)
@@ -1220,48 +1209,10 @@ err_lock:
 	return retval2;
 }
 
-static int stm32l4_protect(struct flash_bank *bank, int set, unsigned int first, unsigned int last)
+static int stm32l4_protect_same_bank(struct flash_bank *bank, enum stm32_bank_id bank_id, int set,
+		unsigned int first, unsigned int last)
 {
-	struct target *target = bank->target;
-	struct stm32l4_flash_bank *stm32l4_info = bank->driver_priv;
-	int ret = ERROR_OK;
 	unsigned int i;
-
-	if (stm32l4_is_otp(bank)) {
-		LOG_ERROR("cannot protect/unprotect OTP memory");
-		return ERROR_FLASH_OPER_UNSUPPORTED;
-	}
-
-	if (target->state != TARGET_HALTED) {
-		LOG_ERROR("Target not halted");
-		return ERROR_TARGET_NOT_HALTED;
-	}
-
-	/* the requested sectors could be located into bank1 and/or bank2 */
-	bool use_bank2 = false;
-	if (last >= stm32l4_info->bank1_sectors) {
-		if (first < stm32l4_info->bank1_sectors) {
-			/* the requested sectors for (un)protection are shared between
-			 * bank 1 and 2, then split the operation */
-
-			/*  1- deal with bank 1 sectors */
-			LOG_DEBUG("The requested sectors for %s are shared between bank 1 and 2",
-					set ? "protection" : "unprotection");
-			ret = stm32l4_protect(bank, set, first, stm32l4_info->bank1_sectors - 1);
-			if (ret != ERROR_OK)
-				return ret;
-
-			/*  2- then continue with bank 2 sectors */
-			first = stm32l4_info->bank1_sectors;
-		}
-
-		use_bank2 = true;
-	}
-
-	/* refresh the sectors' protection */
-	ret = stm32l4_protect_check(bank);
-	if (ret != ERROR_OK)
-		return ret;
 
 	/* check if the desired protection is already configured */
 	for (i = first; i <= last; i++) {
@@ -1278,7 +1229,7 @@ static int stm32l4_protect(struct flash_bank *bank, int set, unsigned int first,
 	unsigned int n_wrp;
 	struct stm32l4_wrp wrpxy[4];
 
-	ret = stm32l4_get_all_wrpxy(bank, use_bank2 ? STM32_BANK2 : STM32_BANK1, wrpxy, &n_wrp);
+	int ret = stm32l4_get_all_wrpxy(bank, bank_id, wrpxy, &n_wrp);
 	if (ret != ERROR_OK)
 		return ret;
 
@@ -1347,6 +1298,40 @@ static int stm32l4_protect(struct flash_bank *bank, int set, unsigned int first,
 
 	/* finally write WRPxy registers */
 	return stm32l4_write_all_wrpxy(bank, wrpxy, n_wrp);
+}
+
+static int stm32l4_protect(struct flash_bank *bank, int set, unsigned int first, unsigned int last)
+{
+	struct target *target = bank->target;
+	struct stm32l4_flash_bank *stm32l4_info = bank->driver_priv;
+
+	if (stm32l4_is_otp(bank)) {
+		LOG_ERROR("cannot protect/unprotect OTP memory");
+		return ERROR_FLASH_OPER_UNSUPPORTED;
+	}
+
+	if (target->state != TARGET_HALTED) {
+		LOG_ERROR("Target not halted");
+		return ERROR_TARGET_NOT_HALTED;
+	}
+
+	/* refresh the sectors' protection */
+	int ret = stm32l4_protect_check(bank);
+	if (ret != ERROR_OK)
+		return ret;
+
+	/* the requested sectors could be located into bank1 and/or bank2 */
+	if (last < stm32l4_info->bank1_sectors) {
+		return stm32l4_protect_same_bank(bank, STM32_BANK1, set, first, last);
+	} else if (first >= stm32l4_info->bank1_sectors) {
+		return stm32l4_protect_same_bank(bank, STM32_BANK2, set, first, last);
+	} else {
+		ret = stm32l4_protect_same_bank(bank, STM32_BANK1, set, first, stm32l4_info->bank1_sectors - 1);
+		if (ret != ERROR_OK)
+			return ret;
+
+		return stm32l4_protect_same_bank(bank, STM32_BANK2, set, stm32l4_info->bank1_sectors, last);
+	}
 }
 
 /* count is the size divided by stm32l4_info->data_width */
@@ -1632,13 +1617,14 @@ err_lock:
 
 static int stm32l4_read_idcode(struct flash_bank *bank, uint32_t *id)
 {
-	int retval;
+	int retval = ERROR_OK;
+	struct target *target = bank->target;
 
 	/* try reading possible IDCODE registers, in the following order */
 	uint32_t dbgmcu_idcode[] = {DBGMCU_IDCODE_L4_G4, DBGMCU_IDCODE_G0, DBGMCU_IDCODE_L5};
 
 	for (unsigned int i = 0; i < ARRAY_SIZE(dbgmcu_idcode); i++) {
-		retval = target_read_u32(bank->target, dbgmcu_idcode[i], id);
+		retval = target_read_u32(target, dbgmcu_idcode[i], id);
 		if ((retval == ERROR_OK) && ((*id & 0xfff) != 0) && ((*id & 0xfff) != 0xfff))
 			return ERROR_OK;
 	}
@@ -1647,12 +1633,16 @@ static int stm32l4_read_idcode(struct flash_bank *bank, uint32_t *id)
 	 * DBGMCU_IDCODE cannot be read using CPU1 (Cortex-M0+) at AP1,
 	 * to solve this read the UID64 (IEEE 64-bit unique device ID register) */
 
-	struct cortex_m_common *cortex_m = target_to_cm(bank->target);
+	struct armv7m_common *armv7m = target_to_armv7m_safe(target);
+	if (!armv7m) {
+		LOG_ERROR("Flash requires Cortex-M target");
+		return ERROR_TARGET_INVALID;
+	}
 
 	/* CPU2 (Cortex-M0+) is supported only with non-hla adapters because it is on AP1.
 	 * Using HLA adapters armv7m.debug_ap is null, and checking ap_num triggers a segfault */
-	if (cortex_m->core_info->partno == CORTEX_M0P_PARTNO &&
-			cortex_m->armv7m.debug_ap && cortex_m->armv7m.debug_ap->ap_num == 1) {
+	if (cortex_m_get_partno_safe(target) == CORTEX_M0P_PARTNO &&
+			armv7m->debug_ap && armv7m->debug_ap->ap_num == 1) {
 		uint32_t uid64_ids;
 
 		/* UID64 is contains
@@ -1662,7 +1652,7 @@ static int stm32l4_read_idcode(struct flash_bank *bank, uint32_t *id)
 		 *
 		 *  read only the fixed values {STID,DEVID} from UID64_IDS to identify the device as STM32WLx
 		 */
-		retval = target_read_u32(bank->target, UID64_IDS, &uid64_ids);
+		retval = target_read_u32(target, UID64_IDS, &uid64_ids);
 		if (retval == ERROR_OK && uid64_ids == UID64_IDS_STM32WL) {
 			/* force the DEV_ID to DEVID_STM32WLE_WL5XX and the REV_ID to unknown */
 			*id = DEVID_STM32WLE_WL5XX;
@@ -1700,10 +1690,20 @@ static const char *get_stm32l4_bank_type_str(struct flash_bank *bank)
 static int stm32l4_probe(struct flash_bank *bank)
 {
 	struct target *target = bank->target;
-	struct armv7m_common *armv7m = target_to_armv7m(target);
 	struct stm32l4_flash_bank *stm32l4_info = bank->driver_priv;
 	const struct stm32l4_part_info *part_info;
 	uint16_t flash_size_kb = 0xffff;
+
+	if (!target_was_examined(target)) {
+		LOG_ERROR("Target not examined yet");
+		return ERROR_TARGET_NOT_EXAMINED;
+	}
+
+	struct armv7m_common *armv7m = target_to_armv7m_safe(target);
+	if (!armv7m) {
+		LOG_ERROR("Flash requires Cortex-M target");
+		return ERROR_TARGET_INVALID;
+	}
 
 	stm32l4_info->probed = false;
 
@@ -1742,7 +1742,7 @@ static int stm32l4_probe(struct flash_bank *bank)
 	 * Ask the flash infrastructure to ensure required alignment */
 	bank->write_start_alignment = bank->write_end_alignment = stm32l4_info->data_width;
 
-	/* initialise the flash registers layout */
+	/* Initialize the flash registers layout */
 	if (part_info->flags & F_HAS_L5_FLASH_REGS)
 		stm32l4_info->flash_regs = stm32l5_ns_flash_regs;
 	else
@@ -1755,7 +1755,7 @@ static int stm32l4_probe(struct flash_bank *bank)
 
 	stm32l4_sync_rdp_tzen(bank);
 
-	/* for devices with trustzone, use flash secure registers when TZEN=1 and RDP is LEVEL_0 */
+	/* for devices with TrustZone, use flash secure registers when TZEN=1 and RDP is LEVEL_0 */
 	if (stm32l4_info->tzen && (stm32l4_info->rdp == RDP_LEVEL_0)) {
 		if (part_info->flags & F_HAS_L5_FLASH_REGS) {
 			stm32l4_info->flash_regs_base |= STM32L5_REGS_SEC_OFFSET;
@@ -1816,7 +1816,7 @@ static int stm32l4_probe(struct flash_bank *bank)
 		flash_size_kb = stm32l4_info->user_bank_size / 1024;
 	}
 
-	LOG_INFO("flash size = %dkbytes", flash_size_kb);
+	LOG_INFO("flash size = %d KiB", flash_size_kb);
 
 	/* did we assign a flash size? */
 	assert((flash_size_kb != 0xffff) && flash_size_kb);
@@ -1972,6 +1972,15 @@ static int stm32l4_probe(struct flash_bank *bank)
 		return ERROR_FAIL;
 	}
 
+	/* ensure that at least there is 1 flash sector / page */
+	if (num_pages == 0) {
+		if (stm32l4_info->user_bank_size)
+			LOG_ERROR("The specified flash size is less than page size");
+
+		LOG_ERROR("Flash pages count cannot be zero");
+		return ERROR_FAIL;
+	}
+
 	LOG_INFO("flash mode : %s-bank", stm32l4_info->dual_bank_mode ? "dual" : "single");
 
 	const int gap_size_kb = stm32l4_info->hole_sectors * page_size_kb;
@@ -2031,8 +2040,19 @@ static int stm32l4_auto_probe(struct flash_bank *bank)
 	if (stm32l4_info->probed) {
 		uint32_t optr_cur;
 
+		/* save flash_regs_base */
+		uint32_t saved_flash_regs_base = stm32l4_info->flash_regs_base;
+
+		/* for devices with TrustZone, use NS flash registers to read OPTR */
+		if (stm32l4_info->part_info->flags & F_HAS_L5_FLASH_REGS)
+			stm32l4_info->flash_regs_base &= ~STM32L5_REGS_SEC_OFFSET;
+
 		/* read flash option register and re-probe if optr value is changed */
 		int retval = stm32l4_read_flash_reg_by_index(bank, STM32_FLASH_OPTR_INDEX, &optr_cur);
+
+		/* restore saved flash_regs_base */
+		stm32l4_info->flash_regs_base = saved_flash_regs_base;
+
 		if (retval != ERROR_OK)
 			return retval;
 

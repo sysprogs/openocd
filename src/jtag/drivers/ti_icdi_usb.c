@@ -1,20 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *                                                                         *
  *   Copyright (C) 2012 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -23,6 +12,7 @@
 
 /* project specific includes */
 #include <helper/binarybuffer.h>
+#include <jtag/adapter.h>
 #include <jtag/interface.h>
 #include <jtag/hla/hla_layout.h>
 #include <jtag/hla/hla_transport.h>
@@ -36,8 +26,8 @@
 #define ICDI_WRITE_ENDPOINT 0x02
 #define ICDI_READ_ENDPOINT 0x83
 
-#define ICDI_WRITE_TIMEOUT 1000
-#define ICDI_READ_TIMEOUT 1000
+#define ICDI_WRITE_TIMEOUT (LIBUSB_TIMEOUT_MS)
+#define ICDI_READ_TIMEOUT (LIBUSB_TIMEOUT_MS)
 #define ICDI_PACKET_SIZE 2048
 
 #define PACKET_START "$"
@@ -689,11 +679,11 @@ static int icdi_usb_open(struct hl_interface_param_s *param, void **fd)
 
 	for (uint8_t i = 0; param->vid[i] && param->pid[i]; ++i)
 		LOG_DEBUG("transport: %d vid: 0x%04x pid: 0x%04x serial: %s", param->transport,
-			param->vid[i], param->pid[i], param->serial ? param->serial : "");
+			param->vid[i], param->pid[i], adapter_get_required_serial() ? adapter_get_required_serial() : "");
 
 	/* TI (Stellaris) ICDI provides its serial number in the USB descriptor;
 	   no need to provide a callback here. */
-	jtag_libusb_open(param->vid, param->pid, param->serial, &h->usb_dev, NULL);
+	jtag_libusb_open(param->vid, param->pid, &h->usb_dev, NULL);
 
 	if (!h->usb_dev) {
 		LOG_ERROR("open failed");

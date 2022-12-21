@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
@@ -7,19 +9,6 @@
  *                                                                         *
  *   Copyright (C) 2008 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifndef OPENOCD_TARGET_CORTEX_M_H
@@ -28,7 +17,7 @@
 #include "armv7m.h"
 #include "helper/bits.h"
 
-#define CORTEX_M_COMMON_MAGIC 0x1A451A45
+#define CORTEX_M_COMMON_MAGIC 0x1A451A45U
 
 #define SYSTEM_CONTROL_BASE 0x400FE000
 
@@ -46,6 +35,8 @@
 #define ARM_CPUID_PARTNO_MASK	(0xFFF << ARM_CPUID_PARTNO_POS)
 
 enum cortex_m_partno {
+	CORTEX_M_PARTNO_INVALID,
+	STAR_MC1_PARTNO    = 0x132,
 	CORTEX_M0_PARTNO   = 0xC20,
 	CORTEX_M1_PARTNO   = 0xC21,
 	CORTEX_M3_PARTNO   = 0xC23,
@@ -76,6 +67,9 @@ struct cortex_m_part_info {
 #define DCB_DCRDR	0xE000EDF8
 #define DCB_DEMCR	0xE000EDFC
 #define DCB_DSCSR	0xE000EE08
+
+#define DAUTHSTATUS	0xE000EFB8
+#define DAUTHSTATUS_SID_MASK	0x00000030
 
 #define DCRSR_WNR	BIT(16)
 
@@ -210,10 +204,15 @@ enum cortex_m_isrmasking_mode {
 };
 
 struct cortex_m_common {
-	int common_magic;
+	unsigned int common_magic;
+
+	struct armv7m_common armv7m;
 
 	/* Context information */
 	uint32_t dcb_dhcsr;
+	uint32_t dcb_dhcsr_cumulated_sticky;
+	/* DCB DHCSR has been at least once read, so the sticky bits have been reset */
+	bool dcb_dhcsr_sticky_is_recent;
 	uint32_t nvic_dfsr;  /* Debug Fault Status Register - shows reason for debug halt */
 	uint32_t nvic_icsr;  /* Interrupt Control State Register - shows active and pending IRQ */
 
@@ -236,20 +235,78 @@ struct cortex_m_common {
 	enum cortex_m_isrmasking_mode isrmasking_mode;
 
 	const struct cortex_m_part_info *core_info;
-	struct armv7m_common armv7m;
 
-	int apsel;
+	bool slow_register_read;	/* A register has not been ready, poll S_REGRDY */
+
+	uint64_t apsel;
 
 	/* Whether this target has the erratum that makes C_MASKINTS not apply to
 	 * already pending interrupts */
 	bool maskints_erratum;
 };
 
+static inline bool is_cortex_m_or_hla(const struct cortex_m_common *cortex_m)
+{
+	return cortex_m->common_magic == CORTEX_M_COMMON_MAGIC;
+}
+
+static inline bool is_cortex_m_with_dap_access(const struct cortex_m_common *cortex_m)
+{
+	if (!is_cortex_m_or_hla(cortex_m))
+		return false;
+
+	return !cortex_m->armv7m.is_hla_target;
+}
+
+/**
+ * @returns the pointer to the target specific struct
+ * without matching a magic number.
+ * Use in target specific service routines, where the correct
+ * type of arch_info is certain.
+ */
 static inline struct cortex_m_common *
 target_to_cm(struct target *target)
 {
 	return container_of(target->arch_info,
-			struct cortex_m_common, armv7m);
+			struct cortex_m_common, armv7m.arm);
+}
+
+/**
+ * @returns the pointer to the target specific struct
+ * or NULL if the magic number does not match.
+ * Use in a flash driver or any place where mismatch of the arch_info
+ * type can happen.
+ */
+static inline struct cortex_m_common *
+target_to_cortex_m_safe(struct target *target)
+{
+	/* Check the parent types first to prevent peeking memory too far
+	 * from arch_info pointer */
+	if (!target_to_armv7m_safe(target))
+		return NULL;
+
+	struct cortex_m_common *cortex_m = target_to_cm(target);
+	if (!is_cortex_m_or_hla(cortex_m))
+		return NULL;
+
+	return cortex_m;
+}
+
+/**
+ * @returns cached value of Cortex-M part number
+ * or CORTEX_M_PARTNO_INVALID if the magic number does not match
+ * or core_info is not initialised.
+ */
+static inline enum cortex_m_partno cortex_m_get_partno_safe(struct target *target)
+{
+	struct cortex_m_common *cortex_m = target_to_cortex_m_safe(target);
+	if (!cortex_m)
+		return CORTEX_M_PARTNO_INVALID;
+
+	if (!cortex_m->core_info)
+		return CORTEX_M_PARTNO_INVALID;
+
+	return cortex_m->core_info->partno;
 }
 
 int cortex_m_examine(struct target *target);

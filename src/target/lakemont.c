@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /*
  * Copyright(c) 2013-2016 Intel Corporation.
  *
@@ -7,19 +9,6 @@
  * Julien Carreno (julien.carreno@intel.com)
  * Jeffrey Maxwell (jeffrey.r.maxwell@intel.com)
  * Jessica Gomez (jessica.gomez.hernandez@intel.com)
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Contact Information:
  * Intel Corporation
@@ -1024,10 +1013,10 @@ int lakemont_resume(struct target *t, int current, target_addr_t address,
 
 		/* if breakpoints are enabled, we need to redirect these into probe mode */
 		struct breakpoint *activeswbp = t->breakpoints;
-		while (activeswbp && activeswbp->set == 0)
+		while (activeswbp && !activeswbp->is_set)
 			activeswbp = activeswbp->next;
 		struct watchpoint *activehwbp = t->watchpoints;
-		while (activehwbp && activehwbp->set == 0)
+		while (activehwbp && !activehwbp->is_set)
 			activehwbp = activehwbp->next;
 		if (activeswbp || activehwbp)
 			buf_set_u32(x86_32->cache->reg_list[PMCR].value, 0, 32, 1);

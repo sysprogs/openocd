@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2011 by Broadcom Corporation                            *
  *   Evan Hunter - ehunter@broadcom.com                                    *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -127,6 +116,7 @@ enum freertos_symbol_values {
 	FREERTOS_VAL_X_SUSPENDED_TASK_LIST = 8,
 	FREERTOS_VAL_UX_CURRENT_NUMBER_OF_TASKS = 9,
 	FREERTOS_VAL_UX_TOP_USED_PRIORITY = 10,
+	FREERTOS_VAL_X_SCHEDULER_RUNNING = 11,
 };
 
 struct symbols {
@@ -146,6 +136,7 @@ static const struct symbols freertos_symbol_list[] = {
 	{ "xSuspendedTaskList", true }, /* Only if INCLUDE_vTaskSuspend */
 	{ "uxCurrentNumberOfTasks", false },
 	{ "uxTopUsedPriority", true }, /* Unavailable since v7.5.3 */
+	{ "xSchedulerRunning", false },
 	{ NULL, false }
 };
 
@@ -205,7 +196,20 @@ static int freertos_update_threads(struct rtos *rtos)
 										rtos->symbols[FREERTOS_VAL_PX_CURRENT_TCB].address,
 										rtos->current_thread);
 
-	if ((thread_list_size  == 0) || (rtos->current_thread == 0)) {
+	/* read scheduler running */
+	uint32_t scheduler_running;
+	retval = target_read_u32(rtos->target,
+			rtos->symbols[FREERTOS_VAL_X_SCHEDULER_RUNNING].address,
+			&scheduler_running);
+	if (retval != ERROR_OK) {
+		LOG_ERROR("Error reading FreeRTOS scheduler state");
+		return retval;
+	}
+	LOG_DEBUG("FreeRTOS: Read xSchedulerRunning at 0x%" PRIx64 ", value 0x%" PRIx32,
+										rtos->symbols[FREERTOS_VAL_X_SCHEDULER_RUNNING].address,
+										scheduler_running);
+
+	if ((thread_list_size  == 0) || (rtos->current_thread == 0) || (scheduler_running != 1)) {
 		/* Either : No RTOS threads - there is always at least the current execution though */
 		/* OR     : No current thread - all threads suspended - show the current execution
 		 * of idling */
@@ -218,7 +222,8 @@ static int freertos_update_threads(struct rtos *rtos)
 			LOG_ERROR("Error allocating memory for %d threads", thread_list_size);
 			return ERROR_FAIL;
 		}
-		rtos->thread_details->threadid = 1;
+		rtos->current_thread = 1;
+		rtos->thread_details->threadid = rtos->current_thread;
 		rtos->thread_details->exists = true;
 		rtos->thread_details->extra_info_str = NULL;
 		rtos->thread_details->thread_name_str = malloc(sizeof(tmp_str));
@@ -432,7 +437,8 @@ static int freertos_get_thread_reg_list(struct rtos *rtos, int64_t thread_id,
 	int cm4_fpu_enabled = 0;
 	struct armv7m_common *armv7m_target = target_to_armv7m(rtos->target);
 	if (is_armv7m(armv7m_target)) {
-		if (armv7m_target->fp_feature == FPV4_SP) {
+		if ((armv7m_target->fp_feature == FPV4_SP) || (armv7m_target->fp_feature == FPV5_SP) ||
+				(armv7m_target->fp_feature == FPV5_DP)) {
 			/* Found ARM v7m target which includes a FPU */
 			uint32_t cpacr;
 

@@ -1,19 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *                                                                         *
  * Copyright (C) ST-Ericsson SA 2011                                       *
  * Author: Michel Jaouen <michel.jaouen@stericsson.com> for ST-Ericsson.   *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -28,6 +18,7 @@
 #include "smp.h"
 #include "helper/binarybuffer.h"
 
+/* DEPRECATED: gdb_read_smp_packet/gdb_write_smp_packet to be removed      */
 /*  implementation of new packet in gdb interface for smp feature          */
 /*                                                                         */
 /*   j : smp  status request                                               */
@@ -53,11 +44,15 @@
 /*  maint packet jc                                                        */
 
 /* packet j :smp status request */
+#define DEPRECATED_MSG "DEPRECATED: This method is deprecated in favor of the hwthread pseudo RTOS"
 int gdb_read_smp_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
 	struct target *target = get_target_from_connection(connection);
 	int retval = ERROR_OK;
+
+	LOG_WARNING(DEPRECATED_MSG);
+
 	if (target->smp) {
 		if (strncmp(packet, "jc", 2) == 0) {
 			const uint32_t len = sizeof(target->gdb_service->core[0]);
@@ -82,6 +77,8 @@ int gdb_write_smp_packet(struct connection *connection,
 	char *separator;
 	int coreid = 0;
 	int retval = ERROR_OK;
+
+	LOG_WARNING(DEPRECATED_MSG);
 
 	/* skip command character */
 	if (target->smp) {
@@ -111,18 +108,18 @@ COMMAND_HANDLER(default_handle_smp_command)
 	}
 
 	if (!strcmp(CMD_ARGV[0], "on")) {
-		foreach_smp_target(head, target->head)
+		foreach_smp_target(head, target->smp_targets)
 			head->target->smp = 1;
 
 		return ERROR_OK;
 	}
 
 	if (!strcmp(CMD_ARGV[0], "off")) {
-		foreach_smp_target(head, target->head)
+		foreach_smp_target(head, target->smp_targets)
 			head->target->smp = 0;
 
 		/* fixes the target display to the debugger */
-		if (target->head)
+		if (!list_empty(target->smp_targets))
 			target->gdb_service->target = target;
 
 		return ERROR_OK;
@@ -135,9 +132,7 @@ COMMAND_HANDLER(handle_smp_gdb_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
 	int retval = ERROR_OK;
-	struct target_list *head;
-	head = target->head;
-	if (head) {
+	if (!list_empty(target->smp_targets)) {
 		if (CMD_ARGC == 1) {
 			int coreid = 0;
 			COMMAND_PARSE_NUMBER(int, CMD_ARGV[0], coreid);

@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 /*
  * Support for RISC-V, debug version 0.13, which is currently (2/4/17) the
@@ -34,7 +34,7 @@ static int riscv013_step_or_resume_current_hart(struct target *target,
 		bool step, bool use_hasel);
 static void riscv013_clear_abstract_error(struct target *target);
 
-/* Implementations of the functions in riscv_info_t. */
+/* Implementations of the functions in struct riscv_info. */
 static int riscv013_get_register(struct target *target,
 		riscv_reg_t *value, int rid);
 static int riscv013_set_register(struct target *target, int regid, uint64_t value);
@@ -67,9 +67,9 @@ static int write_memory(struct target *target, target_addr_t address,
 		uint32_t size, uint32_t count, const uint8_t *buffer);
 static int riscv013_test_sba_config_reg(struct target *target, target_addr_t legal_address,
 		uint32_t num_words, target_addr_t illegal_address, bool run_sbbusyerror_test);
-void write_memory_sba_simple(struct target *target, target_addr_t addr, uint32_t *write_data,
+static void write_memory_sba_simple(struct target *target, target_addr_t addr, uint32_t *write_data,
 		uint32_t write_size, uint32_t sbcs);
-void read_memory_sba_simple(struct target *target, target_addr_t addr,
+static void read_memory_sba_simple(struct target *target, target_addr_t addr,
 		uint32_t *rd_buf, uint32_t read_size, uint32_t sbcs);
 
 /**
@@ -221,14 +221,14 @@ typedef struct {
 	dm013_info_t *dm;
 } riscv013_info_t;
 
-LIST_HEAD(dm_list);
+static LIST_HEAD(dm_list);
 
 static riscv013_info_t *get_info(const struct target *target)
 {
-	riscv_info_t *info = (riscv_info_t *) target->arch_info;
+	struct riscv_info *info = target->arch_info;
 	assert(info);
 	assert(info->version_specific);
-	return (riscv013_info_t *) info->version_specific;
+	return info->version_specific;
 }
 
 /**
@@ -236,7 +236,7 @@ static riscv013_info_t *get_info(const struct target *target)
  * global list of DMs. If it's not in there, then create one and initialize it
  * to 0.
  */
-dm013_info_t *get_dm(struct target *target)
+static dm013_info_t *get_dm(struct target *target)
 {
 	RISCV013_INFO(info);
 	if (info->dm)
@@ -683,7 +683,7 @@ static int dmi_write_exec(struct target *target, uint32_t address,
 	return dmi_op(target, NULL, NULL, DMI_OP_WRITE, address, value, true, ensure_success);
 }
 
-int dmstatus_read_timeout(struct target *target, uint32_t *dmstatus,
+static int dmstatus_read_timeout(struct target *target, uint32_t *dmstatus,
 		bool authenticated, unsigned timeout_sec)
 {
 	int result = dmi_op_timeout(target, dmstatus, NULL, DMI_OP_READ,
@@ -705,7 +705,7 @@ int dmstatus_read_timeout(struct target *target, uint32_t *dmstatus,
 	return ERROR_OK;
 }
 
-int dmstatus_read(struct target *target, uint32_t *dmstatus,
+static int dmstatus_read(struct target *target, uint32_t *dmstatus,
 		bool authenticated)
 {
 	return dmstatus_read_timeout(target, dmstatus, authenticated,
@@ -721,7 +721,7 @@ static void increase_ac_busy_delay(struct target *target)
 			info->ac_busy_delay);
 }
 
-uint32_t abstract_register_size(unsigned width)
+static uint32_t __attribute__((unused)) abstract_register_size(unsigned width)
 {
 	switch (width) {
 		case 32:
@@ -1199,10 +1199,7 @@ static int scratch_reserve(struct target *target,
 static int scratch_release(struct target *target,
 		scratch_mem_t *scratch)
 {
-	if (scratch->area)
-		return target_free_working_area(target, scratch->area);
-
-	return ERROR_OK;
+	return target_free_working_area(target, scratch->area);
 }
 
 static int scratch_read64(struct target *target, scratch_mem_t *scratch,
@@ -1527,7 +1524,10 @@ static int wait_for_authbusy(struct target *target, uint32_t *dmstatus)
 static void deinit_target(struct target *target)
 {
 	LOG_DEBUG("riscv_deinit_target()");
-	riscv_info_t *info = (riscv_info_t *) target->arch_info;
+	struct riscv_info *info = target->arch_info;
+	if (!info)
+		return;
+
 	free(info->version_specific);
 	/* TODO: free register arch_info */
 	info->version_specific = NULL;
@@ -1873,7 +1873,7 @@ static unsigned riscv013_data_bits(struct target *target)
 	return 32;
 }
 
-COMMAND_HELPER(riscv013_print_info, struct target *target)
+static COMMAND_HELPER(riscv013_print_info, struct target *target)
 {
 	RISCV013_INFO(info);
 
@@ -2311,9 +2311,11 @@ static int init_target(struct command_context *cmd_ctx,
 	generic_info->hart_count = &riscv013_hart_count;
 	generic_info->data_bits = &riscv013_data_bits;
 	generic_info->print_info = &riscv013_print_info;
-	generic_info->version_specific = calloc(1, sizeof(riscv013_info_t));
-	if (!generic_info->version_specific)
-		return ERROR_FAIL;
+	if (!generic_info->version_specific) {
+		generic_info->version_specific = calloc(1, sizeof(riscv013_info_t));
+		if (!generic_info->version_specific)
+			return ERROR_FAIL;
+	}
 	generic_info->sample_memory = sample_memory;
 	riscv013_info_t *info = get_info(target);
 
@@ -2357,9 +2359,7 @@ static int assert_reset(struct target *target)
 		/* TODO: Try to use hasel in dmcontrol */
 
 		/* Set haltreq for each hart. */
-		uint32_t control = control_base;
-
-		control = set_hartsel(control_base, target->coreid);
+		uint32_t control = set_hartsel(control_base, target->coreid);
 		control = set_field(control, DM_DMCONTROL_HALTREQ,
 				target->reset_halt ? 1 : 0);
 		dmi_write(target, DM_DMCONTROL, control);
@@ -2398,11 +2398,11 @@ static int deassert_reset(struct target *target)
 	select_dmi(target);
 
 	/* Clear the reset, but make sure haltreq is still set */
-	uint32_t control = 0;
-	control = set_field(control, DM_DMCONTROL_HALTREQ, target->reset_halt ? 1 : 0);
+	uint32_t control = 0, control_haltreq;
 	control = set_field(control, DM_DMCONTROL_DMACTIVE, 1);
+	control_haltreq = set_field(control, DM_DMCONTROL_HALTREQ, target->reset_halt ? 1 : 0);
 	dmi_write(target, DM_DMCONTROL,
-			set_hartsel(control, r->current_hartid));
+			set_hartsel(control_haltreq, r->current_hartid));
 
 	uint32_t dmstatus;
 	int dmi_busy_delay = info->dmi_busy_delay;
@@ -2414,7 +2414,7 @@ static int deassert_reset(struct target *target)
 			if (index != target->coreid)
 				continue;
 			dmi_write(target, DM_DMCONTROL,
-					set_hartsel(control, index));
+					set_hartsel(control_haltreq, index));
 		} else {
 			index = r->current_hartid;
 		}
@@ -2450,7 +2450,7 @@ static int deassert_reset(struct target *target)
 		target->state = TARGET_HALTED;
 
 		if (get_field(dmstatus, DM_DMSTATUS_ALLHAVERESET)) {
-			/* Ack reset. */
+			/* Ack reset and clear DM_DMCONTROL_HALTREQ if previously set */
 			dmi_write(target, DM_DMCONTROL,
 					set_hartsel(control, index) |
 					DM_DMCONTROL_ACKHAVERESET);
@@ -4174,7 +4174,7 @@ static int select_prepped_harts(struct target *target, bool *use_hasel)
 	unsigned total_selected = 0;
 	list_for_each_entry(entry, &dm->target_list, list) {
 		struct target *t = entry->target;
-		riscv_info_t *r = riscv_info(t);
+		struct riscv_info *r = riscv_info(t);
 		riscv013_info_t *info = get_info(t);
 		unsigned index = info->index;
 		LOG_DEBUG("index=%d, coreid=%d, prepped=%d", index, t->coreid, r->prepped);
@@ -4461,7 +4461,9 @@ static int riscv013_test_sba_config_reg(struct target *target,
 
 	uint32_t rd_val;
 	uint32_t sbcs_orig;
-	dmi_read(target, &sbcs_orig, DM_SBCS);
+	int retval = dmi_read(target, &sbcs_orig, DM_SBCS);
+	if (retval != ERROR_OK)
+		return retval;
 
 	uint32_t sbcs = sbcs_orig;
 	bool test_passed;
@@ -4699,7 +4701,7 @@ static int riscv013_test_sba_config_reg(struct target *target,
 
 }
 
-void write_memory_sba_simple(struct target *target, target_addr_t addr,
+static void write_memory_sba_simple(struct target *target, target_addr_t addr,
 		uint32_t *write_data, uint32_t write_size, uint32_t sbcs)
 {
 	RISCV013_INFO(info);
@@ -4729,7 +4731,7 @@ void write_memory_sba_simple(struct target *target, target_addr_t addr,
 		dmi_write(target, DM_SBDATA0+i, write_data[i]);
 }
 
-void read_memory_sba_simple(struct target *target, target_addr_t addr,
+static void read_memory_sba_simple(struct target *target, target_addr_t addr,
 		uint32_t *rd_buf, uint32_t read_size, uint32_t sbcs)
 {
 	RISCV013_INFO(info);

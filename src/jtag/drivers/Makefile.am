@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 noinst_LTLIBRARIES += %D%/libocdjtagdrivers.la
 %C%_libocdjtagdrivers_la_LIBADD =
 
@@ -75,6 +77,9 @@ endif
 if JTAG_VPI
 DRIVERFILES += %D%/jtag_vpi.c
 endif
+if VDEBUG
+DRIVERFILES += %D%/vdebug.c
+endif
 if JTAG_DPI
 DRIVERFILES += %D%/jtag_dpi.c
 endif
@@ -102,6 +107,9 @@ DRIVERFILES += %D%/bitq.c
 endif
 if PRESTO
 DRIVERFILES += %D%/presto.c
+endif
+if ESP_USB_JTAG
+DRIVERFILES += %D%/esp_usb_jtag.c
 endif
 if USBPROG
 DRIVERFILES += %D%/usbprog.c
@@ -184,6 +192,9 @@ DRIVERFILES += %D%/picoprobe.c
 endif
 if XDS110
 DRIVERFILES += %D%/xds110.c
+endif
+if AM335XGPIO
+DRIVERFILES += %D%/am335xgpio.c
 endif
 
 DRIVERHEADERS = \

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # Defines basic Tcl procs that must exist for OpenOCD scripts to work.
 #
 # Embedded into OpenOCD executable
@@ -27,5 +29,27 @@ proc script {filename} {
 }
 add_help_text script "filename of OpenOCD script (tcl) to run"
 add_usage_text script "<file>"
+
+# Run a list of post-init commands
+# Each command should be added with 'lappend post_init_commands command'
+lappend _telnet_autocomplete_skip _run_post_init_commands
+proc _run_post_init_commands {} {
+	if {[info exists ::post_init_commands]} {
+		foreach cmd $::post_init_commands {
+			eval $cmd
+		}
+	}
+}
+
+# Run a list of pre-shutdown commands
+# Each command should be added with 'lappend pre_shutdown_commands command'
+lappend _telnet_autocomplete_skip _run_pre_shutdown_commands
+proc _run_pre_shutdown_commands {} {
+	if {[info exists ::pre_shutdown_commands]} {
+		foreach cmd $::pre_shutdown_commands {
+			eval $cmd
+		}
+	}
+}
 
 #########

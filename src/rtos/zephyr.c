@@ -1,11 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2017 by Intel Corporation
  *   Leandro Pereira <leandro.pereira@intel.com>
  *   Daniel Glöckner <dg@emlix.com>*
  *   Copyright (C) 2021 by Synopsys, Inc.
  *   Evgeniy Didin <didin@synopsys.com>
- *                                                                         *
- *   SPDX-License-Identifier: GPL-2.0-or-later                             *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -136,7 +136,7 @@ static const struct stack_register_offset arm_cpu_saved[] = {
 	{ ARMV7M_R13,  -2, 32 },
 	{ ARMV7M_R14,  20, 32 },
 	{ ARMV7M_PC,   24, 32 },
-	{ ARMV7M_xPSR, 28, 32 },
+	{ ARMV7M_XPSR, 28, 32 },
 };
 
 static struct stack_register_offset arc_cpu_saved[] = {
@@ -375,15 +375,15 @@ static const struct symbol_table_elem zephyr_symbol_list[] = {
 		.optional = false
 	},
 	{
-		.symbol_name = "_kernel_openocd_offsets",
+		.symbol_name = "_kernel_thread_info_offsets",
 		.optional = false
 	},
 	{
-		.symbol_name = "_kernel_openocd_size_t_size",
+		.symbol_name = "_kernel_thread_info_size_t_size",
 		.optional = false
 	},
 	{
-		.symbol_name = "_kernel_openocd_num_offsets",
+		.symbol_name = "_kernel_thread_info_num_offsets",
 		.optional = true
 	},
 	{

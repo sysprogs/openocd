@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2007 by Juergen Stuber <juergen@jstuber.net>            *
  *   based on Dominic Rath's and Benedikt Sauter's usbprog.c               *
@@ -13,19 +15,6 @@
  *                                                                         *
  *   Copyright (C) 2015 by Paul Fertser                                    *
  *   fercerpav@gmail.com                                                   *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -114,8 +103,6 @@ static int jlink_flush(void);
  * @param in A pointer to store TDO data to, if NULL the data will be discarded.
  * @param in_offset A bit offset for TDO data.
  * @param length Amount of bits to transfer out and in.
- *
- * @retval This function doesn't return any value.
  */
 static void jlink_clock_data(const uint8_t *out, unsigned out_offset,
 			     const uint8_t *tms_out, unsigned tms_offset,
@@ -669,6 +656,23 @@ static int jlink_init(void)
 		return ERROR_JTAG_INIT_FAILED;
 	}
 
+	const char *serial = adapter_get_required_serial();
+	if (serial) {
+		ret = jaylink_parse_serial_number(serial, &serial_number);
+		if (ret == JAYLINK_ERR) {
+			LOG_ERROR("Invalid serial number: %s", serial);
+			jaylink_exit(jayctx);
+			return ERROR_JTAG_INIT_FAILED;
+		}
+		if (ret != JAYLINK_OK) {
+			LOG_ERROR("jaylink_parse_serial_number() failed: %s", jaylink_strerror(ret));
+			jaylink_exit(jayctx);
+			return ERROR_JTAG_INIT_FAILED;
+		}
+		use_serial_number = true;
+		use_usb_address = false;
+	}
+
 	bool found_device;
 	ret = jlink_open_device(JAYLINK_HIF_USB, &found_device);
 	if (ret != ERROR_OK)
@@ -979,34 +983,7 @@ COMMAND_HANDLER(jlink_usb_command)
 
 	usb_address = tmp;
 
-	use_serial_number = false;
 	use_usb_address = true;
-
-	return ERROR_OK;
-}
-
-COMMAND_HANDLER(jlink_serial_command)
-{
-	int ret;
-
-	if (CMD_ARGC != 1) {
-		command_print(CMD, "Need exactly one argument for jlink serial");
-		return ERROR_COMMAND_SYNTAX_ERROR;
-	}
-
-	ret = jaylink_parse_serial_number(CMD_ARGV[0], &serial_number);
-
-	if (ret == JAYLINK_ERR) {
-		command_print(CMD, "Invalid serial number: %s", CMD_ARGV[0]);
-		return ERROR_FAIL;
-	} else if (ret != JAYLINK_OK) {
-		command_print(CMD, "jaylink_parse_serial_number() failed: %s",
-			jaylink_strerror(ret));
-		return ERROR_FAIL;
-	}
-
-	use_serial_number = true;
-	use_usb_address = false;
 
 	return ERROR_OK;
 }
@@ -1933,13 +1910,6 @@ static const struct command_registration jlink_subcommand_handlers[] = {
 		.usage = "<0-3>"
 	},
 	{
-		.name = "serial",
-		.handler = &jlink_serial_command,
-		.mode = COMMAND_CONFIG,
-		.help = "set the serial number of the device that should be used",
-		.usage = "<serial number>"
-	},
-	{
 		.name = "config",
 		.handler = &jlink_handle_config_command,
 		.mode = COMMAND_EXEC,
@@ -2148,10 +2118,30 @@ static int jlink_swd_switch_seq(enum swd_special_seq seq)
 			s = swd_seq_jtag_to_swd;
 			s_len = swd_seq_jtag_to_swd_len;
 			break;
+		case JTAG_TO_DORMANT:
+			LOG_DEBUG("JTAG-to-DORMANT");
+			s = swd_seq_jtag_to_dormant;
+			s_len = swd_seq_jtag_to_dormant_len;
+			break;
 		case SWD_TO_JTAG:
 			LOG_DEBUG("SWD-to-JTAG");
 			s = swd_seq_swd_to_jtag;
 			s_len = swd_seq_swd_to_jtag_len;
+			break;
+		case SWD_TO_DORMANT:
+			LOG_DEBUG("SWD-to-DORMANT");
+			s = swd_seq_swd_to_dormant;
+			s_len = swd_seq_swd_to_dormant_len;
+			break;
+		case DORMANT_TO_SWD:
+			LOG_DEBUG("DORMANT-to-SWD");
+			s = swd_seq_dormant_to_swd;
+			s_len = swd_seq_dormant_to_swd_len;
+			break;
+		case DORMANT_TO_JTAG:
+			LOG_DEBUG("DORMANT-to-JTAG");
+			s = swd_seq_dormant_to_jtag;
+			s_len = swd_seq_dormant_to_jtag_len;
 			break;
 		default:
 			LOG_ERROR("Sequence %d not supported", seq);

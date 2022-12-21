@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
@@ -7,19 +9,6 @@
  *                                                                         *
  *   Copyright (C) 2008 Rob Brown, Lou Deluxe                              *
  *   rob@cobbleware.com, lou.openocd012@fixit.nospammail.net               *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -58,8 +47,6 @@
 #define USB_EP2IN_ADDR          (USB_EP2OUT_ADDR | 0x80)
 #define USB_EP2IN_SIZE          (USB_EP2OUT_SIZE)
 #define USB_EP2BANK_SIZE        (512)
-
-#define USB_TIMEOUT_MS          (3 * 1000)
 
 #define DTC_STATUS_POLL_BYTE    (ST7_USB_BUF_EP0OUT + 0xff)
 
@@ -133,7 +120,7 @@ static int ep1_generic_commandl(struct libusb_device_handle *hdev_param, size_t 
 			hdev_param,
 			USB_EP1OUT_ADDR,
 			(char *)usb_buffer, sizeof(usb_buffer),
-			USB_TIMEOUT_MS,
+			LIBUSB_TIMEOUT_MS,
 			&transferred
 			);
 
@@ -176,7 +163,7 @@ static ssize_t ep1_memory_read(
 		usb_ret = jtag_libusb_bulk_write(
 				hdev_param, USB_EP1OUT_ADDR,
 				(char *)usb_buffer, sizeof(usb_buffer),
-				USB_TIMEOUT_MS,
+				LIBUSB_TIMEOUT_MS,
 				&transferred
 				);
 
@@ -186,7 +173,7 @@ static ssize_t ep1_memory_read(
 		usb_ret = jtag_libusb_bulk_read(
 				hdev_param, USB_EP1IN_ADDR,
 				(char *)buffer, length,
-				USB_TIMEOUT_MS,
+				LIBUSB_TIMEOUT_MS,
 				&transferred
 				);
 
@@ -241,7 +228,7 @@ static ssize_t ep1_memory_write(struct libusb_device_handle *hdev_param, uint16_
 		usb_ret = jtag_libusb_bulk_write(
 				hdev_param, USB_EP1OUT_ADDR,
 				(char *)usb_buffer, sizeof(usb_buffer),
-				USB_TIMEOUT_MS,
+				LIBUSB_TIMEOUT_MS,
 				&transferred
 				);
 
@@ -432,7 +419,7 @@ static int dtc_start_download(void)
 	usb_err = jtag_libusb_bulk_read(
 			hdev, USB_EP1IN_ADDR,
 			(char *)&ep2txr, 1,
-			USB_TIMEOUT_MS,
+			LIBUSB_TIMEOUT_MS,
 			&transferred
 			);
 	if (usb_err != ERROR_OK)
@@ -462,7 +449,7 @@ static int dtc_start_download(void)
 	usb_err = jtag_libusb_bulk_read(
 			hdev, USB_EP1IN_ADDR,
 			(char *)&ep2txr, 1,
-			USB_TIMEOUT_MS,
+			LIBUSB_TIMEOUT_MS,
 			&transferred
 			);
 
@@ -488,7 +475,7 @@ static int dtc_run_download(
 			hdev_param,
 			USB_EP2OUT_ADDR,
 			(char *)command_buffer, USB_EP2BANK_SIZE,
-			USB_TIMEOUT_MS,
+			LIBUSB_TIMEOUT_MS,
 			&transferred
 			);
 	if (usb_err < 0)
@@ -512,7 +499,7 @@ static int dtc_run_download(
 				hdev_param,
 				USB_EP1IN_ADDR,
 				&dtc_status, 1,
-				USB_TIMEOUT_MS,
+				LIBUSB_TIMEOUT_MS,
 				&transferred
 				);
 		if (usb_err < 0)
@@ -533,7 +520,7 @@ static int dtc_run_download(
 				hdev_param,
 				USB_EP2IN_ADDR,
 				(char *)reply_buffer, reply_buffer_size,
-				USB_TIMEOUT_MS,
+				LIBUSB_TIMEOUT_MS,
 				&transferred
 				);
 
@@ -954,7 +941,7 @@ static void rlink_reset(int trst, int srst)
 	usb_err = jtag_libusb_bulk_read(
 			hdev, USB_EP1IN_ADDR,
 			(char *)&bitmap, 1,
-			USB_TIMEOUT_MS,
+			LIBUSB_TIMEOUT_MS,
 			&transferred
 			);
 	if (usb_err != ERROR_OK || transferred < 1) {
@@ -990,7 +977,7 @@ static void rlink_reset(int trst, int srst)
 	usb_err = jtag_libusb_bulk_read(
 			hdev, USB_EP1IN_ADDR,
 			(char *)&bitmap, 1,
-			USB_TIMEOUT_MS,
+			LIBUSB_TIMEOUT_MS,
 			&transferred
 			);
 	if (usb_err != ERROR_OK || transferred < 1) {
@@ -1021,7 +1008,7 @@ static void rlink_reset(int trst, int srst)
 	usb_err = jtag_libusb_bulk_read(
 			hdev, USB_EP1IN_ADDR,
 			(char *)&bitmap, 1,
-			USB_TIMEOUT_MS,
+			LIBUSB_TIMEOUT_MS,
 			&transferred
 			);
 	if (usb_err != ERROR_OK || transferred < 1) {
@@ -1461,7 +1448,7 @@ static int rlink_init(void)
 
 	const uint16_t vids[] = { USB_IDVENDOR, 0 };
 	const uint16_t pids[] = { USB_IDPRODUCT, 0 };
-	if (jtag_libusb_open(vids, pids, NULL, &hdev, NULL) != ERROR_OK)
+	if (jtag_libusb_open(vids, pids, &hdev, NULL) != ERROR_OK)
 		return ERROR_FAIL;
 
 	struct libusb_device_descriptor descriptor;
@@ -1576,7 +1563,7 @@ static int rlink_init(void)
 	jtag_libusb_bulk_read(
 		hdev, USB_EP1IN_ADDR,
 		(char *)reply_buffer, 1,
-		USB_TIMEOUT_MS,
+		LIBUSB_TIMEOUT_MS,
 		&transferred
 		);
 
@@ -1601,7 +1588,7 @@ static int rlink_init(void)
 	jtag_libusb_bulk_read(
 		hdev, USB_EP1IN_ADDR,
 		(char *)reply_buffer, 1,
-		USB_TIMEOUT_MS,
+		LIBUSB_TIMEOUT_MS,
 		&transferred
 		);
 

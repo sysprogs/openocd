@@ -1,19 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /*
  * Copyright (C) 2018, STMicroelectronics - All Rights Reserved
  * Author(s): Antonio Borneo <borneo.antonio@gmail.com> for STMicroelectronics
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /*
@@ -28,8 +17,12 @@
 #include <helper/types.h>
 
 #define BIT(nr)                     (1UL << (nr))
+#define BIT_ULL(nr)                 (1ULL << (nr))
 #define BITS_PER_BYTE               8
 #define BITS_PER_LONG               (BITS_PER_BYTE * sizeof(long))
+#define BITS_PER_LONG_LONG          (BITS_PER_BYTE * sizeof(long long))
+#define GENMASK(h, l)               (((~0UL) - (1UL << (l)) + 1) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
+#define GENMASK_ULL(h, l)           (((~0ULL) - (1ULL << (l)) + 1) & (~0ULL >> (BITS_PER_LONG_LONG - 1 - (h))))
 #define BITS_TO_LONGS(nr)           DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
 #define BIT_MASK(nr)                (1UL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)                ((nr) / BITS_PER_LONG)

@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2015 by Oleksij Rempel                                  *
  *   linux@rempel-privat.de                                                *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -26,6 +15,7 @@
 #include "armv7a_cache.h"
 #include <helper/time_support.h>
 #include "arm_opcodes.h"
+#include "smp.h"
 
 static int armv7a_l1_d_cache_sanity_check(struct target *target)
 {
@@ -138,14 +128,10 @@ int armv7a_cache_auto_flush_all_data(struct target *target)
 
 	if (target->smp) {
 		struct target_list *head;
-		struct target *curr;
-		head = target->head;
-		while (head) {
-			curr = head->target;
+		foreach_smp_target(head, target->smp_targets) {
+			struct target *curr = head->target;
 			if (curr->state == TARGET_HALTED)
 				retval = armv7a_l1_d_cache_clean_inval_all(curr);
-
-			head = head->next;
 		}
 	} else
 		retval = armv7a_l1_d_cache_clean_inval_all(target);

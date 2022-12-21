@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 noinst_LTLIBRARIES += %D%/libserver.la
 %C%_libserver_la_SOURCES = \
 	%D%/server.c \
@@ -6,7 +8,6 @@ noinst_LTLIBRARIES += %D%/libserver.la
 	%D%/server.h \
 	%D%/telnet_server.h \
 	%D%/gdb_server.h \
-	%D%/server_stubs.c \
 	%D%/tcl_server.c \
 	%D%/tcl_server.h \
 	%D%/rtt_server.c \

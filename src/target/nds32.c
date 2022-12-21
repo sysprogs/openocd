@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2013 Andes Technology                                   *
  *   Hsiangkai Wang <hkwang@andestech.com>                                 *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -1653,7 +1642,7 @@ int nds32_init_arch_info(struct target *target, struct nds32 *nds32)
 
 	nds32->syscall_break.asid = 0;
 	nds32->syscall_break.length = 4;
-	nds32->syscall_break.set = 0;
+	nds32->syscall_break.is_set = false;
 	nds32->syscall_break.orig_instr = NULL;
 	nds32->syscall_break.next = NULL;
 	nds32->syscall_break.unique_id = 0x515CAll + target->target_number;

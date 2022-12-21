@@ -1,22 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2011 by Mathias Kuester                                 *
  *   Mathias Kuester <kesmtp@freenet.de>                                   *
  *                                                                         *
  *   Copyright (C) 2012 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -38,7 +27,6 @@
 static struct hl_interface_s hl_if = {
 	.param = {
 		.device_desc = NULL,
-		.serial = NULL,
 		.vid = { 0 },
 		.pid = { 0 },
 		.transport = HL_TRANSPORT_UNKNOWN,
@@ -136,7 +124,6 @@ static int hl_interface_quit(void)
 	jtag_command_queue_reset();
 
 	free((void *)hl_if.param.device_desc);
-	free((void *)hl_if.param.serial);
 
 	return ERROR_OK;
 }
@@ -233,19 +220,6 @@ COMMAND_HANDLER(hl_interface_handle_device_desc_command)
 		hl_if.param.device_desc = strdup(CMD_ARGV[0]);
 	} else {
 		LOG_ERROR("expected exactly one argument to hl_device_desc <description>");
-	}
-
-	return ERROR_OK;
-}
-
-COMMAND_HANDLER(hl_interface_handle_serial_command)
-{
-	LOG_DEBUG("hl_interface_handle_serial_command");
-
-	if (CMD_ARGC == 1) {
-		hl_if.param.serial = strdup(CMD_ARGV[0]);
-	} else {
-		LOG_ERROR("expected exactly one argument to hl_serial <serial-number>");
 	}
 
 	return ERROR_OK;
@@ -353,13 +327,6 @@ static const struct command_registration hl_interface_command_handlers[] = {
 	 .mode = COMMAND_CONFIG,
 	 .help = "set the device description of the adapter",
 	 .usage = "description_string",
-	 },
-	{
-	 .name = "hla_serial",
-	 .handler = &hl_interface_handle_serial_command,
-	 .mode = COMMAND_CONFIG,
-	 .help = "set the serial number of the adapter",
-	 .usage = "serial_string",
 	 },
 	{
 	 .name = "hla_layout",

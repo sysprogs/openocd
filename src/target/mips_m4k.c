@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2008 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
@@ -8,19 +10,6 @@
  *                                                                         *
  *   Copyright (C) 2011 by Drasko DRASKOVIC                                *
  *   drasko.draskovic@gmail.com                                            *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -128,14 +117,11 @@ static int mips_m4k_debug_entry(struct target *target)
 static struct target *get_mips_m4k(struct target *target, int32_t coreid)
 {
 	struct target_list *head;
-	struct target *curr;
 
-	head = target->head;
-	while (head) {
-		curr = head->target;
+	foreach_smp_target(head, target->smp_targets) {
+		struct target *curr = head->target;
 		if ((curr->coreid == coreid) && (curr->state == TARGET_HALTED))
 			return curr;
-		head = head->next;
 	}
 	return target;
 }
@@ -144,11 +130,10 @@ static int mips_m4k_halt_smp(struct target *target)
 {
 	int retval = ERROR_OK;
 	struct target_list *head;
-	struct target *curr;
-	head = target->head;
-	while (head) {
+
+	foreach_smp_target(head, target->smp_targets) {
 		int ret = ERROR_OK;
-		curr = head->target;
+		struct target *curr = head->target;
 		if ((curr != target) && (curr->state != TARGET_HALTED))
 			ret = mips_m4k_halt(curr);
 
@@ -156,7 +141,6 @@ static int mips_m4k_halt_smp(struct target *target)
 			LOG_ERROR("halt failed target->coreid: %" PRId32, curr->coreid);
 			retval = ret;
 		}
-		head = head->next;
 	}
 	return retval;
 }
@@ -414,12 +398,10 @@ static int mips_m4k_restore_smp(struct target *target, uint32_t address, int han
 {
 	int retval = ERROR_OK;
 	struct target_list *head;
-	struct target *curr;
 
-	head = target->head;
-	while (head) {
+	foreach_smp_target(head, target->smp_targets) {
 		int ret = ERROR_OK;
-		curr = head->target;
+		struct target *curr = head->target;
 		if ((curr != target) && (curr->state != TARGET_RUNNING)) {
 			/*  resume current address , not in step mode */
 			ret = mips_m4k_internal_restore(curr, 1, address,
@@ -431,7 +413,6 @@ static int mips_m4k_restore_smp(struct target *target, uint32_t address, int han
 				retval = ret;
 			}
 		}
-		head = head->next;
 	}
 	return retval;
 }
@@ -601,7 +582,7 @@ static void mips_m4k_enable_breakpoints(struct target *target)
 
 	/* set any pending breakpoints */
 	while (breakpoint) {
-		if (breakpoint->set == 0)
+		if (!breakpoint->is_set)
 			mips_m4k_set_breakpoint(target, breakpoint);
 		breakpoint = breakpoint->next;
 	}
@@ -615,7 +596,7 @@ static int mips_m4k_set_breakpoint(struct target *target,
 	struct mips32_comparator *comparator_list = mips32->inst_break_list;
 	int retval;
 
-	if (breakpoint->set) {
+	if (breakpoint->is_set) {
 		LOG_WARNING("breakpoint already set");
 		return ERROR_OK;
 	}
@@ -630,7 +611,7 @@ static int mips_m4k_set_breakpoint(struct target *target,
 					breakpoint->unique_id);
 			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 		}
-		breakpoint->set = bp_num + 1;
+		breakpoint_hw_set(breakpoint, bp_num);
 		comparator_list[bp_num].used = 1;
 		comparator_list[bp_num].bp_value = breakpoint->address;
 
@@ -732,7 +713,7 @@ static int mips_m4k_set_breakpoint(struct target *target,
 			}
 		}
 
-		breakpoint->set = 20; /* Any nice value but 0 */
+		breakpoint->is_set = true;
 	}
 
 	return ERROR_OK;
@@ -747,14 +728,14 @@ static int mips_m4k_unset_breakpoint(struct target *target,
 	struct mips32_comparator *comparator_list = mips32->inst_break_list;
 	int retval;
 
-	if (!breakpoint->set) {
+	if (!breakpoint->is_set) {
 		LOG_WARNING("breakpoint not set");
 		return ERROR_OK;
 	}
 
 	if (breakpoint->type == BKPT_HARD) {
-		int bp_num = breakpoint->set - 1;
-		if ((bp_num < 0) || (bp_num >= mips32->num_inst_bpoints)) {
+		int bp_num = breakpoint->number;
+		if (bp_num >= mips32->num_inst_bpoints) {
 			LOG_DEBUG("Invalid FP Comparator number in breakpoint (bpid: %" PRIu32 ")",
 					  breakpoint->unique_id);
 			return ERROR_OK;
@@ -821,7 +802,7 @@ static int mips_m4k_unset_breakpoint(struct target *target,
 		}
 	}
 
-	breakpoint->set = 0;
+	breakpoint->is_set = false;
 
 	return ERROR_OK;
 }
@@ -859,7 +840,7 @@ static int mips_m4k_remove_breakpoint(struct target *target,
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if (breakpoint->set)
+	if (breakpoint->is_set)
 		mips_m4k_unset_breakpoint(target, breakpoint);
 
 	if (breakpoint->type == BKPT_HARD)
@@ -883,7 +864,7 @@ static int mips_m4k_set_watchpoint(struct target *target,
 	int enable = EJTAG_DBCN_NOSB | EJTAG_DBCN_NOLB | EJTAG_DBCN_BE |
 			(0xff << EJTAG_DBCN_BLM_SHIFT);
 
-	if (watchpoint->set) {
+	if (watchpoint->is_set) {
 		LOG_WARNING("watchpoint already set");
 		return ERROR_OK;
 	}
@@ -919,7 +900,7 @@ static int mips_m4k_set_watchpoint(struct target *target,
 			LOG_ERROR("BUG: watchpoint->rw neither read, write nor access");
 	}
 
-	watchpoint->set = wp_num + 1;
+	watchpoint_set(watchpoint, wp_num);
 	comparator_list[wp_num].used = 1;
 	comparator_list[wp_num].bp_value = watchpoint->address;
 
@@ -954,13 +935,13 @@ static int mips_m4k_unset_watchpoint(struct target *target,
 	struct mips_ejtag *ejtag_info = &mips32->ejtag_info;
 	struct mips32_comparator *comparator_list = mips32->data_break_list;
 
-	if (!watchpoint->set) {
+	if (!watchpoint->is_set) {
 		LOG_WARNING("watchpoint not set");
 		return ERROR_OK;
 	}
 
-	int wp_num = watchpoint->set - 1;
-	if ((wp_num < 0) || (wp_num >= mips32->num_data_bpoints)) {
+	int wp_num = watchpoint->number;
+	if (wp_num >= mips32->num_data_bpoints) {
 		LOG_DEBUG("Invalid FP Comparator number in watchpoint");
 		return ERROR_OK;
 	}
@@ -968,7 +949,7 @@ static int mips_m4k_unset_watchpoint(struct target *target,
 	comparator_list[wp_num].bp_value = 0;
 	target_write_u32(target, comparator_list[wp_num].reg_address +
 			 ejtag_info->ejtag_dbc_offs, 0);
-	watchpoint->set = 0;
+	watchpoint->is_set = false;
 
 	return ERROR_OK;
 }
@@ -999,7 +980,7 @@ static int mips_m4k_remove_watchpoint(struct target *target,
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if (watchpoint->set)
+	if (watchpoint->is_set)
 		mips_m4k_unset_watchpoint(target, watchpoint);
 
 	mips32->num_data_bpoints_avail++;
@@ -1013,7 +994,7 @@ static void mips_m4k_enable_watchpoints(struct target *target)
 
 	/* set any pending watchpoints */
 	while (watchpoint) {
-		if (watchpoint->set == 0)
+		if (!watchpoint->is_set)
 			mips_m4k_set_watchpoint(target, watchpoint);
 		watchpoint = watchpoint->next;
 	}
@@ -1394,7 +1375,7 @@ static const struct command_registration mips_m4k_exec_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-const struct command_registration mips_m4k_command_handlers[] = {
+static const struct command_registration mips_m4k_command_handlers[] = {
 	{
 		.chain = mips32_command_handlers,
 	},

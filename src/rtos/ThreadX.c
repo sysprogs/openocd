@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2011 by Broadcom Corporation                            *
  *   Evan Hunter - ehunter@broadcom.com                                    *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -175,6 +164,18 @@ static const struct threadx_params threadx_params_list[] = {
 	get_stacking_info_arm926ejs,		/* fn_get_stacking_info */
 	is_thread_id_valid_arm926ejs,		/* fn_is_thread_id_valid */
 	},
+	{
+	"hla_target",				/* target_name */
+	4,							/* pointer_width; */
+	8,							/* thread_stack_offset; */
+	40,							/* thread_name_offset; */
+	48,							/* thread_state_offset; */
+	136,						/* thread_next_offset */
+	&rtos_standard_cortex_m3_stacking,	/* stacking_info */
+	1,							/* stacking_info_nb */
+	NULL,						/* fn_get_stacking_info */
+	NULL,						/* fn_is_thread_id_valid */
+	},
 };
 
 enum threadx_symbol_values {
@@ -319,6 +320,12 @@ static int threadx_update_threads(struct rtos *rtos)
 		rtos->thread_details->thread_name_str = malloc(sizeof(tmp_str));
 		strcpy(rtos->thread_details->thread_name_str, tmp_str);
 
+		/* If we just invented thread 1 to represent the current execution, we
+		 * need to make sure the RTOS object also claims it's the current thread
+		 * so that threadx_get_thread_reg_list() doesn't attempt to read a
+		 * thread control block at 0x00000001. */
+		rtos->current_thread = 1;
+
 		if (thread_list_size == 0) {
 			rtos->thread_count = 1;
 			return ERROR_OK;
@@ -363,16 +370,21 @@ static int threadx_update_threads(struct rtos *rtos)
 		}
 
 		/* Read the thread name */
-		retval =
-			target_read_buffer(rtos->target,
-				name_ptr,
-				THREADX_THREAD_NAME_STR_SIZE,
-				(uint8_t *)&tmp_str);
-		if (retval != ERROR_OK) {
-			LOG_ERROR("Error reading thread name from ThreadX target");
-			return retval;
+		tmp_str[0] = '\x00';
+
+		/* Check if thread has a valid name */
+		if (name_ptr != 0) {
+			retval =
+				target_read_buffer(rtos->target,
+					name_ptr,
+					THREADX_THREAD_NAME_STR_SIZE,
+					(uint8_t *)&tmp_str);
+			if (retval != ERROR_OK) {
+				LOG_ERROR("Error reading thread name from ThreadX target");
+				return retval;
+			}
+			tmp_str[THREADX_THREAD_NAME_STR_SIZE - 1] = '\x00';
 		}
-		tmp_str[THREADX_THREAD_NAME_STR_SIZE-1] = '\x00';
 
 		if (tmp_str[0] == '\x00')
 			strcpy(tmp_str, "No Name");

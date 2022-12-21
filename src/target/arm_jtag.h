@@ -1,28 +1,18 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
  *                                                                         *
  *   Copyright (C) 2007-2010 Øyvind Harboe                                 *
  *   oyvind.harboe@zylin.com                                               *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifndef OPENOCD_TARGET_ARM_JTAG_H
 #define OPENOCD_TARGET_ARM_JTAG_H
 
 #include <jtag/jtag.h>
+#include <helper/bits.h>
 
 struct arm_jtag {
 	struct jtag_tap *tap;
@@ -42,7 +32,7 @@ static inline int arm_jtag_set_instr(struct jtag_tap *tap,
 		uint32_t new_instr, void *no_verify_capture, tap_state_t end_state)
 {
 	/* inline most common code path */
-	if (buf_get_u32(tap->cur_instr, 0, tap->ir_length) != new_instr)
+	if (buf_get_u32(tap->cur_instr, 0, tap->ir_length) != (new_instr & (BIT(tap->ir_length) - 1)))
 		return arm_jtag_set_instr_inner(tap, new_instr, no_verify_capture, end_state);
 
 	return ERROR_OK;

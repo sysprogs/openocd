@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2016 by Matthias Welwarsky                              *
  *   matthias.welwarsky@sysgo.com                                          *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -23,6 +12,7 @@
 #include "armv8_cache.h"
 #include "armv8_dpm.h"
 #include "armv8_opcodes.h"
+#include "smp.h"
 
 /* CLIDR cache types */
 #define CACHE_LEVEL_HAS_UNIFIED_CACHE	0x4
@@ -250,15 +240,12 @@ static int  armv8_flush_all_data(struct target *target)
 		/*  look if all the other target have been flushed in order to flush level
 		 *  2 */
 		struct target_list *head;
-		struct target *curr;
-		head = target->head;
-		while (head) {
-			curr = head->target;
+		foreach_smp_target(head, target->smp_targets) {
+			struct target *curr = head->target;
 			if (curr->state == TARGET_HALTED) {
 				LOG_INFO("Wait flushing data l1 on core %" PRId32, curr->coreid);
 				retval = _armv8_flush_all_data(curr);
 			}
-			head = head->next;
 		}
 	} else
 		retval = _armv8_flush_all_data(target);

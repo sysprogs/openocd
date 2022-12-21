@@ -1,25 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2013 by Andes Technology                                *
  *   Hsiangkai Wang <hkwang@andestech.com>                                 *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
+#include <jtag/adapter.h>
 #include <jtag/interface.h>
 #include <jtag/commands.h>
 #include <transport/transport.h>
@@ -269,7 +259,7 @@ COMMAND_HANDLER(aice_handle_aice_info_command)
 	LOG_DEBUG("aice_handle_aice_info_command");
 
 	command_print(CMD, "Description: %s", param.device_desc);
-	command_print(CMD, "Serial number: %s", param.serial);
+	command_print(CMD, "Serial number: %s", adapter_get_required_serial());
 	if (strncmp(aice_port->name, "aice_pipe", 9) == 0)
 		command_print(CMD, "Adapter: %s", param.adapter_name);
 
@@ -304,18 +294,6 @@ COMMAND_HANDLER(aice_handle_aice_desc_command)
 		param.device_desc = strdup(CMD_ARGV[0]);
 	else
 		LOG_ERROR("expected exactly one argument to aice desc <description>");
-
-	return ERROR_OK;
-}
-
-COMMAND_HANDLER(aice_handle_aice_serial_command)
-{
-	LOG_DEBUG("aice_handle_aice_serial_command");
-
-	if (CMD_ARGC == 1)
-		param.serial = strdup(CMD_ARGV[0]);
-	else
-		LOG_ERROR("expected exactly one argument to aice serial <serial-number>");
 
 	return ERROR_OK;
 }
@@ -437,13 +415,6 @@ static const struct command_registration aice_subcommand_handlers[] = {
 		.mode = COMMAND_CONFIG,
 		.help = "set the aice device description",
 		.usage = "[description string]",
-	},
-	{
-		.name = "serial",
-		.handler = &aice_handle_aice_serial_command,
-		.mode = COMMAND_CONFIG,
-		.help = "set the serial number of the AICE device",
-		.usage = "[serial string]",
 	},
 	{
 		.name = "vid_pid",

@@ -1,19 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /*
  * Copyright (C) 2016-2017 by Marc Schink <dev@zapb.de>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #include <stdint.h>
 #include <rtt/rtt.h>
@@ -110,6 +103,15 @@ static int rtt_input(struct connection *connection)
 	return ERROR_OK;
 }
 
+static const struct service_driver rtt_service_driver = {
+	.name = "rtt",
+	.new_connection_during_keep_alive_handler = NULL,
+	.new_connection_handler = rtt_new_connection,
+	.input_handler = rtt_input,
+	.connection_closed_handler = rtt_connection_closed,
+	.keep_client_alive_handler = NULL,
+};
+
 COMMAND_HANDLER(handle_rtt_start_command)
 {
 	int ret;
@@ -125,8 +127,7 @@ COMMAND_HANDLER(handle_rtt_start_command)
 
 	COMMAND_PARSE_NUMBER(uint, CMD_ARGV[1], service->channel);
 
-	ret = add_service("rtt", CMD_ARGV[0], CONNECTION_LIMIT_UNLIMITED,
-		rtt_new_connection, rtt_input, rtt_connection_closed, service);
+	ret = add_service(&rtt_service_driver, CMD_ARGV[0], CONNECTION_LIMIT_UNLIMITED, service);
 
 	if (ret != ERROR_OK) {
 		free(service);

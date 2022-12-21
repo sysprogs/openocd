@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 /**
  * @file
@@ -90,6 +90,7 @@ struct arm_tpiu_swo_event_action {
 struct arm_tpiu_swo_object {
 	struct list_head lh;
 	struct adiv5_mem_ap_spot spot;
+	struct adiv5_ap *ap;
 	char *name;
 	struct arm_tpiu_swo_event_action *event_action;
 	/* record enable before init */
@@ -232,6 +233,9 @@ int arm_tpiu_swo_cleanup_all(void)
 			free(ea);
 			ea = next;
 		}
+
+		if (obj->ap)
+			dap_put_ap(obj->ap);
 
 		free(obj->name);
 		free(obj->out_filename);
@@ -582,12 +586,20 @@ static int wrap_read_u32(struct target *target, struct adiv5_ap *tpiu_ap,
 		return mem_ap_read_atomic_u32(tpiu_ap, address, value);
 }
 
+static const struct service_driver arm_tpiu_swo_service_driver = {
+	.name = "tpiu_swo_trace",
+	.new_connection_during_keep_alive_handler = NULL,
+	.new_connection_handler = arm_tpiu_swo_service_new_connection,
+	.input_handler = arm_tpiu_swo_service_input,
+	.connection_closed_handler = arm_tpiu_swo_service_connection_closed,
+	.keep_client_alive_handler = NULL,
+};
+
 static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 {
 	struct command *c = jim_to_command(interp);
 	struct arm_tpiu_swo_object *obj = c->jim_handler_data;
 	struct command_context *cmd_ctx = current_command_context(interp);
-	struct adiv5_ap *tpiu_ap = dap_ap(obj->spot.dap, obj->spot.ap_num);
 	uint32_t value;
 	int retval;
 
@@ -605,8 +617,8 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 	if (obj->enabled)
 		return JIM_OK;
 
-	if (transport_is_hla() && obj->spot.ap_num > 0) {
-		LOG_ERROR("Invalid access port %d. Only AP#0 allowed with hla transport", obj->spot.ap_num);
+	if (transport_is_hla() && obj->spot.ap_num != 0) {
+		LOG_ERROR("Invalid access port 0x%" PRIx64 ". Only AP#0 allowed with hla transport", obj->spot.ap_num);
 		return JIM_ERR;
 	}
 
@@ -616,10 +628,8 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 	}
 
 	if (obj->pin_protocol == TPIU_SPPR_PROTOCOL_MANCHESTER || obj->pin_protocol == TPIU_SPPR_PROTOCOL_UART)
-		if (!obj->swo_pin_freq) {
-			LOG_ERROR("SWO pin frequency not set");
-			return JIM_ERR;
-		}
+		if (!obj->swo_pin_freq)
+			LOG_DEBUG("SWO pin frequency not set, will be autodetected by the adapter");
 
 	struct target *target = get_current_target(cmd_ctx);
 
@@ -637,21 +647,28 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 		struct cortex_m_common *cm = target_to_cm(target);
 		obj->recheck_ap_cur_target = false;
 		obj->spot.ap_num = cm->armv7m.debug_ap->ap_num;
-		tpiu_ap = dap_ap(obj->spot.dap, obj->spot.ap_num);
 		if (obj->spot.ap_num == 0)
 			LOG_INFO(MSG "Confirmed TPIU %s is on AP 0", obj->name);
 		else
-			LOG_INFO(MSG "Target %s is on AP %d. Revised command is "
-				"\'tpiu create %s -dap %s -ap-num %d\'",
+			LOG_INFO(MSG "Target %s is on AP#0x%" PRIx64 ". Revised command is "
+				"\'tpiu create %s -dap %s -ap-num 0x%" PRIx64 "\'",
 				target_name(target), obj->spot.ap_num,
 				obj->name, adiv5_dap_name(obj->spot.dap), obj->spot.ap_num);
 	}
 	/* END_DEPRECATED_TPIU */
 
+	if (!obj->ap) {
+		obj->ap = dap_get_ap(obj->spot.dap, obj->spot.ap_num);
+		if (!obj->ap) {
+			LOG_ERROR("Cannot get AP");
+			return JIM_ERR;
+		}
+	}
+
 	/* trigger the event before any attempt to R/W in the TPIU/SWO */
 	arm_tpiu_swo_handle_event(obj, TPIU_SWO_EVENT_PRE_ENABLE);
 
-	retval = wrap_read_u32(target, tpiu_ap, obj->spot.base + TPIU_DEVID_OFFSET, &value);
+	retval = wrap_read_u32(target, obj->ap, obj->spot.base + TPIU_DEVID_OFFSET, &value);
 	if (retval != ERROR_OK) {
 		LOG_ERROR("Unable to read %s", obj->name);
 		return JIM_ERR;
@@ -677,7 +694,7 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 	}
 
 	if (obj->pin_protocol == TPIU_SPPR_PROTOCOL_SYNC) {
-		retval = wrap_read_u32(target, tpiu_ap, obj->spot.base + TPIU_SSPSR_OFFSET, &value);
+		retval = wrap_read_u32(target, obj->ap, obj->spot.base + TPIU_SSPSR_OFFSET, &value);
 		if (retval != ERROR_OK) {
 			LOG_ERROR("Cannot read TPIU register SSPSR");
 			return JIM_ERR;
@@ -700,10 +717,8 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 			}
 			priv->obj = obj;
 			LOG_INFO("starting trace server for %s on %s", obj->name, &obj->out_filename[1]);
-			retval = add_service("tpiu_swo_trace", &obj->out_filename[1],
-				CONNECTION_LIMIT_UNLIMITED, arm_tpiu_swo_service_new_connection,
-				arm_tpiu_swo_service_input, arm_tpiu_swo_service_connection_closed,
-				priv);
+			retval = add_service(&arm_tpiu_swo_service_driver, &obj->out_filename[1],
+				CONNECTION_LIMIT_UNLIMITED, priv);
 			if (retval != ERROR_OK) {
 				LOG_ERROR("Can't configure trace TCP port %s", &obj->out_filename[1]);
 				return JIM_ERR;
@@ -724,6 +739,17 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 			return JIM_ERR;
 		}
 
+		if (obj->pin_protocol == TPIU_SPPR_PROTOCOL_MANCHESTER || obj->pin_protocol == TPIU_SPPR_PROTOCOL_UART)
+			if (!swo_pin_freq) {
+				if (obj->swo_pin_freq)
+					LOG_ERROR("Adapter rejected SWO pin frequency %d Hz", obj->swo_pin_freq);
+				else
+					LOG_ERROR("Adapter does not support auto-detection of SWO pin frequency nor a default value");
+
+				arm_tpiu_swo_close_output(obj);
+				return JIM_ERR;
+			}
+
 		if (obj->swo_pin_freq != swo_pin_freq)
 			LOG_INFO("SWO pin data rate adjusted by adapter to %d Hz", swo_pin_freq);
 		obj->swo_pin_freq = swo_pin_freq;
@@ -743,26 +769,26 @@ static int jim_arm_tpiu_swo_enable(Jim_Interp *interp, int argc, Jim_Obj *const 
 		obj->swo_pin_freq = swo_pin_freq;
 	}
 
-	retval = wrap_write_u32(target, tpiu_ap, obj->spot.base + TPIU_CSPSR_OFFSET, BIT(obj->port_width - 1));
+	retval = wrap_write_u32(target, obj->ap, obj->spot.base + TPIU_CSPSR_OFFSET, BIT(obj->port_width - 1));
 	if (retval != ERROR_OK)
 		goto error_exit;
 
-	retval = wrap_write_u32(target, tpiu_ap, obj->spot.base + TPIU_ACPR_OFFSET, prescaler - 1);
+	retval = wrap_write_u32(target, obj->ap, obj->spot.base + TPIU_ACPR_OFFSET, prescaler - 1);
 	if (retval != ERROR_OK)
 		goto error_exit;
 
-	retval = wrap_write_u32(target, tpiu_ap, obj->spot.base + TPIU_SPPR_OFFSET, obj->pin_protocol);
+	retval = wrap_write_u32(target, obj->ap, obj->spot.base + TPIU_SPPR_OFFSET, obj->pin_protocol);
 	if (retval != ERROR_OK)
 		goto error_exit;
 
-	retval = wrap_read_u32(target, tpiu_ap, obj->spot.base + TPIU_FFCR_OFFSET, &value);
+	retval = wrap_read_u32(target, obj->ap, obj->spot.base + TPIU_FFCR_OFFSET, &value);
 	if (retval != ERROR_OK)
 		goto error_exit;
 	if (obj->en_formatter)
 		value |= BIT(1);
 	else
 		value &= ~BIT(1);
-	retval = wrap_write_u32(target, tpiu_ap, obj->spot.base + TPIU_FFCR_OFFSET, value);
+	retval = wrap_write_u32(target, obj->ap, obj->spot.base + TPIU_FFCR_OFFSET, value);
 	if (retval != ERROR_OK)
 		goto error_exit;
 
@@ -886,7 +912,8 @@ static int arm_tpiu_swo_create(Jim_Interp *interp, struct arm_tpiu_swo_object *o
 	/* does this command exist? */
 	cmd = Jim_GetCommand(interp, Jim_NewStringObj(interp, obj->name, -1), JIM_NONE);
 	if (cmd) {
-		Jim_SetResultFormatted(interp, "Command: %s Exists", obj->name);
+		Jim_SetResultFormatted(interp, "cannot create TPIU object because a command with name '%s' already exists",
+			obj->name);
 		return JIM_ERR;
 	}
 
@@ -915,7 +942,7 @@ static int jim_arm_tpiu_swo_create(Jim_Interp *interp, int argc, Jim_Obj *const 
 	struct jim_getopt_info goi;
 	jim_getopt_setup(&goi, interp, argc - 1, argv + 1);
 	if (goi.argc < 1) {
-		Jim_WrongNumArgs(goi.interp, 1, goi.argv, "?name? ..options...");
+		Jim_WrongNumArgs(interp, 1, argv, "name ?option option ...?");
 		return JIM_ERR;
 	}
 
@@ -1020,7 +1047,7 @@ COMMAND_HANDLER(handle_tpiu_deprecated_config_command)
 		struct cortex_m_common *cm = target_to_cm(target);
 		struct adiv5_private_config *pc = target->private_config;
 		struct adiv5_dap *dap = pc->dap;
-		int ap_num = pc->ap_num;
+		uint64_t ap_num = pc->ap_num;
 		bool set_recheck_ap_cur_target = false;
 
 		LOG_INFO(MSG "Adding a TPIU \'%s.tpiu\' in the configuration", target_name(target));
@@ -1038,10 +1065,10 @@ COMMAND_HANDLER(handle_tpiu_deprecated_config_command)
 			set_recheck_ap_cur_target = true;
 		}
 
-		LOG_INFO(MSG "Running: \'tpiu create %s.tpiu -dap %s -ap-num %d\'",
+		LOG_INFO(MSG "Running: \'tpiu create %s.tpiu -dap %s -ap-num 0x%" PRIx64 "\'",
 			target_name(target), adiv5_dap_name(dap), ap_num);
 
-		retval = command_run_linef(CMD_CTX, "tpiu create %s.tpiu -dap %s -ap-num %d",
+		retval = command_run_linef(CMD_CTX, "tpiu create %s.tpiu -dap %s -ap-num 0x%" PRIx64,
 			target_name(target), adiv5_dap_name(dap), ap_num);
 		if (retval != ERROR_OK)
 			return retval;
@@ -1160,7 +1187,7 @@ static const struct command_registration arm_tpiu_swo_subcommand_handlers[] = {
 		.name = "create",
 		.mode = COMMAND_ANY,
 		.jim_handler = jim_arm_tpiu_swo_create,
-		.usage = "name [-dap dap] [-ap-num num] [-address baseaddr]",
+		.usage = "name [-dap dap] [-ap-num num] [-baseaddr baseaddr]",
 		.help = "Creates a new TPIU or SWO object",
 	},
 	{

@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2007 by Benedikt Sauter                                 *
  *   sauter@ixbat.de                                                       *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 /*
@@ -346,15 +335,13 @@ static void usbprog_reset(int trst, int srst)
 
 /*************** jtag lowlevel functions ********************/
 
-struct usb_bus *busses;
-
 struct usbprog_jtag *usbprog_jtag_open(void)
 {
 	const uint16_t vids[] = { VID, 0 };
 	const uint16_t pids[] = { PID, 0 };
 	struct libusb_device_handle *dev;
 
-	if (jtag_libusb_open(vids, pids, NULL, &dev, NULL) != ERROR_OK)
+	if (jtag_libusb_open(vids, pids, &dev, NULL) != ERROR_OK)
 		return NULL;
 
 	struct usbprog_jtag *tmp = malloc(sizeof(struct usbprog_jtag));

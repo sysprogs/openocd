@@ -1,18 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2009-2010 by Simon Qian <SimonQian@SimonQian.com>       *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 /* Versaloon is a programming tool for multiple MCUs.
@@ -273,6 +262,7 @@ static int vsllink_quit(void)
 	vsllink_free_buffer();
 	vsllink_usb_close(vsllink_handle);
 
+	libusb_exit(vsllink_handle->libusb_ctx);
 	free(vsllink_handle);
 
 	return ERROR_OK;
@@ -496,21 +486,6 @@ COMMAND_HANDLER(vsllink_handle_usb_pid_command)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 	COMMAND_PARSE_NUMBER(u16, CMD_ARGV[0],
 		versaloon_interface.usb_setting.pid);
-	return ERROR_OK;
-}
-
-COMMAND_HANDLER(vsllink_handle_usb_serial_command)
-{
-	if (CMD_ARGC > 1)
-		return ERROR_COMMAND_SYNTAX_ERROR;
-
-	free(versaloon_interface.usb_setting.serialstring);
-
-	if (CMD_ARGC == 1)
-		versaloon_interface.usb_setting.serialstring = strdup(CMD_ARGV[0]);
-	else
-		versaloon_interface.usb_setting.serialstring = NULL;
-
 	return ERROR_OK;
 }
 
@@ -786,14 +761,14 @@ static int vsllink_check_usb_strings(
 	char desc_string[256];
 	int retval;
 
-	if (versaloon_interface.usb_setting.serialstring) {
+	if (adapter_get_required_serial()) {
 		retval = libusb_get_string_descriptor_ascii(usb_device_handle,
 			usb_desc->iSerialNumber, (unsigned char *)desc_string,
 			sizeof(desc_string));
 		if (retval < 0)
 			return ERROR_FAIL;
 
-		if (strncmp(desc_string, versaloon_interface.usb_setting.serialstring,
+		if (strncmp(desc_string, adapter_get_required_serial(),
 				sizeof(desc_string)))
 			return ERROR_FAIL;
 	}
@@ -902,13 +877,6 @@ static const struct command_registration vsllink_subcommand_handlers[] = {
 		.mode = COMMAND_CONFIG,
 		.help = "Set USB PID",
 		.usage = "<pid>",
-	},
-	{
-		.name = "usb_serial",
-		.handler = &vsllink_handle_usb_serial_command,
-		.mode = COMMAND_CONFIG,
-		.help = "Set or disable check for USB serial",
-		.usage = "[<serial>]",
 	},
 	{
 		.name = "usb_bulkin",

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2011 by Mathias Kuester                                 *
  *   Mathias Kuester <kesmtp@freenet.de>                                   *
@@ -6,19 +8,6 @@
  *   spen@spen-soft.co.uk                                                  *
  *                                                                         *
  *   revised:  4/25/13 by brent@mbari.org [DCC target request support]	   *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -203,7 +192,7 @@ static int adapter_target_create(struct target *target,
 {
 	LOG_DEBUG("%s", __func__);
 	struct adiv5_private_config *pc = target->private_config;
-	if (pc && pc->ap_num > 0) {
+	if (pc && pc->ap_num != DP_APSEL_INVALID && pc->ap_num != 0) {
 		LOG_ERROR("hla_target: invalid parameter -ap-num (> 0)");
 		return ERROR_COMMAND_SYNTAX_ERROR;
 	}
@@ -213,6 +202,8 @@ static int adapter_target_create(struct target *target,
 		LOG_ERROR("No memory creating target");
 		return ERROR_FAIL;
 	}
+
+	cortex_m->common_magic = CORTEX_M_COMMON_MAGIC;
 
 	adapter_init_arch_info(target, cortex_m, target->tap);
 
@@ -240,7 +231,7 @@ static int adapter_debug_entry(struct target *target)
 	struct armv7m_common *armv7m = target_to_armv7m(target);
 	struct arm *arm = &armv7m->arm;
 	struct reg *r;
-	uint32_t xPSR;
+	uint32_t xpsr;
 	int retval;
 
 	/* preserve the DCRDR across halts */
@@ -258,11 +249,11 @@ static int adapter_debug_entry(struct target *target)
 	adapter->layout->api->write_debug_reg(adapter->handle, DCB_DEMCR, TRCENA);
 
 	r = arm->cpsr;
-	xPSR = buf_get_u32(r->value, 0, 32);
+	xpsr = buf_get_u32(r->value, 0, 32);
 
 	/* Are we in an exception handler */
-	if (xPSR & 0x1FF) {
-		armv7m->exception_number = (xPSR & 0x1FF);
+	if (xpsr & 0x1FF) {
+		armv7m->exception_number = (xpsr & 0x1FF);
 
 		arm->core_mode = ARM_MODE_HANDLER;
 		arm->map = armv7m_msp_reg_map;
@@ -355,6 +346,13 @@ static int hl_assert_reset(struct target *target)
 	}
 
 	adapter->layout->api->write_debug_reg(adapter->handle, DCB_DHCSR, DBGKEY|C_DEBUGEN);
+
+	if (!target_was_examined(target) && !target->defer_examine
+		&& srst_asserted && res == ERROR_OK) {
+		/* If the target is not examined, now under reset it is good time to retry examination */
+		LOG_TARGET_DEBUG(target, "Trying to re-examine under reset");
+		target_examine_one(target);
+	}
 
 	/* only set vector catch if halt is requested */
 	if (target->reset_halt)
@@ -621,7 +619,7 @@ static int adapter_write_memory(struct target *target, target_addr_t address,
 	return adapter->layout->api->write_mem(adapter->handle, address, size, count, buffer);
 }
 
-static const struct command_registration adapter_command_handlers[] = {
+static const struct command_registration hla_command_handlers[] = {
 	{
 		.chain = arm_command_handlers,
 	},
@@ -647,7 +645,7 @@ struct target_type hla_target = {
 	.target_create = adapter_target_create,
 	.target_jim_configure = adiv5_jim_configure,
 	.examine = cortex_m_examine,
-	.commands = adapter_command_handlers,
+	.commands = hla_command_handlers,
 
 	.poll = adapter_poll,
 	.arch_state = armv7m_arch_state,

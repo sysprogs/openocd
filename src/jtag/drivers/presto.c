@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2007 by Pavel Chromy                                    *
  *   chromy@asix.cz                                                        *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 /**
@@ -29,6 +18,7 @@
 #include "windows.h"
 #endif
 
+#include <jtag/adapter.h>
 #include <jtag/interface.h>
 #include <helper/time_support.h>
 #include "bitq.h"
@@ -132,7 +122,7 @@ static int presto_read(uint8_t *buf, uint32_t size)
 	return ERROR_OK;
 }
 
-static int presto_open_libftdi(char *req_serial)
+static int presto_open_libftdi(const char *req_serial)
 {
 	uint8_t presto_data;
 
@@ -195,7 +185,7 @@ static int presto_open_libftdi(char *req_serial)
 	return ERROR_OK;
 }
 
-static int presto_open(char *req_serial)
+static int presto_open(const char *req_serial)
 {
 	presto->buff_out_pos = 0;
 	presto->buff_in_pos = 0;
@@ -506,43 +496,10 @@ static int presto_jtag_speed(int speed)
 	return 0;
 }
 
-static char *presto_serial;
-
-COMMAND_HANDLER(presto_handle_serial_command)
-{
-	if (CMD_ARGC == 1) {
-		free(presto_serial);
-		presto_serial = strdup(CMD_ARGV[0]);
-	} else
-		return ERROR_COMMAND_SYNTAX_ERROR;
-
-	return ERROR_OK;
-}
-
-static const struct command_registration presto_subcommand_handlers[] = {
-	{
-		.name = "serial",
-		.handler = presto_handle_serial_command,
-		.mode = COMMAND_CONFIG,
-		.help = "Configure USB serial number of Presto device.",
-		.usage = "serial_string",
-	},
-	COMMAND_REGISTRATION_DONE
-};
-
-static const struct command_registration presto_command_handlers[] = {
-	{
-		.name = "presto",
-		.mode = COMMAND_ANY,
-		.help = "perform presto management",
-		.chain = presto_subcommand_handlers,
-		.usage = "",
-	},
-	COMMAND_REGISTRATION_DONE
-};
-
 static int presto_jtag_init(void)
 {
+	const char *presto_serial = adapter_get_required_serial();
+
 	if (presto_open(presto_serial) != ERROR_OK) {
 		presto_close();
 		if (presto_serial)
@@ -562,10 +519,6 @@ static int presto_jtag_quit(void)
 	bitq_cleanup();
 	presto_close();
 	LOG_INFO("PRESTO closed");
-
-	free(presto_serial);
-	presto_serial = NULL;
-
 	return ERROR_OK;
 }
 
@@ -576,7 +529,6 @@ static struct jtag_interface presto_interface = {
 struct adapter_driver presto_adapter_driver = {
 	.name = "presto",
 	.transports = jtag_only,
-	.commands = presto_command_handlers,
 
 	.init = presto_jtag_init,
 	.quit = presto_jtag_quit,

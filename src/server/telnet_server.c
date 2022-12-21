@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
@@ -7,19 +9,6 @@
  *                                                                         *
  *   Copyright (C) 2008 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -222,9 +211,8 @@ static int telnet_new_connection(struct connection *connection)
 {
 	struct telnet_connection *telnet_connection;
 	struct telnet_service *telnet_service = connection->service->priv;
-	int i;
 
-	telnet_connection = malloc(sizeof(struct telnet_connection));
+	telnet_connection = calloc(1, sizeof(struct telnet_connection));
 
 	if (!telnet_connection) {
 		LOG_ERROR("Failed to allocate telnet connection.");
@@ -234,9 +222,6 @@ static int telnet_new_connection(struct connection *connection)
 	connection->priv = telnet_connection;
 
 	/* initialize telnet connection information */
-	telnet_connection->closed = false;
-	telnet_connection->line_size = 0;
-	telnet_connection->line_cursor = 0;
 	telnet_connection->prompt = strdup("> ");
 	telnet_connection->prompt_visible = true;
 	telnet_connection->state = TELNET_STATE_DATA;
@@ -257,11 +242,6 @@ static int telnet_new_connection(struct connection *connection)
 	telnet_write(connection, "\r", 1);
 	telnet_prompt(connection);
 
-	/* initialize history */
-	for (i = 0; i < TELNET_LINE_HISTORY_SIZE; i++)
-		telnet_connection->history[i] = NULL;
-	telnet_connection->next_history = 0;
-	telnet_connection->current_history = 0;
 	telnet_load_history(telnet_connection);
 
 	log_add_callback(telnet_log_callback, connection);
@@ -624,7 +604,11 @@ static void telnet_auto_complete(struct connection *connection)
 	while ((usr_cmd_pos < t_con->line_cursor) && isspace(t_con->line[usr_cmd_pos]))
 		usr_cmd_pos++;
 
-	/* user command length */
+	/* check user command length */
+	if (t_con->line_cursor < usr_cmd_pos) {
+		telnet_bell(connection);
+		return;
+	}
 	size_t usr_cmd_len = t_con->line_cursor - usr_cmd_pos;
 
 	/* optimize multiple spaces in the user command,
@@ -946,6 +930,15 @@ static int telnet_connection_closed(struct connection *connection)
 	return ERROR_OK;
 }
 
+static const struct service_driver telnet_service_driver = {
+	.name = "telnet",
+	.new_connection_during_keep_alive_handler = NULL,
+	.new_connection_handler = telnet_new_connection,
+	.input_handler = telnet_input,
+	.connection_closed_handler = telnet_connection_closed,
+	.keep_client_alive_handler = NULL,
+};
+
 int telnet_init(char *banner)
 {
 	if (strcmp(telnet_port, "disabled") == 0) {
@@ -963,8 +956,7 @@ int telnet_init(char *banner)
 
 	telnet_service->banner = banner;
 
-	int ret = add_service("telnet", telnet_port, CONNECTION_LIMIT_UNLIMITED,
-		telnet_new_connection, telnet_input, telnet_connection_closed,
+	int ret = add_service(&telnet_service_driver, telnet_port, CONNECTION_LIMIT_UNLIMITED,
 		telnet_service);
 
 	if (ret != ERROR_OK) {

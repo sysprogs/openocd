@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2013 by Andes Technology                                *
  *   Hsiangkai Wang <hkwang@andestech.com>                                 *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -2085,7 +2074,7 @@ static int aice_usb_open(struct aice_port_param_s *param)
 	const uint16_t pids[] = { param->pid, 0 };
 	struct libusb_device_handle *devh;
 
-	if (jtag_libusb_open(vids, pids, NULL, &devh, NULL) != ERROR_OK)
+	if (jtag_libusb_open(vids, pids, &devh, NULL) != ERROR_OK)
 		return ERROR_FAIL;
 
 	/* BE ***VERY CAREFUL*** ABOUT MAKING CHANGES IN THIS
@@ -2109,7 +2098,7 @@ static int aice_usb_open(struct aice_port_param_s *param)
 	/* reopen jlink after usb_reset
 	 * on win32 this may take a second or two to re-enumerate */
 	int retval;
-	while ((retval = jtag_libusb_open(vids, pids, NULL, &devh, NULL)) != ERROR_OK) {
+	while ((retval = jtag_libusb_open(vids, pids, &devh, NULL)) != ERROR_OK) {
 		usleep(1000);
 		timeout--;
 		if (!timeout)

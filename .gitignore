@@ -110,3 +110,6 @@ toolchain.cmake
 GPATH
 GRTAGS
 GTAGS
+
+# checkpatch script files
+.checkpatch-camelcase.*

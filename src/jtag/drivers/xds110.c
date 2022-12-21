@@ -1,18 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2017 by Texas Instruments, Inc.                         *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -20,14 +9,12 @@
 #endif
 
 #include <transport/transport.h>
+#include <jtag/adapter.h>
 #include <jtag/swd.h>
 #include <jtag/interface.h>
 #include <jtag/commands.h>
 #include <jtag/tcl.h>
 #include <libusb.h>
-
-/* XDS110 USB serial number length */
-#define XDS110_SERIAL_LEN 8
 
 /* XDS110 stand-alone probe voltage supply limits */
 #define XDS110_MIN_VOLTAGE 1800
@@ -238,8 +225,6 @@ struct xds110_info {
 	/* TCK speed and delay count*/
 	uint32_t speed;
 	uint32_t delay_count;
-	/* XDS110 serial number */
-	char serial[XDS110_SERIAL_LEN + 1];
 	/* XDS110 voltage supply setting */
 	uint32_t voltage;
 	/* XDS110 firmware and hardware version */
@@ -269,7 +254,6 @@ static struct xds110_info xds110 = {
 	.is_ap_dirty = false,
 	.speed = XDS110_DEFAULT_TCK_SPEED,
 	.delay_count = 0,
-	.serial = {0},
 	.voltage = 0,
 	.firmware = 0,
 	.hardware = 0,
@@ -371,7 +355,7 @@ static bool usb_connect(void)
 					*data = '\0';
 
 					/* May be the requested device if serial number matches */
-					if (xds110.serial[0] == 0) {
+					if (!adapter_get_required_serial()) {
 						/* No serial number given; match first XDS110 found */
 						found = true;
 						break;
@@ -380,7 +364,7 @@ static bool usb_connect(void)
 						result = libusb_get_string_descriptor_ascii(dev,
 									desc.iSerialNumber, data, max_data);
 						if (result > 0 &&
-							strcmp((char *)data, (char *)xds110.serial) == 0) {
+							strcmp((char *)data, adapter_get_required_serial()) == 0) {
 							found = true;
 							break;
 						}
@@ -1370,11 +1354,13 @@ static void xds110_swd_queue_cmd(uint8_t cmd, uint32_t *value)
 static void xds110_swd_read_reg(uint8_t cmd, uint32_t *value,
 	uint32_t ap_delay_clk)
 {
+	assert(cmd & SWD_CMD_RNW);
 	xds110_swd_queue_cmd(cmd, value);
 }
 static void xds110_swd_write_reg(uint8_t cmd, uint32_t value,
 	uint32_t ap_delay_clk)
 {
+	assert(!(cmd & SWD_CMD_RNW));
 	xds110_swd_queue_cmd(cmd, &value);
 }
 
@@ -1395,8 +1381,8 @@ static void xds110_show_info(void)
 		(((firmware >> 12) & 0xf) * 10) + ((firmware >>  8) & 0xf),
 		(((firmware >>  4) & 0xf) * 10) + ((firmware >>  0) & 0xf));
 	LOG_INFO("XDS110: hardware version = 0x%04x", xds110.hardware);
-	if (xds110.serial[0] != 0)
-		LOG_INFO("XDS110: serial number = %s", xds110.serial);
+	if (adapter_get_required_serial())
+		LOG_INFO("XDS110: serial number = %s", adapter_get_required_serial());
 	if (xds110.is_swd_mode) {
 		LOG_INFO("XDS110: connected to target via SWD");
 		LOG_INFO("XDS110: SWCLK set to %" PRIu32 " kHz", xds110.speed);
@@ -2024,34 +2010,6 @@ COMMAND_HANDLER(xds110_handle_info_command)
 	return ERROR_OK;
 }
 
-COMMAND_HANDLER(xds110_handle_serial_command)
-{
-	wchar_t serial[XDS110_SERIAL_LEN + 1];
-
-	xds110.serial[0] = 0;
-
-	if (CMD_ARGC == 1) {
-		size_t len = mbstowcs(0, CMD_ARGV[0], 0);
-		if (len > XDS110_SERIAL_LEN) {
-			LOG_ERROR("XDS110: serial number is limited to %d characters",
-				XDS110_SERIAL_LEN);
-			return ERROR_FAIL;
-		}
-		if ((size_t)-1 == mbstowcs(serial, CMD_ARGV[0], len + 1)) {
-			LOG_ERROR("XDS110: unable to convert serial number");
-			return ERROR_FAIL;
-		}
-
-		for (uint32_t i = 0; i < len; i++)
-			xds110.serial[i] = (char)serial[i];
-
-		xds110.serial[len] = 0;
-	} else
-		return ERROR_COMMAND_SYNTAX_ERROR;
-
-	return ERROR_OK;
-}
-
 COMMAND_HANDLER(xds110_handle_supply_voltage_command)
 {
 	uint32_t voltage = 0;
@@ -2081,13 +2039,6 @@ static const struct command_registration xds110_subcommand_handlers[] = {
 		.mode = COMMAND_EXEC,
 		.help = "show XDS110 info",
 		.usage = "",
-	},
-	{
-		.name = "serial",
-		.handler = &xds110_handle_serial_command,
-		.mode = COMMAND_CONFIG,
-		.help = "set the XDS110 probe serial number",
-		.usage = "serial_string",
 	},
 	{
 		.name = "supply",

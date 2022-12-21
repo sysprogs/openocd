@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2017 by Tomas Vanek					   *
  *   vanekt@fbl.cz							   *
@@ -5,19 +7,6 @@
  *   Based on at91samd.c                                                   *
  *   Copyright (C) 2013 by Andrey Yurovsky                                 *
  *   Andrey Yurovsky <yurovsky@gmail.com>                                  *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -146,6 +135,9 @@ static const struct samd_part same53_parts[] = {
 	{ 0x04, "SAME53J20A", 1024, 256 },
 	{ 0x05, "SAME53J19A", 512, 192 },
 	{ 0x06, "SAME53J18A", 256, 128 },
+	{ 0x55, "LAN9255/ZMX020", 1024, 256 },
+	{ 0x56, "LAN9255/ZMX019", 512, 192 },
+	{ 0x57, "LAN9255/ZMX018", 256, 128 },
 };
 
 /* Known SAME54 parts. */

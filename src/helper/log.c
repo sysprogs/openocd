@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
@@ -7,19 +9,6 @@
  *                                                                         *
  *   Copyright (C) 2008 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -30,6 +19,7 @@
 #include "command.h"
 #include "replacements.h"
 #include "time_support.h"
+#include <server/server.h>
 
 #include <stdarg.h>
 
@@ -47,7 +37,6 @@ static FILE *log_output;
 static struct log_callback *log_callbacks;
 
 static int64_t last_time;
-static int64_t current_time;
 
 static int64_t start;
 
@@ -111,32 +100,27 @@ static void log_puts(enum log_levels level,
 	if (f)
 		file = f + 1;
 
-	if (strlen(string) > 0) {
-		if (debug_level >= LOG_LVL_DEBUG) {
-			/* print with count and time information */
-			int64_t t = timeval_ms() - start;
+	if (debug_level >= LOG_LVL_DEBUG) {
+		/* print with count and time information */
+		int64_t t = timeval_ms() - start;
 #ifdef _DEBUG_FREE_SPACE_
-			struct mallinfo info;
-			info = mallinfo();
+		struct mallinfo info;
+		info = mallinfo();
 #endif
-			fprintf(log_output, "%s%d %" PRId64 " %s:%d %s()"
+		fprintf(log_output, "%s%d %" PRId64 " %s:%d %s()"
 #ifdef _DEBUG_FREE_SPACE_
-				" %d"
+			" %d"
 #endif
-				": %s", log_strings[level + 1], count, t, file, line, function,
+			": %s", log_strings[level + 1], count, t, file, line, function,
 #ifdef _DEBUG_FREE_SPACE_
-				info.fordblks,
+			info.fordblks,
 #endif
-				string);
-		} else {
-			/* if we are using gdb through pipes then we do not want any output
-			 * to the pipe otherwise we get repeated strings */
-			fprintf(log_output, "%s%s",
-				(level > LOG_LVL_USER) ? log_strings[level + 1] : "", string);
-		}
+			string);
 	} else {
-		/* Empty strings are sent to log callbacks to keep e.g. gdbserver alive, here we do
-		 *nothing. */
+		/* if we are using gdb through pipes then we do not want any output
+		 * to the pipe otherwise we get repeated strings */
+		fprintf(log_output, "%s%s",
+			(level > LOG_LVL_USER) ? log_strings[level + 1] : "", string);
 	}
 
 	fflush(log_output);
@@ -302,10 +286,13 @@ void log_init(void)
 	start = last_time = timeval_ms();
 }
 
-int set_log_output(struct command_context *cmd_ctx, FILE *output)
+void log_exit(void)
 {
-	log_output = output;
-	return ERROR_OK;
+	if (log_output && log_output != stderr) {
+		/* Close log file, if it was open and wasn't stderr. */
+		fclose(log_output);
+	}
+	log_output = NULL;
 }
 
 /* add/remove log callback handler */
@@ -431,8 +418,7 @@ static void gdb_timeout_warning(int64_t delta_time)
 
 void keep_alive(void)
 {
-	current_time = timeval_ms();
-
+	int64_t current_time = timeval_ms();
 	int64_t delta_time = current_time - last_time;
 
 	if (delta_time > KEEP_ALIVE_TIMEOUT_MS) {
@@ -445,7 +431,7 @@ void keep_alive(void)
 		last_time = current_time;
 
 		/* this will keep the GDB connection alive */
-		LOG_USER_N("%s", "");
+		server_keep_clients_alive();
 
 		/* DANGER!!!! do not add code to invoke e.g. target event processing,
 		 * jim timer processing, etc. it can cause infinite recursion +
@@ -460,7 +446,7 @@ void keep_alive(void)
 /* reset keep alive timer without sending message */
 void kept_alive(void)
 {
-	current_time = timeval_ms();
+	int64_t current_time = timeval_ms();
 
 	int64_t delta_time = current_time - last_time;
 

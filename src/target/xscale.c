@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2006, 2007 by Dominic Rath                              *
  *   Dominic.Rath@gmx.de                                                   *
@@ -7,19 +9,6 @@
  *                                                                         *
  *   Copyright (C) 2009 Michael Schwingen                                  *
  *   michael@schwingen.org                                                 *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -1087,7 +1076,7 @@ static void xscale_enable_watchpoints(struct target *target)
 	struct watchpoint *watchpoint = target->watchpoints;
 
 	while (watchpoint) {
-		if (watchpoint->set == 0)
+		if (!watchpoint->is_set)
 			xscale_set_watchpoint(target, watchpoint);
 		watchpoint = watchpoint->next;
 	}
@@ -1099,7 +1088,7 @@ static void xscale_enable_breakpoints(struct target *target)
 
 	/* set any pending breakpoints */
 	while (breakpoint) {
-		if (breakpoint->set == 0)
+		if (!breakpoint->is_set)
 			xscale_set_breakpoint(target, breakpoint);
 		breakpoint = breakpoint->next;
 	}
@@ -1506,7 +1495,7 @@ static int xscale_deassert_reset(struct target *target)
 	/* mark all hardware breakpoints as unset */
 	while (breakpoint) {
 		if (breakpoint->type == BKPT_HARD)
-			breakpoint->set = 0;
+			breakpoint->is_set = false;
 		breakpoint = breakpoint->next;
 	}
 
@@ -2088,7 +2077,7 @@ static int xscale_set_breakpoint(struct target *target,
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if (breakpoint->set) {
+	if (breakpoint->is_set) {
 		LOG_WARNING("breakpoint already set");
 		return ERROR_OK;
 	}
@@ -2098,11 +2087,13 @@ static int xscale_set_breakpoint(struct target *target,
 		if (!xscale->ibcr0_used) {
 			xscale_set_reg_u32(&xscale->reg_cache->reg_list[XSCALE_IBCR0], value);
 			xscale->ibcr0_used = 1;
-			breakpoint->set = 1;	/* breakpoint set on first breakpoint register */
+			/* breakpoint set on first breakpoint register */
+			breakpoint_hw_set(breakpoint, 0);
 		} else if (!xscale->ibcr1_used) {
 			xscale_set_reg_u32(&xscale->reg_cache->reg_list[XSCALE_IBCR1], value);
 			xscale->ibcr1_used = 1;
-			breakpoint->set = 2;	/* breakpoint set on second breakpoint register */
+			/* breakpoint set on second breakpoint register */
+			breakpoint_hw_set(breakpoint, 1);
 		} else {/* bug: availability previously verified in xscale_add_breakpoint() */
 			LOG_ERROR("BUG: no hardware comparator available");
 			return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
@@ -2133,7 +2124,7 @@ static int xscale_set_breakpoint(struct target *target,
 			if (retval != ERROR_OK)
 				return retval;
 		}
-		breakpoint->set = 1;
+		breakpoint->is_set = true;
 
 		xscale_send_u32(target, 0x50);	/* clean dcache */
 		xscale_send_u32(target, xscale->cache_clean_address);
@@ -2176,20 +2167,20 @@ static int xscale_unset_breakpoint(struct target *target,
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if (!breakpoint->set) {
+	if (!breakpoint->is_set) {
 		LOG_WARNING("breakpoint not set");
 		return ERROR_OK;
 	}
 
 	if (breakpoint->type == BKPT_HARD) {
-		if (breakpoint->set == 1) {
+		if (breakpoint->number == 0) {
 			xscale_set_reg_u32(&xscale->reg_cache->reg_list[XSCALE_IBCR0], 0x0);
 			xscale->ibcr0_used = 0;
-		} else if (breakpoint->set == 2) {
+		} else if (breakpoint->number == 1) {
 			xscale_set_reg_u32(&xscale->reg_cache->reg_list[XSCALE_IBCR1], 0x0);
 			xscale->ibcr1_used = 0;
 		}
-		breakpoint->set = 0;
+		breakpoint->is_set = false;
 	} else {
 		/* restore original instruction (kept in target endianness) */
 		if (breakpoint->length == 4) {
@@ -2203,7 +2194,7 @@ static int xscale_unset_breakpoint(struct target *target,
 			if (retval != ERROR_OK)
 				return retval;
 		}
-		breakpoint->set = 0;
+		breakpoint->is_set = false;
 
 		xscale_send_u32(target, 0x50);	/* clean dcache */
 		xscale_send_u32(target, xscale->cache_clean_address);
@@ -2223,7 +2214,7 @@ static int xscale_remove_breakpoint(struct target *target, struct breakpoint *br
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if (breakpoint->set)
+	if (breakpoint->is_set)
 		xscale_unset_breakpoint(target, breakpoint);
 
 	if (breakpoint->type == BKPT_HARD)
@@ -2279,13 +2270,13 @@ static int xscale_set_watchpoint(struct target *target,
 		xscale_set_reg_u32(&xscale->reg_cache->reg_list[XSCALE_DBR0], watchpoint->address);
 		dbcon_value |= enable;
 		xscale_set_reg_u32(dbcon, dbcon_value);
-		watchpoint->set = 1;
+		watchpoint_set(watchpoint, 0);
 		xscale->dbr0_used = 1;
 	} else if (!xscale->dbr1_used) {
 		xscale_set_reg_u32(&xscale->reg_cache->reg_list[XSCALE_DBR1], watchpoint->address);
 		dbcon_value |= enable << 2;
 		xscale_set_reg_u32(dbcon, dbcon_value);
-		watchpoint->set = 2;
+		watchpoint_set(watchpoint, 1);
 		xscale->dbr1_used = 1;
 	} else {
 		LOG_ERROR("BUG: no hardware comparator available");
@@ -2349,12 +2340,12 @@ static int xscale_unset_watchpoint(struct target *target,
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if (!watchpoint->set) {
+	if (!watchpoint->is_set) {
 		LOG_WARNING("breakpoint not set");
 		return ERROR_OK;
 	}
 
-	if (watchpoint->set == 1) {
+	if (watchpoint->number == 0) {
 		if (watchpoint->length > 4) {
 			dbcon_value &= ~0x103;	/* clear DBCON[M] as well */
 			xscale->dbr1_used = 0;	/* DBR1 was used for mask */
@@ -2363,12 +2354,12 @@ static int xscale_unset_watchpoint(struct target *target,
 
 		xscale_set_reg_u32(dbcon, dbcon_value);
 		xscale->dbr0_used = 0;
-	} else if (watchpoint->set == 2) {
+	} else if (watchpoint->number == 1) {
 		dbcon_value &= ~0xc;
 		xscale_set_reg_u32(dbcon, dbcon_value);
 		xscale->dbr1_used = 0;
 	}
-	watchpoint->set = 0;
+	watchpoint->is_set = false;
 
 	return ERROR_OK;
 }
@@ -2382,7 +2373,7 @@ static int xscale_remove_watchpoint(struct target *target, struct watchpoint *wa
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	if (watchpoint->set)
+	if (watchpoint->is_set)
 		xscale_unset_watchpoint(target, watchpoint);
 
 	if (watchpoint->length > 4)

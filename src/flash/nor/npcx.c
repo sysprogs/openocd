@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 /*
  * Copyright (C) 2020 by Nuvoton Technology Corporation
@@ -17,7 +17,7 @@
 #include "../../../contrib/loaders/flash/npcx/npcx_flash.h"
 
 /* NPCX flash loader */
-const uint8_t npcx_algo[] = {
+static const uint8_t npcx_algo[] = {
 #include "../../../contrib/loaders/flash/npcx/npcx_algo.inc"
 };
 
@@ -80,10 +80,8 @@ static int npcx_init(struct flash_bank *bank)
 	struct npcx_flash_bank *npcx_bank = bank->driver_priv;
 
 	/* Check for working area to use for flash helper algorithm */
-	if (npcx_bank->working_area) {
-		target_free_working_area(target, npcx_bank->working_area);
-		npcx_bank->working_area = NULL;
-	}
+	target_free_working_area(target, npcx_bank->working_area);
+	npcx_bank->working_area = NULL;
 
 	int retval = target_alloc_working_area(target, npcx_bank->algo_working_size,
 				&npcx_bank->working_area);

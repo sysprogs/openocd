@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
@@ -13,19 +15,6 @@
  *                                                                         *
  *   Copyright (C) ST-Ericsson SA 2011                                     *
  *   michel.jaouen@stericsson.com : smp minimum support                    *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifndef OPENOCD_TARGET_TARGET_H
@@ -200,10 +189,12 @@ struct target {
 	bool rtos_auto_detect;				/* A flag that indicates that the RTOS has been specified as "auto"
 										 * and must be detected when symbols are offered */
 	struct backoff_timer backoff;
-	int smp, amp;							/* add some target attributes for smp support */
+	int smp, amp;						/* Unique non-zero number for each SMP group */
     int frozen;                         /* frozen targets won't be auto-resumed when receiving a 'step' or 'continue' command from gdb*/
     int report_flash_progress;          /* If set to 1, FLASH writing operations will generate detailed progress messages */
-	struct target_list *head;
+	struct list_head *smp_targets;		/* list all targets in this smp group/cluster
+										 * The head of the list is shared between the
+										 * cluster, thus here there is a pointer */
 	/* the gdb service is there in case of smp, we have only one gdb server
 	 * for all smp target
 	 * the target attached to the gdb is changing dynamically by changing
@@ -226,8 +217,8 @@ struct target {
 };
 
 struct target_list {
+	struct list_head lh;
 	struct target *target;
-	struct target_list *next;
 };
 
 struct gdb_fileio_info {
@@ -300,6 +291,15 @@ enum target_event {
 	TARGET_EVENT_GDB_FLASH_WRITE_END,
 
 	TARGET_EVENT_TRACE_CONFIG,
+
+	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X100 = 0x100, /* semihosting allows user cmds from 0x100 to 0x1ff */
+	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X101 = 0x101,
+	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X102 = 0x102,
+	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X103 = 0x103,
+	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X104 = 0x104,
+	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X105 = 0x105,
+	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X106 = 0x106,
+	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X107 = 0x107,
 };
 
 struct target_event_action {
@@ -553,7 +553,7 @@ int target_step(struct target *target,
 int target_run_algorithm(struct target *target,
 		int num_mem_params, struct mem_param *mem_params,
 		int num_reg_params, struct reg_param *reg_param,
-		uint32_t entry_point, uint32_t exit_point,
+		target_addr_t entry_point, target_addr_t exit_point,
 		int timeout_ms, void *arch_info);
 
 /**
@@ -564,7 +564,7 @@ int target_run_algorithm(struct target *target,
 int target_start_algorithm(struct target *target,
 		int num_mem_params, struct mem_param *mem_params,
 		int num_reg_params, struct reg_param *reg_params,
-		uint32_t entry_point, uint32_t exit_point,
+		target_addr_t entry_point, target_addr_t exit_point,
 		void *arch_info);
 
 /**
@@ -575,7 +575,7 @@ int target_start_algorithm(struct target *target,
 int target_wait_algorithm(struct target *target,
 		int num_mem_params, struct mem_param *mem_params,
 		int num_reg_params, struct reg_param *reg_params,
-		uint32_t exit_point, int timeout_ms,
+		target_addr_t exit_point, int timeout_ms,
 		void *arch_info);
 
 /**
@@ -732,6 +732,13 @@ int target_alloc_working_area(struct target *target,
  */
 int target_alloc_working_area_try(struct target *target,
 		uint32_t size, struct working_area **area);
+/**
+ * Free a working area.
+ * Restore target data if area backup is configured.
+ * @param target
+ * @param area Pointer to the area to be freed or NULL
+ * @returns ERROR_OK if successful; error code if restore failed
+ */
 int target_free_working_area(struct target *target, struct working_area *area);
 void target_free_all_working_areas(struct target *target);
 uint32_t target_get_working_area_avail(struct target *target);

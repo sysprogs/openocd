@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2011 by James K. Larson                                 *
  *   jlarson@pacifier.com                                                  *
@@ -10,19 +12,6 @@
  *                                                                         *
  *   Copyright (C) 2015 Nemui Trinomius                                    *
  *   nemuisan_kawausogasuki@live.jp                                        *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -1384,13 +1373,6 @@ static int numicro_writeblock(struct flash_bank *bank, const uint8_t *buffer,
 	init_reg_param(&reg_params[0], "r0", 32, PARAM_IN_OUT); /* *pLW (*buffer) */
 	init_reg_param(&reg_params[1], "r1", 32, PARAM_OUT);    /* faddr */
 	init_reg_param(&reg_params[2], "r2", 32, PARAM_OUT);    /* number of words to program */
-
-	struct armv7m_common *armv7m = target_to_armv7m(target);
-	if (!armv7m) {
-		/* something is very wrong if armv7m is NULL */
-		LOG_ERROR("unable to get armv7m target");
-		return retval;
-	}
 
 	/* write code buffer and use Flash programming code within NuMicro     */
 	/* Set breakpoint to 0 with time-out of 1000 ms                        */

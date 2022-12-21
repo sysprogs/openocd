@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2013 Andes Technology                                   *
  *   Hsiangkai Wang <hkwang@andestech.com>                                 *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -78,12 +67,12 @@ static int nds32_v3_debug_entry(struct nds32 *nds32, bool enable_watchpoint)
 
 	struct breakpoint *syscall_break = &(nds32->syscall_break);
 	if (nds32->virtual_hosting) {
-		if (syscall_break->set) {
+		if (syscall_break->is_set) {
 			/** disable virtual hosting */
 
 			/* remove breakpoint at syscall entry */
 			target_remove_breakpoint(nds32->target, syscall_break);
-			syscall_break->set = 0;
+			syscall_break->is_set = false;
 
 			uint32_t value_pc;
 			nds32_get_mapped_reg(nds32, PC, &value_pc);
@@ -209,7 +198,7 @@ static int nds32_v3_leave_debug_state(struct nds32 *nds32, bool enable_watchpoin
 
 		syscall_break->address = syscall_address;
 		syscall_break->type = BKPT_SOFT;
-		syscall_break->set = 1;
+		syscall_break->is_set = true;
 		target_add_breakpoint(target, syscall_break);
 	}
 

@@ -1,18 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /*
  * Copyright (C) 2009 by David Brownell
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -398,7 +387,7 @@ fail:
  * or running debugger code.
  */
 static int dpm_maybe_update_bpwp(struct arm_dpm *dpm, bool bpwp,
-	struct dpm_bpwp *xp, int *set_p)
+	struct dpm_bpwp *xp, bool *set_p)
 {
 	int retval = ERROR_OK;
 	bool disable;
@@ -473,7 +462,7 @@ int arm_dpm_write_dirty_registers(struct arm_dpm *dpm, bool bpwp)
 			struct breakpoint *bp = dbp->bp;
 
 			retval = dpm_maybe_update_bpwp(dpm, bpwp, &dbp->bpwp,
-					bp ? &bp->set : NULL);
+					bp ? &bp->is_set : NULL);
 			if (retval != ERROR_OK)
 				goto done;
 		}
@@ -485,7 +474,7 @@ int arm_dpm_write_dirty_registers(struct arm_dpm *dpm, bool bpwp)
 		struct watchpoint *wp = dwp->wp;
 
 		retval = dpm_maybe_update_bpwp(dpm, bpwp, &dwp->bpwp,
-				wp ? &wp->set : NULL);
+				wp ? &wp->is_set : NULL);
 		if (retval != ERROR_OK)
 			goto done;
 	}

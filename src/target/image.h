@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /***************************************************************************
  *   Copyright (C) 2007 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
@@ -10,19 +12,6 @@
  *                                                                         *
  *   Copyright (C) 2018 by Advantest                                       *
  *   florian.meister@advantest.com                                         *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 
 #ifndef OPENOCD_TARGET_IMAGE_H
@@ -52,7 +41,7 @@ enum image_type {
 struct imagesection {
 	target_addr_t base_address;
 	uint32_t size;
-	int flags;
+	uint64_t flags;
 	void *private;		/* private data */
 };
 
@@ -108,7 +97,7 @@ int image_read_section(struct image *image, int section, target_addr_t offset,
 void image_close(struct image *image);
 
 int image_add_section(struct image *image, target_addr_t base, uint32_t size,
-		int flags, uint8_t const *data);
+		uint64_t flags, uint8_t const *data);
 
 int image_calculate_checksum(const uint8_t *buffer, uint32_t nbytes,
 		uint32_t *checksum);

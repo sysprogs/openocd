@@ -1,16 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /*
  * Copyright (C) 2009 by David Brownell
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
  */
 
 #ifdef HAVE_CONFIG_H
@@ -610,7 +601,7 @@ int armv8_dpm_modeswitch(struct arm_dpm *dpm, enum arm_mode mode)
 				/* load SPSR with the desired mode and execute DRPS */
 				LOG_DEBUG("SPSR = 0x%08"PRIx32, cpsr);
 				retval = dpm->instr_write_data_r0(dpm,
-						ARMV8_MSR_GP_xPSR_T1(1, 0, 15), cpsr);
+						ARMV8_MSR_GP_XPSR_T1(1, 0, 15), cpsr);
 				if (retval == ERROR_OK)
 					retval = dpm->instr_execute(dpm, armv8_opcode(armv8, ARMV8_OPC_DRPS));
 			}
@@ -818,7 +809,7 @@ fail:
  * or running debugger code.
  */
 static int dpmv8_maybe_update_bpwp(struct arm_dpm *dpm, bool bpwp,
-	struct dpm_bpwp *xp, int *set_p)
+	struct dpm_bpwp *xp, bool *set_p)
 {
 	int retval = ERROR_OK;
 	bool disable;
@@ -892,7 +883,7 @@ int armv8_dpm_write_dirty_registers(struct arm_dpm *dpm, bool bpwp)
 			struct breakpoint *bp = dbp->bp;
 
 			retval = dpmv8_maybe_update_bpwp(dpm, bpwp, &dbp->bpwp,
-					bp ? &bp->set : NULL);
+					bp ? &bp->is_set : NULL);
 			if (retval != ERROR_OK)
 				goto done;
 		}
@@ -904,7 +895,7 @@ int armv8_dpm_write_dirty_registers(struct arm_dpm *dpm, bool bpwp)
 		struct watchpoint *wp = dwp->wp;
 
 		retval = dpmv8_maybe_update_bpwp(dpm, bpwp, &dwp->bpwp,
-				wp ? &wp->set : NULL);
+				wp ? &wp->is_set : NULL);
 		if (retval != ERROR_OK)
 			goto done;
 	}
@@ -926,7 +917,7 @@ int armv8_dpm_write_dirty_registers(struct arm_dpm *dpm, bool bpwp)
 		if (!cache->reg_list[i].exist)
 			continue;
 		/* skip PC and CPSR */
-		if (i == ARMV8_PC || i == ARMV8_xPSR)
+		if (i == ARMV8_PC || i == ARMV8_XPSR)
 			continue;
 		/* skip invalid */
 		if (!cache->reg_list[i].valid)
@@ -948,7 +939,7 @@ int armv8_dpm_write_dirty_registers(struct arm_dpm *dpm, bool bpwp)
 
 	/* flush CPSR and PC */
 	if (retval == ERROR_OK)
-		retval = dpmv8_write_reg(dpm, &cache->reg_list[ARMV8_xPSR], ARMV8_xPSR);
+		retval = dpmv8_write_reg(dpm, &cache->reg_list[ARMV8_XPSR], ARMV8_XPSR);
 	if (retval == ERROR_OK)
 		retval = dpmv8_write_reg(dpm, &cache->reg_list[ARMV8_PC], ARMV8_PC);
 	/* flush R0 -- it's *very* dirty by now */
@@ -1302,9 +1293,9 @@ void armv8_dpm_handle_exception(struct arm_dpm *dpm, bool do_restore)
 	unsigned int el;
 
 	static const int clobbered_regs_by_el[3][5] = {
-		{ ARMV8_PC, ARMV8_xPSR, ARMV8_ELR_EL1, ARMV8_ESR_EL1, ARMV8_SPSR_EL1 },
-		{ ARMV8_PC, ARMV8_xPSR, ARMV8_ELR_EL2, ARMV8_ESR_EL2, ARMV8_SPSR_EL2 },
-		{ ARMV8_PC, ARMV8_xPSR, ARMV8_ELR_EL3, ARMV8_ESR_EL3, ARMV8_SPSR_EL3 },
+		{ ARMV8_PC, ARMV8_XPSR, ARMV8_ELR_EL1, ARMV8_ESR_EL1, ARMV8_SPSR_EL1 },
+		{ ARMV8_PC, ARMV8_XPSR, ARMV8_ELR_EL2, ARMV8_ESR_EL2, ARMV8_SPSR_EL2 },
+		{ ARMV8_PC, ARMV8_XPSR, ARMV8_ELR_EL3, ARMV8_ESR_EL3, ARMV8_SPSR_EL3 },
 	};
 
 	el = (dpm->dscr >> 8) & 3;
@@ -1319,7 +1310,7 @@ void armv8_dpm_handle_exception(struct arm_dpm *dpm, bool do_restore)
 	mem_ap_write_u32(armv8->debug_ap,
 		armv8->debug_base + CPUV8_DBG_DRCR, DRCR_CSE);
 
-	armv8->read_reg_u64(armv8, ARMV8_xPSR, &dlr);
+	armv8->read_reg_u64(armv8, ARMV8_XPSR, &dlr);
 	dspsr = dlr;
 	armv8->read_reg_u64(armv8, ARMV8_PC, &dlr);
 

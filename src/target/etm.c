@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 /***************************************************************************
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful,       *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
- *   GNU General Public License for more details.                          *
- *                                                                         *
- *   You should have received a copy of the GNU General Public License     *
- *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
  ***************************************************************************/
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -1416,8 +1405,7 @@ COMMAND_HANDLER(handle_etm_config_command)
 
 	for (i = 0; etm_capture_drivers[i]; i++) {
 		if (strcmp(CMD_ARGV[4], etm_capture_drivers[i]->name) == 0) {
-			int retval = register_commands(CMD_CTX, NULL,
-					etm_capture_drivers[i]->commands);
+			int retval = register_commands(CMD_CTX, NULL, etm_capture_drivers[i]->commands);
 			if (retval != ERROR_OK) {
 				free(etm_ctx);
 				return retval;
