@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.0)
 project (OpenOCD)
 
 INCLUDE (CheckIncludeFiles)
-SET(OPENOCD_VERSION 0.11.0)
+SET(OPENOCD_VERSION 0.12.0)
 
 set(SH_WRAPPER ${CMAKE_CURRENT_SOURCE_DIR}/external/run-sh.bat)
 include(config.cmake)
