@@ -6636,64 +6636,6 @@ static int jim_target_smp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	return retval;
 }
 
-static int jim_target_amp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
-{
-	int i;
-	const char *targetname;
-	int retval, len;
-	struct target *target = (struct target *)NULL;
-	struct target_list *head, *curr, *new;
-	curr = (struct target_list *)NULL;
-	head = (struct target_list *)NULL;
-
-	retval = 0;
-	LOG_DEBUG("%d", argc);
-	/* argv[1] = target to associate in amp
-	 * argv[2] = target to assoicate in amp
-	 * argv[3] ...
-	 */
-
-	for (i = 1; i < argc; i++)
-	{
-		targetname = Jim_GetString(argv[i], &len);
-		target = get_target(targetname);
-		LOG_DEBUG("%s ", targetname);
-		if (target)
-		{
-			new = malloc(sizeof(struct target_list));
-			new->target = target;
-			new->lh.next = (struct list_head *)NULL;
-			if (head == (struct target_list *)NULL)
-			{
-				head = new;
-				curr = head;
-			}
-			else
-			{
-				curr->lh.next = &new->lh;
-				curr = new;
-			}
-		}
-	}
-	/*  now parse the list of cpu and put the target in smp mode*/
-	curr = head;
-
-	while (curr != (struct target_list *)NULL)
-	{
-		target = curr->target;
-		/* in this case, the amp must be set before */
-		target->amp = 1;
-		target->smp = 0;
-		target->smp_targets = &head->lh;
-		curr = (struct target_list *)curr->lh.next;
-	}
-
-	if (target && target->rtos && !target->amp)
-		retval = rtos_smp_init(head->target);
-
-	return retval;
-}
-
 static int jim_target_create(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 {
 	struct jim_getopt_info goi;
@@ -6746,13 +6688,6 @@ static const struct command_registration target_subcommand_handlers[] = {
 		.jim_handler = jim_target_smp,
 		.usage = "targetname1 targetname2 ...",
 		.help = "gather several target in a smp list"
-	},
-	{
-		.name = "amp",
-		.mode = COMMAND_ANY,
-		.jim_handler = jim_target_amp,
-		.usage = "targetname1 targetname2 ...",
-		.help = "gather several target in an amp list"
 	},
 
 	COMMAND_REGISTRATION_DONE
