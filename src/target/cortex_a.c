@@ -3297,6 +3297,7 @@ COMMAND_HANDLER(handle_cortex_a_dacrfixup_command)
 COMMAND_HANDLER(handle_cortex_a_freeze_core_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
+	struct target_list *head;
     int coreid = 0, delta = 0;
 
     if (CMD_ARGC > 0) 
@@ -3315,9 +3316,9 @@ COMMAND_HANDLER(handle_cortex_a_freeze_core_command)
         return ERROR_COMMAND_ARGUMENT_INVALID;
     }
     
-    for (struct target_list *pLst = target->head; pLst; pLst = pLst->next)
+	foreach_smp_target(head, target->smp_targets)
     {
-        struct target *pThisTarget = pLst->target;
+	    struct target *pThisTarget = head->target;
         if (!pThisTarget)
             continue;
         if (pThisTarget->coreid == coreid)

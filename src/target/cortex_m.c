@@ -30,6 +30,7 @@
 #include "arm_semihosting.h"
 #include <helper/time_support.h>
 #include <rtt/rtt.h>
+#include "smp.h"
 
 /* NOTE:  most of this should work fine for the Cortex-M1 and
  * Cortex-M0 cores too, although they're ARMv6-M not ARMv7-M.
@@ -878,15 +879,14 @@ static int cortex_m_halt_amp(struct target *target)
 	int retval = 0;
 	struct target_list *head;
 	struct target *curr;
-	head = target->head;
-	while (head != (struct target_list *)NULL)
+	
+	foreach_smp_target(head, target->smp_targets)
 	{
 		curr = head->target;
 
 		if ((curr != target) && (curr->state != TARGET_HALTED) && target_was_examined(curr))
 			LOG_INFO("cortex_m_halt_amp : propagate halt to %d", curr->coreid);
 		retval += cortex_m_halt(curr);
-		head = head->next;
 	}
 	return retval;
 }
@@ -1040,7 +1040,6 @@ static int cortex_m_poll(struct target *target)
 static int cortex_m_halt(struct target *target)
 {
 	struct cortex_m_common *cortex_m = target_to_cm(target);
-	LOG_DEBUG("target->state: %s",
 	LOG_TARGET_DEBUG(target, "target->state: %s", target_state_name(target));
 
 	if (target->state == TARGET_HALTED) {
@@ -1456,15 +1455,14 @@ enum DM_AP_REGISTER
 	DM_AP_CSW = 0,
 	DM_AP_REQUEST = 4,
 	DM_AP_RETURN = 8,
-	DM_AP_ID = AP_REG_IDR
-}
-;
+	DM_AP_ID = ADIV5_AP_REG_IDR
+};
 
 //Based on section 51.6.1 of UM11295 (rev 1.4)
 static int dap_lpc55sx_start_debug_session(struct adiv5_dap *dap)
 {
 	int retval;
-	struct adiv5_ap *ap = dap_ap(dap, 2);
+	struct adiv5_ap *ap = dap_get_ap(dap, 2);
 		
 	uint32_t ap_id = 0;
 	retval = dap_queue_ap_read(ap, DM_AP_ID, &ap_id);
@@ -3061,39 +3059,25 @@ COMMAND_HANDLER(cortex_m_handle_amp_on_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
 	struct target_list *head;
-	struct target *curr;
-	head = target->head;
 
 	LOG_INFO("target =%p", target);
-	if (head != (struct target_list *)NULL)
+	foreach_smp_target(head, target->smp_targets)
 	{
-		target->amp = 1;
-		while (head != (struct target_list *)NULL)
-		{
-			curr = head->target;
-			curr->amp = 1;
-			head = head->next;
-		}
+		head->target->amp = 1;
 	}
+	
 	return ERROR_OK;
 }
 
 COMMAND_HANDLER(cortex_m_handle_amp_off_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
-	/* check target is an amp target */
 	struct target_list *head;
-	struct target *curr;
-	head = target->head;
-	target->amp = 0;
-	if (head != (struct target_list *)NULL)
+	/* check target is an amp target */
+	foreach_smp_target(head, target->smp_targets)
 	{
-		while (head != (struct target_list *)NULL)
-		{
-			curr = head->target;
-			curr->amp = 0;
-			head = head->next;
-		}
+		head->target->amp = 0;
+		
 		/* fixes the target display to the debugger */
 		target->gdb_service->target = target;
 	}
@@ -3104,9 +3088,7 @@ COMMAND_HANDLER(cortex_m_handle_amp_gdb_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
 	int retval = ERROR_OK;
-	struct target_list *head;
-	head = target->head;
-	if (head != (struct target_list *)NULL)
+	if (target->amp)
 	{
 		if (CMD_ARGC == 1)
 		{

@@ -25,7 +25,6 @@ extern struct rtos_type chromium_ec_rtos;
 extern struct rtos_type embkernel_rtos;
 extern struct rtos_type mqx_rtos;
 extern struct rtos_type ucos_iii_rtos;
-extern struct rtos_type multicore_rtos;
 extern struct rtos_type nuttx_rtos;
 extern struct rtos_type hwthread_rtos;
 extern struct rtos_type riot_rtos;
@@ -42,7 +41,6 @@ static struct rtos_type *rtos_types[] = {
 	&mqx_rtos,
 	&ucos_iii_rtos,
 	&nuttx_rtos,
-	&multicore_rtos,
 	&riot_rtos,
 	&zephyr_rtos,
 	/* keep this as last, as it always matches with rtos auto */

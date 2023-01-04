@@ -6655,7 +6655,6 @@ static int jim_target_amp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 
 	for (i = 1; i < argc; i++)
 	{
-
 		targetname = Jim_GetString(argv[i], &len);
 		target = get_target(targetname);
 		LOG_DEBUG("%s ", targetname);
@@ -6663,7 +6662,7 @@ static int jim_target_amp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 		{
 			new = malloc(sizeof(struct target_list));
 			new->target = target;
-			new->next = (struct target_list *)NULL;
+			new->lh.next = (struct list_head *)NULL;
 			if (head == (struct target_list *)NULL)
 			{
 				head = new;
@@ -6671,7 +6670,7 @@ static int jim_target_amp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 			}
 			else
 			{
-				curr->next = new;
+				curr->lh.next = &new->lh;
 				curr = new;
 			}
 		}
@@ -6685,8 +6684,8 @@ static int jim_target_amp(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 		/* in this case, the amp must be set before */
 		target->amp = 1;
 		target->smp = 0;
-		target->head = head;
-		curr = curr->next;
+		target->smp_targets = &head->lh;
+		curr = (struct target_list *)curr->lh.next;
 	}
 
 	if (target && target->rtos && !target->amp)

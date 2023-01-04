@@ -173,6 +173,22 @@
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
 	<TargetDeviceFamily>
+		<ID>STM32WL</ID>
+		<Name>STM32WLxx</Name>
+		<MatchRegex>^STM32WL.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32wl</BspID>
+		<ScriptFile>target/stm32wlx.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32U5</ID>
+		<Name>STM32U5xx</Name>
+		<MatchRegex>^STM32U5.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<ScriptFile>target/stm32u5x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
 		<ID>BLUENRG-LP</ID>
 		<Name>BlueNRG-LP</Name>
 		<MatchRegex>^BlueNRG-LP$</MatchRegex>

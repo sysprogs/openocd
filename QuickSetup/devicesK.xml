@@ -14,6 +14,13 @@
 		<HardwareBreakpointsOnly>true</HardwareBreakpointsOnly>
 	</TargetDeviceFamily>
 	<TargetDeviceFamily>
+		<ID>raspberrypi4</ID>
+		<Name>Raspberry Pi 4</Name>
+		<ScriptFile>target/raspberrypi4.cfg</ScriptFile>
+		<JTAGHelpURL>http://sysprogs.com/VisualKernel/tutorials/raspberry/jtagsetup/</JTAGHelpURL>
+		<HardwareBreakpointsOnly>true</HardwareBreakpointsOnly>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
 		<ID>imx6_single</ID>
 		<Name>i.MX6 (single core)</Name>
 		<ScriptFile>target/imx6.cfg</ScriptFile>

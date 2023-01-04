@@ -106,6 +106,16 @@ add_library(target
 	arc.c
 	arc_cmd.c
 	arc_jtag.c
-	arc_mem.c)
+	arc_mem.c
+	espressif/esp_semihosting.c
+	espressif/esp_xtensa.c
+	espressif/esp_xtensa_semihosting.c
+	espressif/esp_xtensa_smp.c
+	espressif/esp32.c
+	espressif/esp32s2.c
+	espressif/esp32s3.c
+	xtensa/xtensa.c
+	xtensa/xtensa_chip.c
+	xtensa/xtensa_debug_module.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})
