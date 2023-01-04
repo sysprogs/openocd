@@ -44,6 +44,7 @@ static const struct option long_options[] = {
 	{"search",		required_argument,		0,				's'},
 	{"log_output",	required_argument,		0,				'l'},
 	{"command",		required_argument,		0,				'c'},
+	{"set",			required_argument,		0,				'e'},
 	{0, 0, 0, 0}
 };
 
@@ -310,6 +311,14 @@ int parse_cmdline_args(struct command_context *cmd_ctx, int argc, char *argv[])
 				if (optarg)
 				    add_config_command(optarg);
 				break;
+			case 'e':
+				if (optarg)
+				{
+					char *command = alloc_printf("set %s", optarg);
+					add_config_command(command);
+					free(command);
+				}
+				break;			
 			default:  /* '?' */
 				/* getopt will emit an error message, all we have to do is bail. */
 				return ERROR_FAIL;
