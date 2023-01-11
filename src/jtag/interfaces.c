@@ -262,7 +262,7 @@ struct adapter_driver *adapter_drivers[] = {
 #if BUILD_XDS110 == 1
 		&xds110_adapter_driver,
 #endif
-#if BUILD_HLADAPTER_STLINK == 1 && !defined(HLA_MULTICORE)
+#if BUILD_HLADAPTER_STLINK == 1
 		&stlink_dap_adapter_driver,
 #endif
 #if BUILD_RSHIM == 1
