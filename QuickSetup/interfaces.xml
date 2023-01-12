@@ -372,6 +372,11 @@
 				<PID>F148</PID>
 				<Interface>00</Interface>
 			</UsbIdentity>
+			<UsbIdentity>
+				<VID>2E8A</VID>
+				<PID>000C</PID>
+				<Interface>00</Interface>
+			</UsbIdentity>
 		</UsbIdentities>
 		<SerialNumberCommand>cmsis_dap_serial</SerialNumberCommand>
 	</ProgrammingInterface>
