@@ -269,7 +269,7 @@ static struct command_context *setup_command_handler(Jim_Interp *interp)
 
 	LOG_OUTPUT(OPENOCD_VERSION "\n"
 		"Licensed under GNU GPL v2\n");
-	LOG_OUTPUT("libusb1 " LIBUSB1_COMMIT "\n");
+	LOG_OUTPUT("libusb1 ++LIBUSB1_COMMIT++ \n");
 
 	global_cmd_ctx = cmd_ctx;
 

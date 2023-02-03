@@ -51,13 +51,13 @@ extern const struct flash_driver nrf51_flash;
 extern const struct flash_driver numicro_flash;
 extern const struct flash_driver ocl_flash;
 extern const struct flash_driver pic32mx_flash;
-extern const struct flash_driver pic32mm_flash;
+//extern const struct flash_driver pic32mm_flash;
 extern const struct flash_driver psoc4_flash;
 extern const struct flash_driver psoc5lp_flash;
 extern const struct flash_driver psoc5lp_eeprom_flash;
 extern const struct flash_driver psoc5lp_nvl_flash;
 extern const struct flash_driver psoc6_flash;
-extern const struct flash_driver rs14100_flash;
+//extern const struct flash_driver rs14100_flash;
 extern const struct flash_driver renesas_rpchf_flash;
 extern const struct flash_driver rp2040_flash;
 extern const struct flash_driver sh_qspi_flash;
@@ -67,10 +67,10 @@ extern const struct flash_driver stm32f1x_flash;
 extern const struct flash_driver stm32f2x_flash;
 extern const struct flash_driver stm32lx_flash;
 extern const struct flash_driver stm32l4x_flash;
-extern const struct flash_driver stm32l5x_flash;
+//extern const struct flash_driver stm32l5x_flash;
 extern const struct flash_driver stm32h7x_flash;
-extern const struct flash_driver stm32g0x_flash;
-extern const struct flash_driver stm32g4x_flash;
+//extern const struct flash_driver stm32g0x_flash;
+//extern const struct flash_driver stm32g4x_flash;
 extern const struct flash_driver stmqspi_flash;
 extern const struct flash_driver stmsmi_flash;
 extern const struct flash_driver str7x_flash;
@@ -85,10 +85,10 @@ extern const struct flash_driver xmc1xxx_flash;
 extern const struct flash_driver xmc4xxx_flash;
 extern const struct flash_driver rsl10_flash;
 
-extern struct flash_driver plugin_flash;
-extern struct flash_driver msp432p4_flash;
-extern struct flash_driver aducm302x_flash;
-extern struct flash_driver aducm4x50_flash;
+//extern const struct flash_driver plugin_flash;
+//extern const struct flash_driver msp432p4_flash;
+//extern const struct flash_driver aducm302x_flash;
+//extern const struct flash_driver aducm4x50_flash;
 
 
 /**
@@ -97,9 +97,9 @@ extern struct flash_driver aducm4x50_flash;
  */
 static const struct flash_driver * const flash_drivers[] = {
 	&aduc702x_flash,
-	&aducm302x_flash,
+	//&aducm302x_flash,
 	&aducm360_flash,
-	&aducm4x50_flash,
+	//&aducm4x50_flash,
 	&ambiqmicro_flash,
 	&at91sam3_flash,
 	&at91sam4_flash,
@@ -140,13 +140,13 @@ static const struct flash_driver * const flash_drivers[] = {
 	&numicro_flash,
 	&ocl_flash,
 	&pic32mx_flash,
-	&pic32mm_flash,
+	//&pic32mm_flash,
 	&psoc4_flash,
 	&psoc5lp_flash,
 	&psoc5lp_eeprom_flash,
 	&psoc5lp_nvl_flash,
 	&psoc6_flash,
-	&rs14100_flash,
+	//&rs14100_flash,
 	&renesas_rpchf_flash,
 	&rp2040_flash,
 	&sh_qspi_flash,
@@ -156,10 +156,10 @@ static const struct flash_driver * const flash_drivers[] = {
 	&stm32f2x_flash,
 	&stm32lx_flash,
 	&stm32l4x_flash,
-	&stm32l5x_flash,
+	//&stm32l5x_flash,
 	&stm32h7x_flash,
-	&stm32g0x_flash,
-	&stm32g4x_flash,
+	//&stm32g0x_flash,
+	//&stm32g4x_flash,
 	&stmsmi_flash,
 	&stmqspi_flash,
 	&str7x_flash,
@@ -173,8 +173,8 @@ static const struct flash_driver * const flash_drivers[] = {
 	&xmc4xxx_flash,
 	&w600_flash,
 	&rsl10_flash,
-	&msp432p4_flash,
-	&plugin_flash,
+	//&msp432p4_flash,
+	//&plugin_flash,
 	NULL,
 };
 

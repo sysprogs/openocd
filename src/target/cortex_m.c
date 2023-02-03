@@ -3155,7 +3155,7 @@ COMMAND_HANDLER(handle_cortex_m_reset_config_command)
 				cortex_m->soft_reset_config = CORTEX_M_RESET_VECTRESET;
 
 		}
-		else if (stricmp(*CMD_ARGV, "lpc55sxx") == 0)
+		else if (strcasecmp(*CMD_ARGV, "lpc55sxx") == 0)
 			cortex_m->soft_reset_config = CORTEX_M_RESET_LPC55SX;
 		else
 			return ERROR_COMMAND_SYNTAX_ERROR;
