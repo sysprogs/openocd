@@ -2372,7 +2372,7 @@ static int aarch64_read_cpu_memory(struct target *target,
         int wordCount = ((size * count) + delta + 3) / 4;
         uint8_t *pTmp = (uint8_t *)malloc(wordCount * 4);
         int r = aarch64_read_cpu_memory(target, alignedAddr, 4, wordCount, pTmp);
-        if (r == ERROR_SUCCESS)
+        if (r == ERROR_OK)
         {
             memcpy(buffer, pTmp + delta, size * count);
         }
