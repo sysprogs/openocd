@@ -1,6 +1,6 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/helper ${CMAKE_CURRENT_SOURCE_DIR}/../jimtcl ${CMAKE_CURRENT_BINARY_DIR}/../jimtcl-cmake ${CMAKE_CURRENT_BINARY_DIR})
 
-add_library(helper helper/binarybuffer.c helper/options.c helper/time_support_common.c helper/configuration.c helper/log.c helper/command.c helper/time_support.c helper/replacements.c helper/fileio.c helper/util.c helper/jim-nvp.c helper/jep106.c helper/unicode.c)
+add_library(helper helper/binarybuffer.c helper/options.c helper/time_support_common.c helper/configuration.c helper/log.c helper/command.c helper/time_support.c helper/replacements.c helper/fileio.c helper/util.c helper/jim-nvp.c helper/jep106.c helper/unicode.c helper/crc32.c)
 
 add_library(transport transport/transport.c)
 add_library(svf svf/svf.c)
@@ -8,7 +8,7 @@ add_library(xsvf xsvf/xsvf.c)
 add_library(pld pld/pld.c pld/xilinx_bit.c pld/virtex2.c)
 add_library(rtt rtt/rtt.c rtt/tcl.c)
 add_library(server server/server.c server/telnet_server.c server/gdb_server.c server/rtt_server.c server/tcl_server.c server/ipdbg.c)
-add_library(rtos rtos/rtos.c rtos/rtos_standard_stackings.c rtos/rtos_ecos_stackings.c rtos/rtos_chibios_stackings.c rtos/rtos_embkernel_stackings.c rtos/rtos_mqx_stackings.c rtos/FreeRTOS.c rtos/ThreadX.c rtos/eCos.c rtos/linux.c rtos/ChibiOS.c rtos/embKernel.c rtos/mqx.c rtos/rtos_ucos_iii_stackings.c rtos/uCOS-III.c rtos/nuttx.c rtos/chromium-ec.c rtos/hwthread.c rtos/riot.c rtos/rtos_riot_stackings.c rtos/zephyr.c)
+add_library(rtos rtos/rtos.c rtos/rtos_standard_stackings.c rtos/rtos_ecos_stackings.c rtos/rtos_chibios_stackings.c rtos/rtos_embkernel_stackings.c rtos/rtos_mqx_stackings.c rtos/FreeRTOS.c rtos/ThreadX.c rtos/eCos.c rtos/linux.c rtos/ChibiOS.c rtos/embKernel.c rtos/mqx.c rtos/rtos_ucos_iii_stackings.c rtos/uCOS-III.c rtos/nuttx.c rtos/chromium-ec.c rtos/hwthread.c rtos/riot.c rtos/rtos_riot_stackings.c rtos/zephyr.c rtos/rtkernel.c rtos/rtos_nuttx_stackings.c)
 
 add_subdirectory(target)
 add_subdirectory(jtag)
@@ -44,7 +44,6 @@ target_link_libraries(openocd
 	ocdflashnand
 	ocdflashnor
 	ocdhla
-	ocdaice
 	ocdusbblaster
 	openrisc
 	target

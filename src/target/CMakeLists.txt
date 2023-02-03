@@ -62,16 +62,6 @@ add_library(target
 	mips32_pracc.c
 	mips_ejtag.c
 	mips_m4k.c
-	nds32.c
-	nds32_aice.c
-	nds32_cmd.c
-	nds32_disassembler.c
-	nds32_reg.c
-	nds32_tlb.c
-	nds32_v2.c
-	nds32_v3.c
-	nds32_v3m.c
-	nds32_v3_common.c
 	quark_d20xx.c
 	quark_x10xx.c
 	register.c

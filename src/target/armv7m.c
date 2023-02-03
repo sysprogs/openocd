@@ -97,7 +97,7 @@ static const struct {
 	{ ARMV7M_R13, "sp", 32, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.m-profile" },
 	{ ARMV7M_R14, "lr", 32, REG_TYPE_INT, "general", "org.gnu.gdb.arm.m-profile" },
 	{ ARMV7M_PC, "pc", 32, REG_TYPE_CODE_PTR, "general", "org.gnu.gdb.arm.m-profile" },
-	{ ARMV7M_XPSR, "xPSR", 32, REG_TYPE_INT, "general", "org.gnu.gdb.arm.m-profile" },
+	{ ARMV7M_XPSR, "xpsr", 32, REG_TYPE_INT, "general", "org.gnu.gdb.arm.m-profile" },
 
 	{ ARMV7M_MSP, "msp", 32, REG_TYPE_DATA_PTR, "system", "org.gnu.gdb.arm.m-system" },
 	{ ARMV7M_PSP, "psp", 32, REG_TYPE_DATA_PTR, "system", "org.gnu.gdb.arm.m-system" },
@@ -182,8 +182,11 @@ int armv7m_restore_context(struct target *target)
 	for (i = cache->num_regs - 1; i >= 0; i--) {
 		struct reg *r = &cache->reg_list[i];
 
-		if (r->exist && r->dirty)
-			armv7m->arm.write_core_reg(target, r, i, ARM_MODE_ANY, r->value);
+		if (r->exist && r->dirty) {
+			int retval = armv7m->arm.write_core_reg(target, r, i, ARM_MODE_ANY, r->value);
+			if (retval != ERROR_OK)
+				return retval;
+		}
 	}
 
 	return ERROR_OK;

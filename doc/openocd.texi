@@ -2480,7 +2480,7 @@ This command is only available if your libusb1 is at least version 1.0.16.
 Specifies the @var{serial_string} of the adapter to use.
 If this command is not specified, serial strings are not checked.
 Only the following adapter drivers use the serial string from this command:
-aice (aice_usb), arm-jtag-ew, cmsis_dap, ft232r, ftdi, hla (stlink, ti-icdi), jlink, kitprog, opendus,
+arm-jtag-ew, cmsis_dap, esp_usb_jtag, ft232r, ftdi, hla (stlink, ti-icdi), jlink, kitprog, opendus,
 openjtag, osbdm, presto, rlink, st-link, usb_blaster (ublast2), usbprog, vsllink, xds110.
 @end deffn
 
@@ -4825,9 +4825,6 @@ specified, @xref{gdbportoverride,,option -gdb-port}.), and a fake ARM core will
 be emulated to comply to GDB remote protocol.
 @item @code{mips_m4k} -- a MIPS core.
 @item @code{mips_mips64} -- a MIPS64 core.
-@item @code{nds32_v2} -- this is an Andes NDS32 v2 core (deprecated; would be removed in v0.13.0).
-@item @code{nds32_v3} -- this is an Andes NDS32 v3 core (deprecated; would be removed in v0.13.0).
-@item @code{nds32_v3m} -- this is an Andes NDS32 v3m core (deprecated; would be removed in v0.13.0).
 @item @code{or1k} -- this is an OpenRISC 1000 core.
 The current implementation supports three JTAG TAP cores:
 @itemize @minus
@@ -5003,7 +5000,7 @@ The value should normally correspond to a static mapping for the
 @var{rtos_type} can be one of @option{auto}, @option{none}, @option{eCos},
 @option{ThreadX}, @option{FreeRTOS}, @option{linux}, @option{ChibiOS},
 @option{embKernel}, @option{mqx}, @option{uCOS-III}, @option{nuttx},
-@option{RIOT}, @option{Zephyr}
+@option{RIOT}, @option{Zephyr}, @option{rtkernel}
 @xref{gdbrtossupport,,RTOS Support}.
 
 @item @code{-defer-examine} -- skip target examination at initial JTAG chain
@@ -10300,6 +10297,16 @@ the target, the exception catch must be disabled again with @command{$target_nam
 Issuing the command without options prints the current configuration.
 @end deffn
 
+@deffn {Command} {$target_name pauth} [@option{off}|@option{on}]
+Enable or disable pointer authentication features.
+When pointer authentication is used on ARM cores, GDB asks GDB servers for an 8-bytes mask to remove signature bits added by pointer authentication.
+If this feature is enabled, OpenOCD provides GDB with an 8-bytes mask.
+Pointer authentication feature is broken until gdb 12.1, going to be fixed.
+Consider using a newer version of gdb if you want to enable pauth feature.
+The default configuration is @option{off}.
+@end deffn
+
+
 @section EnSilica eSi-RISC Architecture
 
 eSi-RISC is a highly configurable microprocessor architecture for embedded systems
@@ -11860,6 +11867,7 @@ Currently supported rtos's include:
 @item @option{RIOT}
 @item @option{hwthread} (This is not an actual RTOS. @xref{usingopenocdsmpwithgdb,,Using OpenOCD SMP with GDB}.)
 @item @option{Zephyr}
+@item @option{rtkernel}
 @end itemize
 
 At any time, it's possible to drop the selected RTOS using:
@@ -11901,6 +11909,8 @@ _tcb_name_offset.
 @end raggedright
 @item Zephyr symbols
 _kernel, _kernel_openocd_offsets, _kernel_openocd_size_t_size
+@item rtkernel symbols
+Multiple struct offsets.
 @end table
 
 For most RTOS supported the above symbols will be exported by default. However for

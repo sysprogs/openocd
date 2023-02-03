@@ -2367,37 +2367,6 @@ COMMAND_HANDLER(riscv_set_reset_timeout_sec)
 	return ERROR_OK;
 }
 
-COMMAND_HANDLER(riscv_set_prefer_sba)
-{
-	struct target *target = get_current_target(CMD_CTX);
-	RISCV_INFO(r);
-	bool prefer_sba;
-	LOG_WARNING("`riscv set_prefer_sba` is deprecated. Please use `riscv set_mem_access` instead.");
-	if (CMD_ARGC != 1) {
-		LOG_ERROR("Command takes exactly 1 parameter");
-		return ERROR_COMMAND_SYNTAX_ERROR;
-	}
-	COMMAND_PARSE_ON_OFF(CMD_ARGV[0], prefer_sba);
-	if (prefer_sba) {
-		/* Use system bus with highest priority */
-		r->mem_access_methods[0] = RISCV_MEM_ACCESS_SYSBUS;
-		r->mem_access_methods[1] = RISCV_MEM_ACCESS_PROGBUF;
-		r->mem_access_methods[2] = RISCV_MEM_ACCESS_ABSTRACT;
-	} else {
-		/* Use progbuf with highest priority */
-		r->mem_access_methods[0] = RISCV_MEM_ACCESS_PROGBUF;
-		r->mem_access_methods[1] = RISCV_MEM_ACCESS_SYSBUS;
-		r->mem_access_methods[2] = RISCV_MEM_ACCESS_ABSTRACT;
-	}
-
-	/* Reset warning flags */
-	r->mem_access_progbuf_warn = true;
-	r->mem_access_sysbus_warn = true;
-	r->mem_access_abstract_warn = true;
-
-	return ERROR_OK;
-}
-
 COMMAND_HANDLER(riscv_set_mem_access)
 {
 	struct target *target = get_current_target(CMD_CTX);
@@ -2742,38 +2711,6 @@ COMMAND_HANDLER(riscv_dmi_write)
 	}
 }
 
-COMMAND_HANDLER(riscv_test_sba_config_reg)
-{
-	LOG_WARNING("Command \"riscv test_sba_config_reg\" is deprecated. "
-		"It will be removed in a future OpenOCD version.");
-
-	if (CMD_ARGC != 4) {
-		LOG_ERROR("Command takes exactly 4 arguments");
-		return ERROR_COMMAND_SYNTAX_ERROR;
-	}
-
-	struct target *target = get_current_target(CMD_CTX);
-	RISCV_INFO(r);
-
-	target_addr_t legal_address;
-	uint32_t num_words;
-	target_addr_t illegal_address;
-	bool run_sbbusyerror_test;
-
-	COMMAND_PARSE_NUMBER(target_addr, CMD_ARGV[0], legal_address);
-	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[1], num_words);
-	COMMAND_PARSE_NUMBER(target_addr, CMD_ARGV[2], illegal_address);
-	COMMAND_PARSE_ON_OFF(CMD_ARGV[3], run_sbbusyerror_test);
-
-	if (r->test_sba_config_reg) {
-		return r->test_sba_config_reg(target, legal_address, num_words,
-				illegal_address, run_sbbusyerror_test);
-	} else {
-		LOG_ERROR("test_sba_config_reg is not implemented for this target.");
-		return ERROR_FAIL;
-	}
-}
-
 COMMAND_HANDLER(riscv_reset_delays)
 {
 	int wait = 0;
@@ -2949,14 +2886,6 @@ static const struct command_registration riscv_exec_command_handlers[] = {
 		.help = "Set the wall-clock timeout (in seconds) after reset is deasserted"
 	},
 	{
-		.name = "set_prefer_sba",
-		.handler = riscv_set_prefer_sba,
-		.mode = COMMAND_ANY,
-		.usage = "on|off",
-		.help = "When on, prefer to use System Bus Access to access memory. "
-			"When off (default), prefer to use the Program Buffer to access memory."
-	},
-	{
 		.name = "set_mem_access",
 		.handler = riscv_set_mem_access,
 		.mode = COMMAND_ANY,
@@ -3020,19 +2949,6 @@ static const struct command_registration riscv_exec_command_handlers[] = {
 		.mode = COMMAND_ANY,
 		.usage = "address value",
 		.help = "Perform a 32-bit DMI write of value at address."
-	},
-	{
-		.name = "test_sba_config_reg",
-		.handler = riscv_test_sba_config_reg,
-		.mode = COMMAND_ANY,
-		.usage = "legal_address num_words "
-			"illegal_address run_sbbusyerror_test[on/off]",
-		.help = "Perform a series of tests on the SBCS register. "
-			"Inputs are a legal, 128-byte aligned address and a number of words to "
-			"read/write starting at that address (i.e., address range [legal address, "
-			"legal_address+word_size*num_words) must be legally readable/writable), "
-			"an illegal, 128-byte aligned address for error flag/handling cases, "
-			"and whether sbbusyerror test should be run."
 	},
 	{
 		.name = "reset_delays",
