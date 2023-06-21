@@ -10,16 +10,18 @@
 #endif
 
 #include "pld.h"
+#include <sys/stat.h>
 #include <helper/log.h>
 #include <helper/replacements.h>
 #include <helper/time_support.h>
 
 
-/* pld drivers
- */
-extern struct pld_driver virtex2_pld;
-
 static struct pld_driver *pld_drivers[] = {
+	&efinix_pld,
+	&gatemate_pld,
+	&gowin_pld,
+	&intel_pld,
+	&lattice_pld,
 	&virtex2_pld,
 	NULL,
 };
@@ -134,12 +136,26 @@ COMMAND_HANDLER(handle_pld_load_command)
 		return ERROR_OK;
 	}
 
+	struct stat input_stat;
+	if (stat(CMD_ARGV[1], &input_stat) == -1) {
+		LOG_ERROR("couldn't stat() %s: %s", CMD_ARGV[1], strerror(errno));
+		return ERROR_PLD_FILE_LOAD_FAILED;
+	}
+
+	if (S_ISDIR(input_stat.st_mode)) {
+		LOG_ERROR("%s is a directory", CMD_ARGV[1]);
+		return ERROR_PLD_FILE_LOAD_FAILED;
+	}
+
+	if (input_stat.st_size == 0) {
+		LOG_ERROR("Empty file %s", CMD_ARGV[1]);
+		return ERROR_PLD_FILE_LOAD_FAILED;
+	}
+
 	retval = p->driver->load(p, CMD_ARGV[1]);
 	if (retval != ERROR_OK) {
 		command_print(CMD, "failed loading file %s to pld device %u",
 			CMD_ARGV[1], dev_id);
-		switch (retval) {
-		}
 		return retval;
 	} else {
 		gettimeofday(&end, NULL);

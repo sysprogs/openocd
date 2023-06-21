@@ -117,7 +117,7 @@ static void gdb_sig_halted(struct connection *connection);
 
 /* number of gdb connections, mainly to suppress gdb related debugging spam
  * in helper/log.c when no gdb connections are actually active */
-int gdb_actual_connections;
+static int gdb_actual_connections;
 
 /* set if we are sending a memory map to gdb
  * via qXfer:memory-map:read packet */
@@ -145,6 +145,9 @@ static char gdb_running_type;
 
 static int gdb_last_signal(struct target *target)
 {
+	LOG_TARGET_DEBUG(target, "Debug reason is: %s",
+			target_debug_reason_str(target->debug_reason));
+
 	switch (target->debug_reason) {
 		case DBG_REASON_DBGRQ:
 			return 0x2;		/* SIGINT */
@@ -159,8 +162,9 @@ static int gdb_last_signal(struct target *target)
 		case DBG_REASON_NOTHALTED:
 			return 0x0;		/* no signal... shouldn't happen */
 		default:
-			LOG_USER("undefined debug reason %d - target needs reset",
-					target->debug_reason);
+			LOG_USER("undefined debug reason %d (%s) - target needs reset",
+					target->debug_reason,
+					target_debug_reason_str(target->debug_reason));
 			return 0x0;
 	}
 }
@@ -231,39 +235,20 @@ static int gdb_get_char_inner(struct connection *connection, int *next_char)
 		}
 
 #ifdef _WIN32
-		errno = WSAGetLastError();
-
-		switch (errno) {
-			case WSAEWOULDBLOCK:
-				usleep(1000);
-				break;
-			case WSAECONNABORTED:
-				gdb_con->closed = true;
-				return ERROR_SERVER_REMOTE_CLOSED;
-			case WSAECONNRESET:
-				gdb_con->closed = true;
-				return ERROR_SERVER_REMOTE_CLOSED;
-			default:
-				LOG_ERROR("read: %d", errno);
-				exit(-1);
-		}
+		bool retry = (WSAGetLastError() == WSAEWOULDBLOCK);
 #else
-		switch (errno) {
-			case EAGAIN:
-				usleep(1000);
-				break;
-			case ECONNABORTED:
-				gdb_con->closed = true;
-				return ERROR_SERVER_REMOTE_CLOSED;
-			case ECONNRESET:
-				gdb_con->closed = true;
-				return ERROR_SERVER_REMOTE_CLOSED;
-			default:
-				LOG_ERROR("read: %s", strerror(errno));
-				gdb_con->closed = true;
-				return ERROR_SERVER_REMOTE_CLOSED;
-		}
+		bool retry = (errno == EAGAIN);
 #endif
+
+		if (retry) {
+			// Try again after a delay
+			usleep(1000);
+		} else {
+			// Print error and close the socket
+			log_socket_error("GDB");
+			gdb_con->closed = true;
+			return ERROR_SERVER_REMOTE_CLOSED;
+		}
 	}
 
 #ifdef _DEBUG_GDB_IO_
@@ -798,6 +783,7 @@ static void gdb_signal_reply(struct target *target, struct connection *connectio
 		}
 
 		if (gdb_connection->ctrl_c) {
+			LOG_TARGET_DEBUG(target, "Responding with signal 2 (SIGINT) to debugger due to Ctrl-C");
 			signal_var = 0x2;
 		} else
 			signal_var = gdb_last_signal(ct);
@@ -2395,6 +2381,7 @@ static int smp_reg_list_noread(struct target *target,
 						local_list = realloc(local_list, combined_allocated * sizeof(struct reg *));
 						if (!local_list) {
 							LOG_ERROR("realloc(%zu) failed", combined_allocated * sizeof(struct reg *));
+							free(reg_list);
 							return ERROR_FAIL;
 						}
 					}
@@ -3023,7 +3010,8 @@ static int gdb_query_packet(struct connection *connection,
 	return ERROR_OK;
 }
 
-static bool gdb_handle_vcont_packet(struct connection *connection, const char *packet, int packet_size)
+static bool gdb_handle_vcont_packet(struct connection *connection, const char *packet,
+	__attribute__((unused)) int packet_size)
 {
 	struct gdb_connection *gdb_connection = connection->priv;
 	struct target *target = get_target_from_connection(connection);
@@ -3042,7 +3030,6 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 
 	if (parse[0] == ';') {
 		++parse;
-		--packet_size;
 	}
 
 	/* simple case, a continue packet */
@@ -3081,14 +3068,11 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 		int current_pc = 1;
 		int64_t thread_id;
 		parse++;
-		packet_size--;
 		if (parse[0] == ':') {
 			char *endp;
 			parse++;
-			packet_size--;
 			thread_id = strtoll(parse, &endp, 16);
 			if (endp) {
-				packet_size -= endp - parse;
 				parse = endp;
 			}
 		} else {
@@ -3111,7 +3095,6 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 
 		if (parse[0] == ';') {
 			++parse;
-			--packet_size;
 
 			if (parse[0] == 'c') {
 				parse += 1;
@@ -4158,4 +4141,9 @@ void gdb_service_free(void)
 {
 	free(gdb_port);
 	free(gdb_port_next);
+}
+
+int gdb_get_actual_connections(void)
+{
+	return gdb_actual_connections;
 }

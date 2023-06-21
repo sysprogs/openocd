@@ -3293,15 +3293,32 @@ GPIO numbers >= 32 can't be used for performance reasons. GPIO configuration is
 handled by the generic command @ref{adapter gpio, @command{adapter gpio}}.
 
 See @file{interface/raspberrypi-native.cfg} for a sample config and
-pinout.
+@file{interface/raspberrypi-gpio-connector.cfg} for pinout.
 
 @deffn {Config Command} {bcm2835gpio speed_coeffs} @var{speed_coeff} @var{speed_offset}
 Set SPEED_COEFF and SPEED_OFFSET for delay calculations. If unspecified,
 speed_coeff defaults to 113714, and speed_offset defaults to 28.
 @end deffn
 
+@deffn {Config Command} {bcm2835gpio peripheral_mem_dev} @var{device}
+Set the device path for access to the memory mapped GPIO control registers.
+Uses @file{/dev/gpiomem} by default, this is also the preferred option with
+respect to system security.
+If overridden to @file{/dev/mem}:
+@itemize @minus
+@item OpenOCD needs @code{cap_sys_rawio} or run as root to open @file{/dev/mem}.
+Please be aware of security issues imposed by running OpenOCD with
+elevated user rights and by @file{/dev/mem} itself.
+@item correct @command{peripheral_base} must be configured.
+@item GPIO 0-27 pads are set to the limited slew rate
+and drive strength is reduced to 4 mA (2 mA on RPi 4).
+@end itemize
+
+@end deffn
+
 @deffn {Config Command} {bcm2835gpio peripheral_base} @var{base}
-Set the peripheral base register address to access GPIOs. For the RPi1, use
+Set the peripheral base register address to access GPIOs.
+Ignored if @file{/dev/gpiomem} is used. For the RPi1, use
 0x20000000. For RPi2 and RPi3, use 0x3F000000. For RPi4, use 0xFE000000. A full
 list can be found in the
 @uref{https://www.raspberrypi.org/documentation/hardware/raspberrypi/peripheral_addresses.md, official guide}.
@@ -7324,6 +7341,116 @@ Note: only Main and Work flash regions support Erase operation.
 @end deffn
 @end deffn
 
+@deffn {Flash Driver} {qn908x}
+The NXP QN908x microcontrollers feature a Cortex-M4F with integrated Bluetooth
+LE 5 support and an internal flash of up to 512 KiB. These chips only support
+the SWD interface.
+
+The @var{qn908x} driver uses the internal "Flash Memory Controller" block via
+SWD to erase, program and read the internal flash. This driver does not
+support the ISP (In-System Programming) mode which is an alternate way to
+program the flash via UART, SPI or USB.
+
+The internal flash is 512 KiB in size in all released chips and it starts at
+the address 0x01000000, although it can be mapped to address 0 and it is
+aliased to other addresses. This driver only recognizes the bank starting at
+address 0x01000000.
+
+The internal bootloader stored in ROM is in charge of loading and verifying
+the image from flash, or enter ISP mode. The programmed image must start at
+the beginning of the flash and contain a valid header and a matching CRC32
+checksum. Additionally, the image header contains a "Code Read Protection"
+(CRP) word which indicates whether SWD access is enabled, as well as whether
+ISP mode is enabled. Therefore, it is possible to program an image that
+disables SWD and ISP making it impossible to program another image in the
+future through these interfaces, or even debug the current image. While this is
+a valid use case for production deployments where the chips are locked down, by
+default this driver doesn't allow such images that disable the SWD interface.
+To program such images see the @command{qn908x allow_brick} command.
+
+Apart from the CRP field which is located in the image header, the last page
+of the flash memory contains a "Flash lock and protect" descriptor which allows
+to individually protect each 2 KiB page, as well as disabling SWD access to the
+flash and RAM. If this access is disabled it is not possible to read, erase or
+program individual pages from the SWD interface or even access the read-only
+"Flash information page" with information about the bootloader version and
+flash size. However when this protection is in place, it is still possible to
+mass erase the whole chip and then program a new image, for which you can use
+the @command{qn908x mass_erase}.
+
+Example:
+@example
+flash bank $FLASHNAME qn908x 0x01000000 0 0 0 $TARGETNAME calc_checksum
+@end example
+
+Parameters:
+@itemize
+@item @option{calc_checksum} optional parameter to compute the required
+checksum of the first bytes in the vector table.
+@quotation Note
+If the checksum in the header of your image is invalid and you don't provide the
+@option{calc_checksum} option the boot ROM will not boot your image and it may
+render the flash inaccessible. On the other hand, if you use this option to
+compute the checksum keep in mind that @command{verify_image} will fail on
+those four bytes of the checksum since those bytes in the flash will have the
+updated checksum.
+@end quotation
+@end itemize
+
+@deffn {Command} {qn908x allow_brick}
+Allow the qn908x driver to program images with a "Code Read Protection" byte
+that disables the SWD access. Programming such image will cause OpenOCD to
+not be able to reach the target over SWD anymore after the new image is
+programmed and its configuration takes effect, e.g. after a reboot. After
+executing @command{qn908x allow_brick} these images will be allowed to be
+programmed when writing to the flash.
+@end deffn
+
+@deffn {Command} {qn908x disable_wdog}
+Disable the watchdog timer (WDT) by resetting its CTRL field. The WDT starts
+enabled after a @command{reset halt} and it doesn't run while the target is
+halted. However, the verification process in this driver uses the generic
+Cortex-M verification process which executes a payload in RAM and thus
+requires the watchdog to be disabled before running @command{verify_image}
+after a reset halt or any other condition where the watchdog is running.
+Note that this is not done automatically and you must run this command in
+those scenarios.
+@end deffn
+
+@deffn {Command} {qn908x mass_erase}
+Erases the complete flash using the mass_erase method. Mass erase is only
+allowed if enabled in the Lock Status Register 8 (LOCK_STAT_8) which is read
+from the last sector of the flash on boot. However, this mass_erase lock
+protection can be bypassed and this command does so automatically.
+
+In the same LOCK_STAT_8 the flash and RAM access from SWD can be disabled by
+setting two bits in this register. After a mass_erase, all the bits of the
+flash would be set, making it the default to restrict SWD access to the flash
+and RAM regions. This new after erase LOCK_STAT_8 value only takes effect after
+being read from flash on the next reboot for example. After a mass_erase the
+LOCK_STAT_8 register is changed by the hardware to allow access to flash and
+RAM regardless of the value on flash, but only right after a mass_erase and
+until the next boot. Therefore it is possible to perform a mass_erase, program
+a new image, verify it and then reboot to a valid image that's locked from the
+SWD access.
+
+The @command{qn908x mass_erase} command clears the bits that would be loaded
+from the flash into LOCK_STAT_8 after erasing the whole chip to allow SWD
+access for debugging or re-flashing an image without a mass_erase by default.
+If the image being programmed also programs the last page of the flash with its
+own settings, this mass_erase behavior will interfere with that write since a
+new erase of at least the last page would need to be performed before writing
+to it again. For this reason the optional @option{keep_lock} argument can be
+used to leave the flash and RAM lock set. For development environments, the
+default behavior is desired.
+
+The mass erase locking mechanism is independent from the individual page
+locking bits, so it is possible that you can't erase a given page that is
+locked and you can't unprotect that page because the locking bits are also
+locked, but can still mass erase the whole flash.
+@end deffn
+@end deffn
+
 @deffn {Flash Driver} {rp2040}
 Supports RP2040 "Raspberry Pi Pico" microcontroller.
 RP2040 is a dual-core device with two CM0+ cores. Both cores share the same
@@ -8488,12 +8615,89 @@ openocd -f board/digilent_zedboard.cfg -c "init" \
 @end example
 
 
-
 @deffn {Command} {virtex2 read_stat} num
 Reads and displays the Virtex-II status register (STAT)
 for FPGA @var{num}.
 @end deffn
 @end deffn
+
+
+
+@deffn {FPGA Driver} {lattice} [family]
+The FGPA families ECP2, ECP3, ECP5, Certus and CertusPro by Lattice are supported.
+This driver can be used to load the bitstream into the FPGA or read the status register and read/write the usercode register.
+
+The option @option{family} is one of @var{ecp2 ecp3 ecp5 certus}. This is needed when the JTAG ID of the device is not known by openocd (newer NX devices).
+
+@deffn {Command} {lattice read_status} num
+Reads and displays the status register
+for FPGA @var{num}.
+@end deffn
+
+@deffn {Command} {lattice read_user} num
+Reads and displays the user register
+for FPGA @var{num}.
+@end deffn
+
+@deffn {Command} {lattice write_user} num val
+Writes the user register.
+for FPGA @var{num} with value @var{val}.
+@end deffn
+
+@deffn {Command} {lattice set_preload} num length
+Set the length of the register for the preload. This is needed when the JTAG ID of the device is not known by openocd (newer NX devices).
+The load command for the FPGA @var{num} will use a length for the preload of @var{length}.
+@end deffn
+@end deffn
+
+
+@deffn {FPGA Driver} {efinix}
+Both families (Trion and Titanium) sold by Efinix are supported as both use the same protocol for In-System Configuration.
+This driver can be used to load the bitstream into the FPGA.
+@end deffn
+
+
+@deffn {FPGA Driver} {intel} [@option{family}]
+This driver can be used to load the bitstream into Intel (former Altera) FPGAs.
+The families Cyclone III, Cyclone IV, Cyclone V, Cyclone 10, Arria II are supported.
+@c Arria V and Arria 10, MAX II, MAX V, MAX10)
+
+The option @option{family} is one of @var{cycloneiii cycloneiv cyclonev cyclone10 arriaii}.
+This is needed when the JTAG ID of the device is ambiguous (same ID is used for chips in different families).
+
+As input file format the driver supports a '.rbf' (raw bitstream file) file. The '.rbf' file can be generated
+from a '.sof' file with @verb{|quartus_cpf -c blinker.sof blinker.rbf|}
+
+Defines a new PLD device, an FPGA of the Cyclone III family, using the TAP named @verb{|cycloneiii.tap|}:
+@example
+pld device intel cycloneiii.tap cycloneiii
+@end example
+
+@deffn {Command} {intel set_bscan} num len
+Set boundary scan register length of FPGA @var{num} to @var{len}. This is needed because the
+length can vary between chips with the same JTAG ID.
+@end deffn
+
+@deffn {Command} {intel set_check_pos} num pos
+Selects the position @var{pos} in the boundary-scan register. The bit at this
+position is checked after loading the bitstream and must be '1', which is the case when no error occurred.
+With a value of -1 for @var{pos} the check will be omitted.
+@end deffn
+@end deffn
+
+
+@deffn {FPGA Driver} {gowin}
+This driver can be used to load the bitstream into FPGAs from Gowin.
+It is possible to program the SRAM. Programming the flash is not supported.
+The files @verb{|.fs|} and @verb{|.bin|} generated by Gowin FPGA Designer are supported.
+@end deffn
+
+
+@deffn {FPGA Driver} {gatemate}
+This driver can be used to load the bitstream into GateMate FPGAs form CologneChip.
+The files @verb{|.bit|} and @verb{|.cfg|} both generated by p_r tool from CologneChip are supported.
+@end deffn
+
 
 @node General Commands
 @chapter General Commands
@@ -8780,7 +8984,6 @@ power consumption (because the CPU is needlessly clocked).
 @deffn {Command} {resume} [address]
 Resume the target at its current code position,
 or the optional @var{address} if it is provided.
-OpenOCD will wait 5 seconds for the target to resume.
 @end deffn
 
 @deffn {Command} {step} [address]
@@ -9101,8 +9304,10 @@ format. Optional @option{start} and @option{end} parameters allow to
 limit the address range.
 @end deffn
 
-@deffn {Command} {version}
-Displays a string identifying the version of this OpenOCD server.
+@deffn {Command} {version} [git]
+Returns a string identifying the version of this OpenOCD server.
+With option @option{git}, it returns the git version obtained at compile time
+through ``git describe''.
 @end deffn
 
 @deffn {Command} {virt2phys} virtual_address
@@ -11136,6 +11341,80 @@ Stop current trace as started by the tracestart command.
 Dump trace memory to a file.
 @end deffn
 
+@section Espressif Specific Commands
+
+@deffn {Command} {esp apptrace} (start <destination> [<poll_period> [<trace_size> [<stop_tmo> [<wait4halt> [<skip_size>]]]]])
+Starts
+@uref{https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/app_trace.html#application-level-tracing-library, application level tracing}.
+Data will be stored to specified destination. Available destinations are:
+@itemize @bullet
+@item @code{file://<outfile>} - Save trace logs into file.
+@item @code{tcp://<host>:<port>} - Send trace logs to tcp port on specified host. OpenOCD will act as a tcp client.
+@item @code{con:} - Print trace logs to the stdout.
+@end itemize
+Other parameters will be same for each destination.
+@itemize @bullet
+@item @code{poll_period} - trace data polling period in ms.
+@item @code{trace_size} - maximum trace data size.
+Tracing will be stopped automatically when that amount is reached.
+Use "-1" to disable the limitation.
+@item @code{stop_tmo} - Data reception timeout in ms.
+Tracing will be stopped automatically when no data is received within that period.
+@item @code{wait4halt} - if non-zero then wait for target to be halted before tracing start.
+@item @code{skip_size} - amount of tracing data to be skipped before writing it to destination.
+@end itemize
+@end deffn
+
+@deffn {Command} {esp apptrace} (stop)
+Stops tracing started with above command.
+@end deffn
+
+@deffn {Command} {esp apptrace} (status)
+Requests ongoing tracing status.
+@end deffn
+
+@deffn {Command} {esp apptrace} (dump file://<outfile>)
+Dumps tracing data from target buffer. It can be useful to dump the latest data
+buffered on target for post-mortem analysis. For example when target starts tracing automatically
+w/o OpenOCD command and keeps only the latest data window which fit into the buffer.
+@uref{https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/app_trace.html#application-level-tracing-library, application level tracing}.
+Data will be stored to specified destination.
+@end deffn
+
+@deffn {Command} {esp sysview} (start file://<outfile1> [file://<outfile2>] [<poll_period> [<trace_size> [<stop_tmo> [<wait4halt> [<skip_size>]]]]])
+Starts @uref{https://www.segger.com/products/development-tools/systemview/, SEGGER SystemView}
+compatible tracing. Data will be stored to specified destination.
+For dual-core chips traces from every core will be saved to separate files.
+Resulting files can be open in "SEGGER SystemView" application.
+@url{https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/app_trace.html#openocd-systemview-tracing-command-options}
+The meaning of the arguments is identical to @command{esp apptrace start}.
+@end deffn
+
+@deffn {Command} {esp sysview} (stop)
+Stops SystremView compatible tracing started with above command.
+@url{https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/app_trace.html#openocd-systemview-tracing-command-options}
+@end deffn
+
+@deffn {Command} {esp sysview} (status)
+Requests ongoing SystremView compatible tracing status.
+@url{https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/app_trace.html#openocd-systemview-tracing-command-options}
+@end deffn
+
+@deffn {Command} {esp sysview_mcore} (start file://<outfile> [<poll_period> [<trace_size> [<stop_tmo> [<wait4halt> [<skip_size>]]]]])
+This command is identical to @command{esp sysview start}, but uses Espressif multi-core extension to
+@uref{https://www.segger.com/products/development-tools/systemview/, SEGGER SystemView} data format.
+Data will be stored to specified destination. Tracing data from all cores are saved in the same file.
+The meaning of the arguments is identical to @command{esp sysview start}.
+@end deffn
+
+@deffn {Command} {esp sysview_mcore} (stop)
+Stops Espressif multi-core SystremView tracing started with above command.
+@end deffn
+
+@deffn {Command} {esp sysview_mcore} (status)
+Requests ongoing Espressif multi-core SystremView tracing status.
+@end deffn
+
 @anchor{softwaredebugmessagesandtracing}
 @section Software Debug Messages and Tracing
 @cindex Linux-ARM DCC support
@@ -11432,8 +11711,9 @@ way to represent JTAG test patterns in text files.
 In a debug session using JTAG for its transport protocol,
 OpenOCD supports running such test files.
 
-@deffn {Command} {svf} @file{filename} [@option{-tap @var{tapname}}] [@option{[-]quiet}] @
-                     [@option{[-]nil}] [@option{[-]progress}] [@option{[-]ignore_error}]
+@deffn {Command} {svf} @file{filename} [@option{-tap @var{tapname}}] [@option{-quiet}] @
+                     [@option{-nil}] [@option{-progress}] [@option{-ignore_error}] @
+                     [@option{-noreset}] [@option{-addcycles @var{cyclecount}}]
 This issues a JTAG reset (Test-Logic-Reset) and then
 runs the SVF script from @file{filename}.
 
@@ -11446,12 +11726,16 @@ Command options:
 specified by the SVF file with HIR, TIR, HDR and TDR commands;
 instead, calculate them automatically according to the current JTAG
 chain configuration, targeting @var{tapname};
-@item @option{[-]quiet} do not log every command before execution;
-@item @option{[-]nil} ``dry run'', i.e., do not perform any operations
+@item @option{-quiet} do not log every command before execution;
+@item @option{-nil} ``dry run'', i.e., do not perform any operations
 on the real interface;
-@item @option{[-]progress} enable progress indication;
-@item @option{[-]ignore_error} continue execution despite TDO check
+@item @option{-progress} enable progress indication;
+@item @option{-ignore_error} continue execution despite TDO check
 errors.
+@item @option{-noreset} omit JTAG reset (Test-Logic-Reset) before executing
+content of the SVF file;
+@item @option{-addcycles @var{cyclecount}} inject @var{cyclecount} number of
+additional TCLK cycles after each SDR scan instruction;
 @end itemize
 @end deffn
 
@@ -11887,7 +12171,7 @@ _tx_thread_current_ptr, _tx_thread_created_ptr, _tx_thread_created_count.
 @raggedright
 pxCurrentTCB, pxReadyTasksLists, xDelayedTaskList1, xDelayedTaskList2,
 pxDelayedTaskList, pxOverflowDelayedTaskList, xPendingReadyList,
-uxCurrentNumberOfTasks, uxTopUsedPriority.
+uxCurrentNumberOfTasks, uxTopUsedPriority, xSchedulerRunning.
 @end raggedright
 @item linux symbols
 init_task.

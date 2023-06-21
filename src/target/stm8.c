@@ -542,12 +542,12 @@ static int stm8_get_core_reg(struct reg *reg)
 	int retval;
 	struct stm8_core_reg *stm8_reg = reg->arch_info;
 	struct target *target = stm8_reg->target;
-	struct stm8_common *stm8_target = target_to_stm8(target);
+	struct stm8_common *stm8 = target_to_stm8(target);
 
 	if (target->state != TARGET_HALTED)
 		return ERROR_TARGET_NOT_HALTED;
 
-	retval = stm8_target->read_core_reg(target, stm8_reg->num);
+	retval = stm8->read_core_reg(target, stm8_reg->num);
 
 	return retval;
 }
@@ -1784,7 +1784,7 @@ static int stm8_checksum_memory(struct target *target, target_addr_t address,
 
 /* run to exit point. return error if exit point was not reached. */
 static int stm8_run_and_wait(struct target *target, uint32_t entry_point,
-		int timeout_ms, uint32_t exit_point, struct stm8_common *stm8)
+		unsigned int timeout_ms, uint32_t exit_point, struct stm8_common *stm8)
 {
 	uint32_t pc;
 	int retval;
@@ -1819,7 +1819,7 @@ static int stm8_run_and_wait(struct target *target, uint32_t entry_point,
 static int stm8_run_algorithm(struct target *target, int num_mem_params,
 		struct mem_param *mem_params, int num_reg_params,
 		struct reg_param *reg_params, target_addr_t entry_point,
-		target_addr_t exit_point, int timeout_ms, void *arch_info)
+		target_addr_t exit_point, unsigned int timeout_ms, void *arch_info)
 {
 	struct stm8_common *stm8 = target_to_stm8(target);
 

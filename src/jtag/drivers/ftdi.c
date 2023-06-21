@@ -64,6 +64,7 @@
 #include <transport/transport.h>
 #include <helper/time_support.h>
 #include <helper/log.h>
+#include <helper/nvp.h>
 
 #if IS_CYGWIN == 1
 #include <windows.h>
@@ -181,7 +182,7 @@ static int ftdi_set_signal(const struct signal *s, char value)
 		oe = s->invert_oe;
 		break;
 	default:
-		assert(0 && "invalid signal level specifier");
+		LOG_ERROR("invalid signal level specifier \'%c\'(0x%02x)", value, value);
 		return ERROR_FAIL;
 	}
 
@@ -658,13 +659,8 @@ static int ftdi_initialize(void)
 		return ERROR_JTAG_INIT_FAILED;
 	}
 
-	for (int i = 0; ftdi_vid[i] || ftdi_pid[i]; i++) {
-		mpsse_ctx = mpsse_open(&ftdi_vid[i], &ftdi_pid[i], ftdi_device_desc,
+	mpsse_ctx = mpsse_open(ftdi_vid, ftdi_pid, ftdi_device_desc,
 				adapter_get_required_serial(), adapter_usb_get_location(), ftdi_channel);
-		if (mpsse_ctx)
-			break;
-	}
-
 	if (!mpsse_ctx)
 		return ERROR_JTAG_INIT_FAILED;
 
@@ -901,22 +897,22 @@ COMMAND_HANDLER(ftdi_handle_vid_pid_command)
 
 COMMAND_HANDLER(ftdi_handle_tdo_sample_edge_command)
 {
-	struct jim_nvp *n;
-	static const struct jim_nvp nvp_ftdi_jtag_modes[] = {
+	const struct nvp *n;
+	static const struct nvp nvp_ftdi_jtag_modes[] = {
 		{ .name = "rising", .value = JTAG_MODE },
 		{ .name = "falling", .value = JTAG_MODE_ALT },
 		{ .name = NULL, .value = -1 },
 	};
 
 	if (CMD_ARGC > 0) {
-		n = jim_nvp_name2value_simple(nvp_ftdi_jtag_modes, CMD_ARGV[0]);
+		n = nvp_name2value(nvp_ftdi_jtag_modes, CMD_ARGV[0]);
 		if (!n->name)
 			return ERROR_COMMAND_SYNTAX_ERROR;
 		ftdi_jtag_mode = n->value;
 
 	}
 
-	n = jim_nvp_value2name_simple(nvp_ftdi_jtag_modes, ftdi_jtag_mode);
+	n = nvp_value2name(nvp_ftdi_jtag_modes, ftdi_jtag_mode);
 	command_print(CMD, "ftdi samples TDO on %s edge of TCK", n->name);
 
 	return ERROR_OK;
