@@ -106,6 +106,10 @@ add_library(target
 	espressif/esp32s3.c
 	xtensa/xtensa.c
 	xtensa/xtensa_chip.c
-	xtensa/xtensa_debug_module.c)
+	xtensa/xtensa_debug_module.c
+	espressif/esp_xtensa_apptrace.c
+	espressif/esp32_apptrace.c
+	espressif/esp32_sysview.c
+	xtensa/xtensa_fileio.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

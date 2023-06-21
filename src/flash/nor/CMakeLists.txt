@@ -78,4 +78,5 @@ add_library(ocdflashnor
 	rp2040.c
 	pic32mm.c
 	npcx.c
-	rsl10.c)
+	rsl10.c
+	qn908x.c)

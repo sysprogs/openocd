@@ -921,7 +921,7 @@ static int pic32mm_info(struct flash_bank *bank, struct command_invocation *cmd)
 	return ERROR_OK;
 }
 
-extern struct flash_driver virtual_flash;
+extern const struct flash_driver virtual_flash;
 struct flash_bank *virtual_get_master_bank(struct flash_bank *bank);
 
 	

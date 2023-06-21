@@ -580,7 +580,7 @@ static int rs14100_erase_check(struct flash_bank *bank)
   return ERROR_OK;
 }
 
-struct flash_driver rs14100_flash = {
+const struct flash_driver rs14100_flash = {
 	.name = "rs14100",
 	.flash_bank_command = rs14100_flash_bank_command,
 	.erase = rs14100_erase,
