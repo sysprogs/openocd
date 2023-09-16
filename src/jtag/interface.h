@@ -364,12 +364,14 @@ int adapter_poll_trace(uint8_t *buf, size_t *size);
 
 extern struct adapter_driver am335xgpio_adapter_driver;
 extern struct adapter_driver amt_jtagaccel_adapter_driver;
+extern struct adapter_driver angie_adapter_driver;
 extern struct adapter_driver armjtagew_adapter_driver;
 extern struct adapter_driver at91rm9200_adapter_driver;
 extern struct adapter_driver bcm2835gpio_adapter_driver;
 extern struct adapter_driver picoprobe_adapter_driver;
 extern struct adapter_driver buspirate_adapter_driver;
 extern struct adapter_driver cmsis_dap_adapter_driver;
+extern struct adapter_driver dmem_dap_adapter_driver;
 extern struct adapter_driver dummy_adapter_driver;
 extern struct adapter_driver ep93xx_adapter_driver;
 extern struct adapter_driver esp_usb_adapter_driver;

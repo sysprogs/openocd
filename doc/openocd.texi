@@ -508,6 +508,9 @@ debuggers to ARM Cortex based targets @url{http://www.keil.com/support/man/docs/
 @item @b{ARM-JTAG-EW}
 @* Link: @url{http://www.olimex.com/dev/arm-jtag-ew.html}
 
+@item @b{angie}
+@* Link: @url{https://nanoxplore.org/}
+
 @item @b{Buspirate}
 @* Link: @url{http://dangerousprototypes.com/bus-pirate-manual/}
 
@@ -2180,6 +2183,9 @@ In such cases, just specify the relevant port number as "disabled".
 If you disable all access through TCP/IP, you will need to
 use the command line @option{-pipe} option.
 
+You can request the operating system to select one of the available
+ports for the server by specifying the relevant port number as "0".
+
 @anchor{gdb_port}
 @deffn {Config Command} {gdb_port} [number]
 @cindex GDB server
@@ -2510,6 +2516,10 @@ the number of the @file{/dev/parport} device.
 Displays status of RTCK option.
 Optionally sets that option first.
 @end deffn
+@end deffn
+
+@deffn {Interface Driver} {angie}
+This is the NanoXplore's ANGIE USB-JTAG Adapter.
 @end deffn
 
 @deffn {Interface Driver} {arm-jtag-ew}
@@ -3554,6 +3564,79 @@ Set chip id to transfer to the ESP USB bridge board
 @example
 espusbjtag chip_id 1
 @end example
+@end deffn
+
+@end deffn
+
+@deffn {Interface Driver} {dmem} Direct Memory access debug interface
+
+The Texas Instruments K3 SoC family provides memory access to DAP
+and coresight control registers. This allows control over the
+microcontrollers directly from one of the processors on the SOC
+itself.
+
+For maximum performance, the driver accesses the debug registers
+directly over the SoC memory map. The memory mapping requires read
+and write permission to kernel memory via "/dev/mem" and assumes that
+the system firewall configurations permit direct access to the debug
+memory space.
+
+@verbatim
++-----------+
+|  OpenOCD  |   SoC mem map (/dev/mem)
+|    on     +--------------+
+| Cortex-A53|              |
++-----------+              |
+                           |
++-----------+        +-----v-----+
+|Cortex-M4F <--------+           |
++-----------+        |           |
+                     |  DebugSS  |
++-----------+        |           |
+|Cortex-M4F <--------+           |
++-----------+        +-----------+
+@end verbatim
+
+NOTE: Firewalls are configurable in K3 SoC and depending on various types of
+device configuration, this function may be blocked out. Typical behavior
+observed in such cases is a firewall exception report on the security
+controller and armv8 processor reporting a system error.
+
+See @file{tcl/interface/ti_k3_am625-swd-native.cfg} for a sample configuration
+file.
+
+@deffn {Command} {dmem info}
+Print the DAPBUS dmem configuration.
+@end deffn
+
+@deffn {Config Command} {dmem device} device_path
+Set the DAPBUS memory access device (default: /dev/mem).
+@end deffn
+
+@deffn {Config Command} {dmem base_address} base_address
+Set the DAPBUS base address which is used to access CoreSight
+compliant Access Ports (APs) directly.
+@end deffn
+
+@deffn {Config Command} {dmem ap_address_offset} offset_address
+Set the address offset between Access Ports (APs).
+@end deffn
+
+@deffn {Config Command} {dmem max_aps} n
+Set the maximum number of valid access ports on the SoC.
+@end deffn
+
+@deffn {Config Command} {dmem emu_ap_list} n
+Set the list of Access Ports (APs) that need to be emulated. This
+emulation mode supports software translation of an AP request into an
+address mapped transaction that does not rely on physical AP hardware.
+This maybe needed if the AP is either denied access via memory map or
+protected using other SoC mechanisms.
+@end deffn
+
+@deffn {Config Command} {dmem emu_base_address_range} base_address address_window_size
+Set the emulated address and address window size. Both of these
+parameters must be aligned to page size.
 @end deffn
 
 @end deffn
@@ -7110,10 +7193,16 @@ Show information about flash driver.
 All versions of the NPCX microcontroller families from Nuvoton include internal
 flash. The NPCX flash driver supports the NPCX family of devices. The driver
 automatically recognizes the specific version's flash parameters and
-autoconfigures itself. The flash bank starts at address 0x64000000.
+autoconfigures itself. The flash bank starts at address 0x64000000. An optional additional
+parameter sets the FIU version for the bank, with the default FIU is @var{npcx.fiu}.
 
 @example
+
+flash bank $_FLASHNAME npcx 0x64000000 0 0 0 $_TARGETNAME npcx_v2.fiu
+
+# FIU defaults to npcx.fiu
 flash bank $_FLASHNAME npcx 0x64000000 0 0 0 $_TARGETNAME
+
 @end example
 @end deffn
 

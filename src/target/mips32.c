@@ -18,6 +18,7 @@
 #endif
 
 #include "mips32.h"
+#include "mips_cpu.h"
 #include "breakpoints.h"
 #include "algorithm.h"
 #include "register.h"
@@ -441,7 +442,7 @@ int mips32_run_algorithm(struct target *target, int num_mem_params,
 	}
 
 	if (target->state != TARGET_HALTED) {
-		LOG_WARNING("target not halted");
+		LOG_TARGET_ERROR(target, "not halted (run target algo)");
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
@@ -696,6 +697,63 @@ int mips32_enable_interrupts(struct target *target, int enable)
 	return ERROR_OK;
 }
 
+/* read processor identification cp0 register */
+static int mips32_read_c0_prid(struct target *target)
+{
+	struct mips32_common *mips32 = target_to_mips32(target);
+	struct mips_ejtag *ejtag_info = &mips32->ejtag_info;
+	int retval;
+
+	retval = mips32_cp0_read(ejtag_info, &mips32->prid, 15, 0);
+	if (retval != ERROR_OK) {
+		LOG_ERROR("processor id not available, failed to read cp0 PRId register");
+		mips32->prid = 0;
+	}
+
+	return retval;
+}
+
+/*
+ * Detect processor type and apply required quirks.
+ *
+ * NOTE: The proper detection of certain CPUs can become quite complicated.
+ * Please consult the following Linux kernel code when adding new CPUs:
+ *  arch/mips/include/asm/cpu.h
+ *  arch/mips/kernel/cpu-probe.c
+ */
+int mips32_cpu_probe(struct target *target)
+{
+	struct mips32_common *mips32 = target_to_mips32(target);
+	const char *cpu_name = "unknown";
+	int retval;
+
+	if (mips32->prid)
+		return ERROR_OK; /* Already probed once, return early. */
+
+	retval = mips32_read_c0_prid(target);
+	if (retval != ERROR_OK)
+		return retval;
+
+	switch (mips32->prid & PRID_COMP_MASK) {
+	case PRID_COMP_INGENIC_E1:
+		switch (mips32->prid & PRID_IMP_MASK) {
+		case PRID_IMP_XBURST_REV1:
+			cpu_name = "Ingenic XBurst rev1";
+			mips32->cpu_quirks |= EJTAG_QUIRK_PAD_DRET;
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	LOG_DEBUG("CPU: %s (PRId %08x)", cpu_name, mips32->prid);
+
+	return ERROR_OK;
+}
+
 /* read config to config3 cp0 registers and log isa implementation */
 int mips32_read_config_regs(struct target *target)
 {
@@ -927,8 +985,8 @@ COMMAND_HANDLER(mips32_handle_cp0_command)
 		return retval;
 
 	if (target->state != TARGET_HALTED) {
-		command_print(CMD, "target must be stopped for \"%s\" command", CMD_NAME);
-		return ERROR_OK;
+		command_print(CMD, "Error: target must be stopped for \"%s\" command", CMD_NAME);
+		return ERROR_TARGET_NOT_HALTED;
 	}
 
 	/* two or more argument, access a single register/select (write if third argument is given) */

@@ -319,7 +319,7 @@ static int lattice_load_command(struct pld_device *pld_device, const char *filen
 	return retval;
 }
 
-int lattice_get_ipdbg_hub(int user_num, struct pld_device *pld_device, struct pld_ipdbg_hub *hub)
+static int lattice_get_ipdbg_hub(int user_num, struct pld_device *pld_device, struct pld_ipdbg_hub *hub)
 {
 	if (!pld_device)
 		return ERROR_FAIL;
@@ -526,7 +526,7 @@ static const struct command_registration lattice_exec_command_handlers[] = {
 		.usage = "pld_name value",
 	}, {
 		.name = "set_preload",
-		.mode = COMMAND_EXEC,
+		.mode = COMMAND_ANY,
 		.handler = lattice_set_preload_command_handler,
 		.help = "set length for preload (device specific)",
 		.usage = "pld_name value",
