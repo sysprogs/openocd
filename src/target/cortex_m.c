@@ -112,6 +112,11 @@ static const struct cortex_m_part_info cortex_m_parts[] = {
 		.flags = CORTEX_M_F_HAS_FPV5,
 	},
 	{
+		.impl_part = INFINEON_SLX2_PARTNO,
+		.name = "Infineon-SLx2",
+		.arch = ARM_ARCH_V8M,
+	},
+	{
 		.impl_part = REALTEK_M200_PARTNO,
 		.name = "Real-M200 (KM0)",
 		.arch = ARM_ARCH_V8M,
@@ -2123,7 +2128,8 @@ static int cortex_m_set_watchpoint(struct target *target, struct watchpoint *wat
 	target_write_u32(target, comparator->dwt_comparator_address + 0,
 		comparator->comp);
 
-	if ((cortex_m->dwt_devarch & 0x1FFFFF) != DWT_DEVARCH_ARMV8M) {
+	if ((cortex_m->dwt_devarch & 0x1FFFFF) != DWT_DEVARCH_ARMV8M_V2_0
+			&& (cortex_m->dwt_devarch & 0x1FFFFF) != DWT_DEVARCH_ARMV8M_V2_1) {
 		uint32_t mask = 0, temp;
 
 		/* watchpoint params were validated earlier */
