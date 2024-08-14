@@ -70,7 +70,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/xds110.cfg -c "adapter speed 3000" -c "transport select jtag" -f target/ti_cc3220sf.cfg -c init -c "reset init" -c "echo VisualGDB_OpenOCD_Ready"</Arguments>
+            <Arguments>-f interface/stlink-v2-1.cfg -f target/stm32f4x.cfg -c init -c "flash probe 0" </Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>

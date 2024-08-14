@@ -286,13 +286,13 @@ static uint8_t dtc_entry_download;
 static int dtc_load_from_buffer(struct libusb_device_handle *hdev_param, const uint8_t *buffer,
 		size_t length)
 {
-	struct header_s {
+	struct header {
 		uint8_t type;
 		uint8_t length;
 	};
 
 	int usb_err;
-	struct header_s *header;
+	struct header *header;
 	uint8_t lut_start = 0xc0;
 
 	dtc_entry_download = 0;
@@ -311,7 +311,7 @@ static int dtc_load_from_buffer(struct libusb_device_handle *hdev_param, const u
 			exit(1);
 		}
 
-		header = (struct header_s *)buffer;
+		header = (struct header *)buffer;
 		buffer += sizeof(*header);
 		length -= sizeof(*header);
 
@@ -869,7 +869,7 @@ static void rlink_state_move(void)
 
 static void rlink_path_move(struct pathmove_command *cmd)
 {
-	int num_states = cmd->num_states;
+	unsigned int num_states = cmd->num_states;
 	int state_count;
 	int tms = 0;
 
@@ -896,10 +896,8 @@ static void rlink_path_move(struct pathmove_command *cmd)
 	tap_set_end_state(tap_get_state());
 }
 
-static void rlink_runtest(int num_cycles)
+static void rlink_runtest(unsigned int num_cycles)
 {
-	int i;
-
 	tap_state_t saved_end_state = tap_get_end_state();
 
 	/* only do a state_move when we're not already in RTI */
@@ -909,7 +907,7 @@ static void rlink_runtest(int num_cycles)
 	}
 
 	/* execute num_cycles */
-	for (i = 0; i < num_cycles; i++)
+	for (unsigned int i = 0; i < num_cycles; i++)
 		tap_state_queue_append(0);
 
 	/* finish in end_state */
@@ -1262,9 +1260,9 @@ static int rlink_scan(struct jtag_command *cmd, enum scan_type type,
 	return 0;
 }
 
-static int rlink_execute_queue(void)
+static int rlink_execute_queue(struct jtag_command *cmd_queue)
 {
-	struct jtag_command *cmd = jtag_command_queue;	/* currently processed command */
+	struct jtag_command *cmd = cmd_queue;	/* currently processed command */
 	int scan_size;
 	enum scan_type type;
 	uint8_t *buffer;
@@ -1323,7 +1321,7 @@ static int rlink_execute_queue(void)
 				rlink_state_move();
 				break;
 			case JTAG_PATHMOVE:
-				LOG_DEBUG_IO("pathmove: %i states, end in %i",
+				LOG_DEBUG_IO("pathmove: %u states, end in %i",
 						cmd->cmd.pathmove->num_states,
 						cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]);
 				rlink_path_move(cmd->cmd.pathmove);
@@ -1448,7 +1446,7 @@ static int rlink_init(void)
 
 	const uint16_t vids[] = { USB_IDVENDOR, 0 };
 	const uint16_t pids[] = { USB_IDPRODUCT, 0 };
-	if (jtag_libusb_open(vids, pids, &hdev, NULL) != ERROR_OK)
+	if (jtag_libusb_open(vids, pids, NULL, &hdev, NULL) != ERROR_OK)
 		return ERROR_FAIL;
 
 	struct libusb_device_descriptor descriptor;

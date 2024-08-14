@@ -36,6 +36,8 @@
 
 #define PRACC_BLOCK	128	/* 1 Kbyte */
 
+struct mips32_common;
+
 struct pa_list {
 	uint32_t instr;
 	uint32_t addr;
@@ -51,6 +53,8 @@ struct pracc_queue_info {
 	struct pa_list *pracc_list;	/* Code and store addresses at dmseg */
 };
 
+struct mips32_common;
+
 void pracc_queue_init(struct pracc_queue_info *ctx);
 void pracc_add(struct pracc_queue_info *ctx, uint32_t addr, uint32_t instr);
 void pracc_queue_free(struct pracc_queue_info *ctx);
@@ -64,8 +68,8 @@ int mips32_pracc_write_mem(struct mips_ejtag *ejtag_info,
 int mips32_pracc_fastdata_xfer(struct mips_ejtag *ejtag_info, struct working_area *source,
 		int write_t, uint32_t addr, int count, uint32_t *buf);
 
-int mips32_pracc_read_regs(struct mips_ejtag *ejtag_info, uint32_t *regs);
-int mips32_pracc_write_regs(struct mips_ejtag *ejtag_info, uint32_t *regs);
+int mips32_pracc_read_regs(struct mips32_common *mips32);
+int mips32_pracc_write_regs(struct mips32_common *mips32);
 
 /**
  * \b mips32_cp0_read
@@ -98,6 +102,21 @@ int mips32_cp0_read(struct mips_ejtag *ejtag_info,
  */
 int mips32_cp0_write(struct mips_ejtag *ejtag_info,
 		uint32_t val, uint32_t cp0_reg, uint32_t cp0_sel);
+
+/**
+ * mips32_cp1_control_read
+ *
+ * @brief Simulates cfc1 ASM instruction (Move Control Word From Floating Point),
+ * i.e. implements copro C1 Control Register read.
+ *
+ * @param[in] ejtag_info
+ * @param[in] val Storage to hold read value
+ * @param[in] cp1_c_reg Number of copro C1 control register we want to read
+ *
+ * @return ERROR_OK on Success, ERROR_FAIL otherwise
+ */
+int mips32_cp1_control_read(struct mips_ejtag *ejtag_info,
+		uint32_t *val, uint32_t cp1_c_reg);
 
 static inline void pracc_swap16_array(struct mips_ejtag *ejtag_info, uint32_t *buf, int count)
 {

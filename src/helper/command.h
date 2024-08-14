@@ -21,7 +21,7 @@
 /* To achieve C99 printf compatibility in MinGW, gnu_printf should be
  * used for __attribute__((format( ... ))), with GCC v4.4 or later
  */
-#if (defined(IS_MINGW) && (((__GNUC__ << 16) + __GNUC_MINOR__) >= 0x00040004))
+#if (defined(IS_MINGW) && (((__GNUC__ << 16) + __GNUC_MINOR__) >= 0x00040004)) && !defined(__clang__)
 #define PRINTF_ATTRIBUTE_FORMAT gnu_printf
 #else
 #define PRINTF_ATTRIBUTE_FORMAT printf
@@ -79,6 +79,7 @@ struct command_invocation {
 	const char *name;
 	unsigned argc;
 	const char **argv;
+	Jim_Obj * const *jimtcl_argv;
 	Jim_Obj *output;
 };
 
@@ -153,6 +154,11 @@ void *jimcmd_privdata(Jim_Cmd *cmd);
  * rather than accessing the variable directly.  It may be moved.
  */
 #define CMD_ARGV (cmd->argv)
+/**
+ * Use this macro to access the jimtcl arguments for the command being
+ * handled, rather than accessing the variable directly.  It may be moved.
+ */
+#define CMD_JIMTCL_ARGV (cmd->jimtcl_argv)
 /**
  * Use this macro to access the name of the command being handled,
  * rather than accessing the variable directly.  It may be moved.
@@ -510,6 +516,17 @@ DECLARE_PARSE_WRAPPER(_target_addr, target_addr_t);
 
 int command_parse_bool_arg(const char *in, bool *out);
 COMMAND_HELPER(handle_command_parse_bool, bool *out, const char *label);
+
+/**
+ * Parse a number (base 10, base 16 or base 8) and store the result
+ * into a bit buffer.
+ *
+ * In case of parsing error, a user-readable error message is produced.
+ *
+ * If radix = 0 is given, the function guesses the radix by looking at the number prefix.
+ */
+COMMAND_HELPER(command_parse_str_to_buf, const char *str, void *buf, unsigned int buf_len,
+	unsigned int radix);
 
 /** parses an on/off command argument */
 #define COMMAND_PARSE_ON_OFF(in, out) \

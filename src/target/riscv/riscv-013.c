@@ -132,7 +132,7 @@ typedef enum {
 
 typedef struct {
 	struct list_head list;
-	int abs_chain_position;
+	unsigned int abs_chain_position;
 
 	/* The number of harts connected to this DM. */
 	int hart_count;
@@ -236,7 +236,7 @@ static dm013_info_t *get_dm(struct target *target)
 	if (info->dm)
 		return info->dm;
 
-	int abs_chain_position = target->tap->abs_chain_position;
+	unsigned int abs_chain_position = target->tap->abs_chain_position;
 
 	dm013_info_t *entry;
 	dm013_info_t *dm = NULL;
@@ -389,7 +389,7 @@ static void dump_field(int idle, const struct scan_field *field)
 
 	log_printf_lf(LOG_LVL_DEBUG,
 			__FILE__, __LINE__, "scan",
-			"%db %s %08x @%02x -> %s %08x @%02x; %di",
+			"%ub %s %08x @%02x -> %s %08x @%02x; %di",
 			field->num_bits, op_string[out_op], out_data, out_address,
 			status_string[in_op], in_data, in_address, idle);
 

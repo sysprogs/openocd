@@ -19,7 +19,7 @@
 /* To achieve C99 printf compatibility in MinGW, gnu_printf should be
  * used for __attribute__((format( ... ))), with GCC v4.4 or later
  */
-#if (defined(IS_MINGW) && (((__GNUC__ << 16) + __GNUC_MINOR__) >= 0x00040004))
+#if (defined(IS_MINGW) && (((__GNUC__ << 16) + __GNUC_MINOR__) >= 0x00040004)) && !defined(__clang__)
 #define PRINTF_ATTRIBUTE_FORMAT gnu_printf
 #else
 #define PRINTF_ATTRIBUTE_FORMAT printf
@@ -110,6 +110,15 @@ extern int debug_level;
 	do { \
 		if (debug_level >= LOG_LVL_DEBUG) \
 			log_printf_lf(LOG_LVL_DEBUG, \
+				__FILE__, __LINE__, __func__, \
+				expr); \
+	} while (0)
+
+#define LOG_CUSTOM_LEVEL(level, expr ...) \
+	do { \
+		enum log_levels _level = level; \
+		if (debug_level >= _level) \
+			log_printf_lf(_level, \
 				__FILE__, __LINE__, __func__, \
 				expr); \
 	} while (0)

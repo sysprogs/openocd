@@ -18,7 +18,6 @@
 #include "target/target.h"
 #include "target/cortex_m.h"
 #include "target/breakpoints.h"
-#include "target/target_type.h"
 #include "target/algorithm.h"
 
 /**************************************************************************************************
@@ -224,6 +223,8 @@ static int ipc_poll_lock_stat(struct target *target, uint32_t ipc_id, bool lock_
 {
 	int hr;
 	uint32_t reg_val;
+	struct armv7m_common *armv7m = target_to_armv7m(target);
+	bool is_cm0 = (armv7m->arm.arch == ARM_ARCH_V6M);
 
 	struct timeout to;
 	timeout_init(&to, IPC_TIMEOUT_MS);
@@ -245,7 +246,7 @@ static int ipc_poll_lock_stat(struct target *target, uint32_t ipc_id, bool lock_
 			return ERROR_OK;
 	}
 
-	if (target->coreid) {
+	if (!is_cm0) {
 		LOG_WARNING("SROM API calls via CM4 target are supported on single-core PSoC6 devices only. "
 			"Please perform all Flash-related operations via CM0+ target on dual-core devices.");
 	}
@@ -887,7 +888,8 @@ static int handle_reset_halt(struct target *target)
 {
 	int hr;
 	uint32_t reset_addr;
-	bool is_cm0 = (target->coreid == 0);
+	struct armv7m_common *armv7m = target_to_armv7m(target);
+	bool is_cm0 = (armv7m->arm.arch == ARM_ARCH_V6M);
 
 	/* Halt target device */
 	if (target->state != TARGET_HALTED) {

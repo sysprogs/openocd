@@ -110,6 +110,7 @@ add_library(target
 	espressif/esp_xtensa_apptrace.c
 	espressif/esp32_apptrace.c
 	espressif/esp32_sysview.c
-	xtensa/xtensa_fileio.c)
+	xtensa/xtensa_fileio.c
+	espressif/esp.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

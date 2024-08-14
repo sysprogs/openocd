@@ -97,7 +97,7 @@ enum xtensa_ar_scratch_set_e {
 	XT_AR_SCRATCH_NUM
 };
 
-struct xtensa_keyval_info_s {
+struct xtensa_keyval_info {
 	char *chrval;
 	int intval;
 };
@@ -222,6 +222,17 @@ struct xtensa_sw_breakpoint {
 	uint8_t insn_sz;	/* 2 or 3 bytes */
 };
 
+/**
+ * Xtensa algorithm data.
+ */
+struct xtensa_algorithm {
+	/** User can set this to specify which core mode algorithm should be run in. */
+	enum xtensa_mode core_mode;
+	/** Used internally to backup and restore core state. */
+	enum target_debug_reason ctx_debug_reason;
+	xtensa_reg_val_t ctx_ps;
+};
+
 #define XTENSA_COMMON_MAGIC 0x54E4E555U
 
 /**
@@ -272,7 +283,7 @@ struct xtensa {
 	bool halt_request;
 	uint32_t nx_stop_cause;
 	uint32_t nx_reg_idx[XT_NX_REG_IDX_NUM];
-	struct xtensa_keyval_info_s scratch_ars[XT_AR_SCRATCH_NUM];
+	struct xtensa_keyval_info scratch_ars[XT_AR_SCRATCH_NUM];
 	bool regs_fetched;	/* true after first register fetch completed successfully */
 };
 
@@ -395,8 +406,23 @@ int xtensa_breakpoint_add(struct target *target, struct breakpoint *breakpoint);
 int xtensa_breakpoint_remove(struct target *target, struct breakpoint *breakpoint);
 int xtensa_watchpoint_add(struct target *target, struct watchpoint *watchpoint);
 int xtensa_watchpoint_remove(struct target *target, struct watchpoint *watchpoint);
+int xtensa_start_algorithm(struct target *target,
+	int num_mem_params, struct mem_param *mem_params,
+	int num_reg_params, struct reg_param *reg_params,
+	target_addr_t entry_point, target_addr_t exit_point,
+	void *arch_info);
+int xtensa_wait_algorithm(struct target *target,
+	int num_mem_params, struct mem_param *mem_params,
+	int num_reg_params, struct reg_param *reg_params,
+	target_addr_t exit_point, unsigned int timeout_ms,
+	void *arch_info);
+int xtensa_run_algorithm(struct target *target,
+	int num_mem_params, struct mem_param *mem_params,
+	int num_reg_params, struct reg_param *reg_params,
+	target_addr_t entry_point, target_addr_t exit_point,
+	unsigned int timeout_ms, void *arch_info);
 void xtensa_set_permissive_mode(struct target *target, bool state);
-const char *xtensa_get_gdb_arch(struct target *target);
+const char *xtensa_get_gdb_arch(const struct target *target);
 int xtensa_gdb_query_custom(struct target *target, const char *packet, char **response_p);
 
 COMMAND_HELPER(xtensa_cmd_xtdef_do, struct xtensa *xtensa);

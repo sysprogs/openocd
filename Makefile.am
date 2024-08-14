@@ -48,6 +48,8 @@ AM_CPPFLAGS = $(HOST_CPPFLAGS)\
 if INTERNAL_JIMTCL
 AM_CPPFLAGS += -I$(top_srcdir)/jimtcl \
 			   -I$(top_builddir)/jimtcl
+else
+AM_CPPFLAGS += $(JIMTCL_CFLAGS)
 endif
 EXTRA_DIST += \
 	BUGS \
@@ -64,11 +66,13 @@ EXTRA_DIST += \
 	LICENSES/preferred/BSD-2-Clause-Views \
 	LICENSES/preferred/BSD-3-Clause \
 	LICENSES/preferred/BSD-Source-Code \
+	LICENSES/preferred/CC0-1.0 \
 	LICENSES/preferred/GFDL-1.2 \
 	LICENSES/preferred/gfdl-1.2.texi.readme \
 	LICENSES/preferred/GPL-2.0 \
 	LICENSES/preferred/LGPL-2.1 \
 	LICENSES/preferred/MIT \
+	LICENSES/stand-alone/Apache-2.0 \
 	LICENSES/stand-alone/GPL-3.0 \
 	tools/logger.pl \
 	tools/rlink_make_speed_table \
@@ -112,9 +116,14 @@ TCL_PATH = tcl
 TCL_FILES = find $(srcdir)/$(TCL_PATH) -name '*.cfg' -o -name '*.tcl' -o -name '*.txt' | \
 		sed -e 's,^$(srcdir)/$(TCL_PATH),,'
 
+# Without the PERL_UNICODE="IO" workaround below when running git2cl, you get several
+# "Wide character" warnings and you also risk an invalid character encoding in
+# the generated ChangeLog file. For more information, see this bug report:
+#   Warning "Wide character in print"
+#   https://savannah.nongnu.org/bugs/?65689
 dist-hook:
 	if test -d $(srcdir)/.git -a \( ! -e $(distdir)/ChangeLog -o -w $(distdir)/ChangeLog \) ; then \
-		git --git-dir $(srcdir)/.git log | $(srcdir)/tools/git2cl/git2cl > $(distdir)/ChangeLog ; \
+		git --git-dir $(srcdir)/.git log | PERL_UNICODE="IO" $(srcdir)/tools/git2cl/git2cl > $(distdir)/ChangeLog ; \
 	fi
 	for i in $$($(TCL_FILES)); do \
 		j="$(distdir)/$(TCL_PATH)/$$i" && \

@@ -275,7 +275,7 @@ static int kitprog_usb_open(void)
 	const uint16_t vids[] = { VID, 0 };
 	const uint16_t pids[] = { PID, 0 };
 
-	if (jtag_libusb_open(vids, pids, &kitprog_handle->usb_handle, NULL) != ERROR_OK) {
+	if (jtag_libusb_open(vids, pids, NULL, &kitprog_handle->usb_handle, NULL) != ERROR_OK) {
 		LOG_ERROR("Failed to open or find the device");
 		return ERROR_FAIL;
 	}
@@ -782,7 +782,7 @@ static int kitprog_swd_run_queue(void)
 			if (ack != SWD_ACK_OK || (buffer[read_index] & 0x08)) {
 				LOG_DEBUG("SWD ack not OK: %d %s", i,
 					  ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK");
-				queued_retval = ack == SWD_ACK_WAIT ? ERROR_WAIT : ERROR_FAIL;
+				queued_retval = swd_ack_to_error_code(ack);
 				break;
 			}
 			read_index++;
@@ -879,6 +879,13 @@ static const struct command_registration kitprog_subcommand_handlers[] = {
 		.usage = "",
 		.help = "try to acquire a PSoC",
 	},
+	{
+		.name = "init_acquire_psoc",
+		.handler = &kitprog_handle_init_acquire_psoc_command,
+		.mode = COMMAND_CONFIG,
+		.help = "try to acquire a PSoC during init",
+		.usage = "",
+	},
 	COMMAND_REGISTRATION_DONE
 };
 
@@ -889,13 +896,6 @@ static const struct command_registration kitprog_command_handlers[] = {
 		.help = "perform KitProg management",
 		.usage = "<cmd>",
 		.chain = kitprog_subcommand_handlers,
-	},
-	{
-		.name = "kitprog_init_acquire_psoc",
-		.handler = &kitprog_handle_init_acquire_psoc_command,
-		.mode = COMMAND_CONFIG,
-		.help = "try to acquire a PSoC during init",
-		.usage = "",
 	},
 	COMMAND_REGISTRATION_DONE
 };

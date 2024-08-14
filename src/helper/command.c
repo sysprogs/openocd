@@ -99,8 +99,7 @@ static struct log_capture_state *command_log_capture_start(Jim_Interp *interp)
  * The tcl return value is empty for openocd commands that provide
  * progress output.
  *
- * Therefore we set the tcl return value only if we actually
- * captured output.
+ * For other commands, we prepend the logs to the tcl return value.
  */
 static void command_log_capture_finish(struct log_capture_state *state)
 {
@@ -109,15 +108,18 @@ static void command_log_capture_finish(struct log_capture_state *state)
 
 	log_remove_callback(tcl_output, state);
 
-	int length;
-	Jim_GetString(state->output, &length);
+	int loglen;
+	const char *log_result = Jim_GetString(state->output, &loglen);
+	int reslen;
+	const char *cmd_result = Jim_GetString(Jim_GetResult(state->interp), &reslen);
 
-	if (length > 0)
-		Jim_SetResult(state->interp, state->output);
-	else {
-		/* No output captured, use tcl return value (which could
-		 * be empty too). */
-	}
+	// Just in case the log doesn't end with a newline, we add it
+	if (loglen != 0 && reslen != 0 && log_result[loglen - 1] != '\n')
+		Jim_AppendString(state->interp, state->output, "\n", 1);
+
+	Jim_AppendString(state->interp, state->output, cmd_result, reslen);
+
+	Jim_SetResult(state->interp, state->output);
 	Jim_DecrRefCount(state->interp, state->output);
 
 	free(state);
@@ -143,42 +145,13 @@ static void script_debug(Jim_Interp *interp, unsigned int argc, Jim_Obj * const 
 
 	char *dbg = alloc_printf("command -");
 	for (unsigned i = 0; i < argc; i++) {
-		int len;
-		const char *w = Jim_GetString(argv[i], &len);
+		const char *w = Jim_GetString(argv[i], NULL);
 		char *t = alloc_printf("%s %s", dbg, w);
 		free(dbg);
 		dbg = t;
 	}
 	LOG_DEBUG("%s", dbg);
 	free(dbg);
-}
-
-static void script_command_args_free(char **words, unsigned nwords)
-{
-	for (unsigned i = 0; i < nwords; i++)
-		free(words[i]);
-	free(words);
-}
-
-static char **script_command_args_alloc(
-	unsigned argc, Jim_Obj * const *argv, unsigned *nwords)
-{
-	char **words = malloc(argc * sizeof(char *));
-	if (!words)
-		return NULL;
-
-	unsigned i;
-	for (i = 0; i < argc; i++) {
-		int len;
-		const char *w = Jim_GetString(argv[i], &len);
-		words[i] = strdup(w);
-		if (!words[i]) {
-			script_command_args_free(words, i);
-			return NULL;
-		}
-	}
-	*nwords = i;
-	return words;
 }
 
 struct command_context *current_command_context(Jim_Interp *interp)
@@ -516,15 +489,29 @@ static bool command_can_run(struct command_context *cmd_ctx, struct command *c, 
 	return false;
 }
 
-static int run_command(struct command_context *context,
-	struct command *c, const char **words, unsigned num_words)
+static int exec_command(Jim_Interp *interp, struct command_context *context,
+		struct command *c, int argc, Jim_Obj * const *argv)
 {
+	if (c->jim_handler)
+		return c->jim_handler(interp, argc, argv);
+
+	/* use c->handler */
+	const char **words = malloc(argc * sizeof(char *));
+	if (!words) {
+		LOG_ERROR("Out of memory");
+		return JIM_ERR;
+	}
+
+	for (int i = 0; i < argc; i++)
+		words[i] = Jim_GetString(argv[i], NULL);
+
 	struct command_invocation cmd = {
 		.ctx = context,
 		.current = c,
 		.name = c->name,
-		.argc = num_words - 1,
+		.argc = argc - 1,
 		.argv = words + 1,
+		.jimtcl_argv = argv + 1,
 	};
 
 	cmd.output = Jim_NewEmptyStringObj(context->interp);
@@ -553,7 +540,8 @@ static int run_command(struct command_context *context,
 	}
 	Jim_DecrRefCount(context->interp, cmd.output);
 
-	return retval;
+	free(words);
+	return command_retval_set(interp, retval);
 }
 
 int command_run_line(struct command_context *context, char *line)
@@ -691,8 +679,8 @@ COMMAND_HANDLER(handle_echo)
 	return ERROR_OK;
 }
 
-/* Capture progress output and return as tcl return value. If the
- * progress output was empty, return tcl return value.
+/* Return both the progress output (LOG_INFO and higher)
+ * and the tcl return value of a command.
  */
 static int jim_capture(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 {
@@ -892,23 +880,6 @@ static char *alloc_concatenate_strings(int argc, Jim_Obj * const *argv)
 	}
 
 	return all;
-}
-
-static int exec_command(Jim_Interp *interp, struct command_context *cmd_ctx,
-		struct command *c, int argc, Jim_Obj * const *argv)
-{
-	if (c->jim_handler)
-		return c->jim_handler(interp, argc, argv);
-
-	/* use c->handler */
-	unsigned int nwords;
-	char **words = script_command_args_alloc(argc, argv, &nwords);
-	if (!words)
-		return JIM_ERR;
-
-	int retval = run_command(cmd_ctx, c, (const char **)words, nwords);
-	script_command_args_free(words, nwords);
-	return command_retval_set(interp, retval);
 }
 
 static int jim_command_dispatch(Jim_Interp *interp, int argc, Jim_Obj * const *argv)
@@ -1387,6 +1358,46 @@ int command_parse_bool_arg(const char *in, bool *out)
 	if (command_parse_bool(in, out, "1", "0") == ERROR_OK)
 		return ERROR_OK;
 	return ERROR_COMMAND_SYNTAX_ERROR;
+}
+
+static const char *radix_to_str(unsigned int radix)
+{
+	switch (radix) {
+		case 16: return "hexadecimal";
+		case 10: return "decadic";
+		case 8: return "octal";
+	}
+	assert(false);
+	return "";
+}
+
+COMMAND_HELPER(command_parse_str_to_buf, const char *str, void *buf, unsigned int buf_len,
+	unsigned int radix)
+{
+	assert(str);
+	assert(buf);
+
+	int ret = str_to_buf(str, buf, buf_len, radix, NULL);
+	if (ret == ERROR_OK)
+		return ret;
+
+	/* Provide a clear error message to the user */
+	if (ret == ERROR_INVALID_NUMBER) {
+		if (radix == 0) {
+			/* Any radix is accepted, so don't include it in the error message. */
+			command_print(CMD, "'%s' is not a valid number", str);
+		} else {
+			/* Specific radix is required - tell the user what it is. */
+			command_print(CMD, "'%s' is not a valid number (requiring %s number)",
+				str, radix_to_str(radix));
+		}
+	} else if (ret == ERROR_NUMBER_EXCEEDS_BUFFER) {
+		command_print(CMD, "Number %s exceeds %u bits", str, buf_len);
+	} else {
+		command_print(CMD, "Could not parse number '%s'", str);
+	}
+
+	return ERROR_COMMAND_ARGUMENT_INVALID;
 }
 
 COMMAND_HELPER(handle_command_parse_bool, bool *out, const char *label)

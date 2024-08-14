@@ -15,9 +15,15 @@
 #include "config.h"
 #endif
 
+#include <jtag/jtag.h>      /* Added to avoid include loop in commands.h */
 #include "bitbang.h"
 #include <jtag/interface.h>
 #include <jtag/commands.h>
+
+#include <helper/time_support.h>
+
+/* Timeout for retrying on SWD WAIT in msec */
+#define SWD_WAIT_TIMEOUT 500
 
 /**
  * Function bitbang_stableclocks
@@ -27,7 +33,7 @@
  * this function checks the current stable state to decide on the value of TMS
  * to use.
  */
-static int bitbang_stableclocks(int num_cycles);
+static int bitbang_stableclocks(unsigned int num_cycles);
 
 static void bitbang_swd_write_reg(uint8_t cmd, uint32_t value, uint32_t ap_delay_clk);
 
@@ -89,7 +95,7 @@ static int bitbang_execute_tms(struct jtag_command *cmd)
 	unsigned num_bits = cmd->cmd.tms->num_bits;
 	const uint8_t *bits = cmd->cmd.tms->bits;
 
-	LOG_DEBUG_IO("TMS: %d bits", num_bits);
+	LOG_DEBUG_IO("TMS: %u bits", num_bits);
 
 	int tms = 0;
 	for (unsigned i = 0; i < num_bits; i++) {
@@ -107,7 +113,7 @@ static int bitbang_execute_tms(struct jtag_command *cmd)
 
 static int bitbang_path_move(struct pathmove_command *cmd)
 {
-	int num_states = cmd->num_states;
+	unsigned int num_states = cmd->num_states;
 	int state_count;
 	int tms = 0;
 
@@ -141,10 +147,8 @@ static int bitbang_path_move(struct pathmove_command *cmd)
 	return ERROR_OK;
 }
 
-static int bitbang_runtest(int num_cycles)
+static int bitbang_runtest(unsigned int num_cycles)
 {
-	int i;
-
 	tap_state_t saved_end_state = tap_get_end_state();
 
 	/* only do a state_move when we're not already in IDLE */
@@ -155,7 +159,7 @@ static int bitbang_runtest(int num_cycles)
 	}
 
 	/* execute num_cycles */
-	for (i = 0; i < num_cycles; i++) {
+	for (unsigned int i = 0; i < num_cycles; i++) {
 		if (bitbang_interface->write(0, 0, 0) != ERROR_OK)
 			return ERROR_FAIL;
 		if (bitbang_interface->write(1, 0, 0) != ERROR_OK)
@@ -173,13 +177,12 @@ static int bitbang_runtest(int num_cycles)
 	return ERROR_OK;
 }
 
-static int bitbang_stableclocks(int num_cycles)
+static int bitbang_stableclocks(unsigned int num_cycles)
 {
 	int tms = (tap_get_state() == TAP_RESET ? 1 : 0);
-	int i;
 
 	/* send num_cycles clocks onto the cable */
-	for (i = 0; i < num_cycles; i++) {
+	for (unsigned int i = 0; i < num_cycles; i++) {
 		if (bitbang_interface->write(1, tms, 0) != ERROR_OK)
 			return ERROR_FAIL;
 		if (bitbang_interface->write(0, tms, 0) != ERROR_OK)
@@ -278,9 +281,18 @@ static int bitbang_scan(bool ir_scan, enum scan_type type, uint8_t *buffer,
 	return ERROR_OK;
 }
 
-int bitbang_execute_queue(void)
+static void bitbang_sleep(unsigned int microseconds)
 {
-	struct jtag_command *cmd = jtag_command_queue;	/* currently processed command */
+	if (bitbang_interface->sleep) {
+		bitbang_interface->sleep(microseconds);
+	} else {
+		jtag_sleep(microseconds);
+	}
+}
+
+int bitbang_execute_queue(struct jtag_command *cmd_queue)
+{
+	struct jtag_command *cmd = cmd_queue;	/* currently processed command */
 	int scan_size;
 	enum scan_type type;
 	uint8_t *buffer;
@@ -304,7 +316,7 @@ int bitbang_execute_queue(void)
 	while (cmd) {
 		switch (cmd->type) {
 			case JTAG_RUNTEST:
-				LOG_DEBUG_IO("runtest %i cycles, end in %s",
+				LOG_DEBUG_IO("runtest %u cycles, end in %s",
 						cmd->cmd.runtest->num_cycles,
 						tap_state_name(cmd->cmd.runtest->end_state));
 				bitbang_end_state(cmd->cmd.runtest->end_state);
@@ -328,7 +340,7 @@ int bitbang_execute_queue(void)
 					return ERROR_FAIL;
 				break;
 			case JTAG_PATHMOVE:
-				LOG_DEBUG_IO("pathmove: %i states, end in %s",
+				LOG_DEBUG_IO("pathmove: %u states, end in %s",
 						cmd->cmd.pathmove->num_states,
 						tap_state_name(cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]));
 				if (bitbang_path_move(cmd->cmd.pathmove) != ERROR_OK)
@@ -351,7 +363,9 @@ int bitbang_execute_queue(void)
 				break;
 			case JTAG_SLEEP:
 				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
-				jtag_sleep(cmd->cmd.sleep->us);
+				if (bitbang_interface->flush && (bitbang_interface->flush() != ERROR_OK))
+					return ERROR_FAIL;
+				bitbang_sleep(cmd->cmd.sleep->us);
 				break;
 			case JTAG_TMS:
 				retval = bitbang_execute_tms(cmd);
@@ -462,7 +476,8 @@ static void bitbang_swd_read_reg(uint8_t cmd, uint32_t *value, uint32_t ap_delay
 		return;
 	}
 
-	for (;;) {
+	int64_t timeout = timeval_ms() + SWD_WAIT_TIMEOUT;
+	for (unsigned int retry = 0;; retry++) {
 		uint8_t trn_ack_data_parity_trn[DIV_ROUND_UP(4 + 3 + 32 + 1 + 4, 8)];
 
 		cmd |= SWD_CMD_START | SWD_CMD_PARK;
@@ -476,16 +491,25 @@ static void bitbang_swd_read_reg(uint8_t cmd, uint32_t *value, uint32_t ap_delay
 		uint32_t data = buf_get_u32(trn_ack_data_parity_trn, 1 + 3, 32);
 		int parity = buf_get_u32(trn_ack_data_parity_trn, 1 + 3 + 32, 1);
 
-		LOG_DEBUG_IO("%s %s read reg %X = %08" PRIx32,
-			  ack == SWD_ACK_OK ? "OK" : ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK",
-			  cmd & SWD_CMD_APNDP ? "AP" : "DP",
-			  (cmd & SWD_CMD_A32) >> 1,
-			  data);
+		LOG_CUSTOM_LEVEL((ack != SWD_ACK_OK && (retry == 0 || ack != SWD_ACK_WAIT))
+				? LOG_LVL_DEBUG : LOG_LVL_DEBUG_IO,
+			"%s %s read reg %X = %08" PRIx32,
+			ack == SWD_ACK_OK ? "OK" : ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK",
+			cmd & SWD_CMD_APNDP ? "AP" : "DP",
+			(cmd & SWD_CMD_A32) >> 1,
+			data);
 
-		if (ack == SWD_ACK_WAIT) {
+		if (ack == SWD_ACK_WAIT && timeval_ms() <= timeout) {
 			swd_clear_sticky_errors();
+			if (retry > 20)
+				alive_sleep(1);
+
 			continue;
-		} else if (ack != SWD_ACK_OK) {
+		}
+		if (retry > 1)
+			LOG_DEBUG("SWD WAIT: retried %u times", retry);
+
+		if (ack != SWD_ACK_OK) {
 			queued_retval = swd_ack_to_error_code(ack);
 			return;
 		}
@@ -512,12 +536,14 @@ static void bitbang_swd_write_reg(uint8_t cmd, uint32_t value, uint32_t ap_delay
 		return;
 	}
 
+	int64_t timeout = timeval_ms() + SWD_WAIT_TIMEOUT;
+
 	/* Devices do not reply to DP_TARGETSEL write cmd, ignore received ack */
 	bool check_ack = swd_cmd_returns_ack(cmd);
 
 	/* init the array to silence scan-build */
 	uint8_t trn_ack_data_parity_trn[DIV_ROUND_UP(4 + 3 + 32 + 1 + 4, 8)] = {0};
-	for (;;) {
+	for (unsigned int retry = 0;; retry++) {
 		buf_set_u32(trn_ack_data_parity_trn, 1 + 3 + 1, 32, value);
 		buf_set_u32(trn_ack_data_parity_trn, 1 + 3 + 1 + 32, 1, parity_u32(value));
 
@@ -542,22 +568,29 @@ static void bitbang_swd_write_reg(uint8_t cmd, uint32_t value, uint32_t ap_delay
 		bitbang_swd_exchange(false, trn_ack_data_parity_trn, 1 + 3 + 1, 32 + 1);
 
 		int ack = buf_get_u32(trn_ack_data_parity_trn, 1, 3);
+		LOG_CUSTOM_LEVEL((check_ack && ack != SWD_ACK_OK && (retry == 0 || ack != SWD_ACK_WAIT))
+				? LOG_LVL_DEBUG : LOG_LVL_DEBUG_IO,
+			"%s%s %s write reg %X = %08" PRIx32,
+			check_ack ? "" : "ack ignored ",
+			ack == SWD_ACK_OK ? "OK" : ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK",
+			cmd & SWD_CMD_APNDP ? "AP" : "DP",
+			(cmd & SWD_CMD_A32) >> 1,
+			buf_get_u32(trn_ack_data_parity_trn, 1 + 3 + 1, 32));
 
-		LOG_DEBUG_IO("%s%s %s write reg %X = %08" PRIx32,
-			  check_ack ? "" : "ack ignored ",
-			  ack == SWD_ACK_OK ? "OK" : ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK",
-			  cmd & SWD_CMD_APNDP ? "AP" : "DP",
-			  (cmd & SWD_CMD_A32) >> 1,
-			  buf_get_u32(trn_ack_data_parity_trn, 1 + 3 + 1, 32));
+		if (check_ack && ack == SWD_ACK_WAIT && timeval_ms() <= timeout) {
+			swd_clear_sticky_errors();
+			if (retry > 20)
+				alive_sleep(1);
 
-		if (check_ack) {
-			if (ack == SWD_ACK_WAIT) {
-				swd_clear_sticky_errors();
-				continue;
-			} else if (ack != SWD_ACK_OK) {
-				queued_retval = swd_ack_to_error_code(ack);
-				return;
-			}
+			continue;
+		}
+
+		if (retry > 1)
+			LOG_DEBUG("SWD WAIT: retried %u times", retry);
+
+		if (check_ack && ack != SWD_ACK_OK) {
+			queued_retval = swd_ack_to_error_code(ack);
+			return;
 		}
 
 		if (cmd & SWD_CMD_APNDP)

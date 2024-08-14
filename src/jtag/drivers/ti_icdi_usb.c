@@ -33,7 +33,7 @@
 #define PACKET_START "$"
 #define PACKET_END "#"
 
-struct icdi_usb_handle_s {
+struct icdi_usb_handle {
 	struct libusb_device_handle *usb_dev;
 
 	char *read_buffer;
@@ -116,7 +116,7 @@ static int remote_unescape_input(const char *buffer, int len, char *out_buf, int
 static int icdi_send_packet(void *handle, int len)
 {
 	unsigned char cksum = 0;
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 	int result, retry = 0;
 	int transferred = 0;
 
@@ -228,7 +228,7 @@ static int icdi_send_packet(void *handle, int len)
 
 static int icdi_send_cmd(void *handle, const char *cmd)
 {
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 
 	int cmd_len = snprintf(h->write_buffer, h->max_packet, PACKET_START "%s", cmd);
 	return icdi_send_packet(handle, cmd_len);
@@ -236,7 +236,7 @@ static int icdi_send_cmd(void *handle, const char *cmd)
 
 static int icdi_send_remote_cmd(void *handle, const char *data)
 {
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 
 	size_t cmd_len = sprintf(h->write_buffer, PACKET_START "qRcmd,");
 	cmd_len += hexify(h->write_buffer + cmd_len, (const uint8_t *)data,
@@ -247,7 +247,7 @@ static int icdi_send_remote_cmd(void *handle, const char *data)
 
 static int icdi_get_cmd_result(void *handle)
 {
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 	int offset = 0;
 	char ch;
 
@@ -292,7 +292,7 @@ static int icdi_usb_write_debug_reg(void *handle, uint32_t addr, uint32_t val TA
 static enum target_state icdi_usb_state(void *handle TARGET_ARGUMENT)
 {
 	int result;
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 	uint32_t dhcsr;
 	uint8_t buf[4];
 
@@ -311,7 +311,7 @@ static enum target_state icdi_usb_state(void *handle TARGET_ARGUMENT)
 
 static int icdi_usb_version(void *handle)
 {
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 
 	char version[20];
 
@@ -343,7 +343,7 @@ static int icdi_usb_query(void *handle)
 {
 	int result;
 
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 
 	result = icdi_send_cmd(handle, "qSupported");
 	if (result != ERROR_OK)
@@ -476,7 +476,7 @@ static int icdi_usb_read_regs(void *handle TARGET_ARGUMENT)
 static int icdi_usb_read_reg(void *handle, unsigned regsel, uint32_t *val TARGET_ARGUMENT)
 {
 	int result;
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 	char cmd[10];
 
 	snprintf(cmd, sizeof(cmd), "p%x", regsel);
@@ -529,7 +529,7 @@ static int icdi_usb_write_reg(void *handle, unsigned regsel, uint32_t val TARGET
 static int icdi_usb_read_mem_int(void *handle, uint32_t addr, uint32_t len, uint8_t *buffer)
 {
 	int result;
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 	char cmd[20];
 
 	snprintf(cmd, sizeof(cmd), "x%" PRIx32 ",%" PRIx32, addr, len);
@@ -557,7 +557,7 @@ static int icdi_usb_read_mem_int(void *handle, uint32_t addr, uint32_t len, uint
 static int icdi_usb_write_mem_int(void *handle, uint32_t addr, uint32_t len, const uint8_t *buffer)
 {
 	int result;
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 
 	size_t cmd_len = snprintf(h->write_buffer, h->max_packet, PACKET_START "X%" PRIx32 ",%" PRIx32 ":", addr, len);
 
@@ -589,7 +589,7 @@ static int icdi_usb_read_mem(void *handle, uint32_t addr, uint32_t size,
 		uint32_t count, uint8_t *buffer TARGET_ARGUMENT)
 {
 	int retval = ERROR_OK;
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 	uint32_t bytes_remaining;
 
 	/* calculate byte count */
@@ -617,7 +617,7 @@ static int icdi_usb_write_mem(void *handle, uint32_t addr, uint32_t size,
 		uint32_t count, const uint8_t *buffer TARGET_ARGUMENT)
 {
 	int retval = ERROR_OK;
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 	uint32_t bytes_remaining;
 
 	/* calculate byte count */
@@ -648,7 +648,7 @@ static int icdi_usb_override_target(const char *targetname)
 
 static int icdi_usb_close(void *handle)
 {
-	struct icdi_usb_handle_s *h = handle;
+	struct icdi_usb_handle *h = handle;
 
 	if (!h)
 		return ERROR_OK;
@@ -662,15 +662,15 @@ static int icdi_usb_close(void *handle)
 	return ERROR_OK;
 }
 
-static int icdi_usb_open(struct hl_interface_param_s *param, void **fd)
+static int icdi_usb_open(struct hl_interface_param *param, void **fd)
 {
 	/* TODO: Convert remaining libusb_ calls to jtag_libusb_ */
 	int retval;
-	struct icdi_usb_handle_s *h;
+	struct icdi_usb_handle *h;
 
 	LOG_DEBUG("icdi_usb_open");
 
-	h = calloc(1, sizeof(struct icdi_usb_handle_s));
+	h = calloc(1, sizeof(struct icdi_usb_handle));
 
 	if (!h) {
 		LOG_ERROR("unable to allocate memory");
@@ -683,7 +683,7 @@ static int icdi_usb_open(struct hl_interface_param_s *param, void **fd)
 
 	/* TI (Stellaris) ICDI provides its serial number in the USB descriptor;
 	   no need to provide a callback here. */
-	jtag_libusb_open(param->vid, param->pid, &h->usb_dev, NULL);
+	jtag_libusb_open(param->vid, param->pid, NULL, &h->usb_dev, NULL);
 
 	if (!h->usb_dev) {
 		LOG_ERROR("open failed");
@@ -751,7 +751,7 @@ error_open:
 	return ERROR_FAIL;
 }
 
-struct hl_layout_api_s icdi_usb_layout_api = {
+struct hl_layout_api icdi_usb_layout_api = {
 	.open = icdi_usb_open,
 	.close = icdi_usb_close,
 	.idcode = icdi_usb_idcode,

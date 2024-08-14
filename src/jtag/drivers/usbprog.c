@@ -37,7 +37,7 @@
 static void usbprog_end_state(tap_state_t state);
 static void usbprog_state_move(void);
 static void usbprog_path_move(struct pathmove_command *cmd);
-static void usbprog_runtest(int num_cycles);
+static void usbprog_runtest(unsigned int num_cycles);
 static void usbprog_scan(bool ir_scan, enum scan_type type, uint8_t *buffer, int scan_size);
 
 #define UNKNOWN_COMMAND 0x00
@@ -83,9 +83,9 @@ static void usbprog_jtag_write_slice(struct usbprog_jtag *usbprog_jtag, unsigned
 static void usbprog_jtag_set_bit(struct usbprog_jtag *usbprog_jtag, int bit, int value);
 /* static int usbprog_jtag_get_bit(struct usbprog_jtag *usbprog_jtag, int bit); */
 
-static int usbprog_execute_queue(void)
+static int usbprog_execute_queue(struct jtag_command *cmd_queue)
 {
-	struct jtag_command *cmd = jtag_command_queue;	/* currently processed command */
+	struct jtag_command *cmd = cmd_queue;	/* currently processed command */
 	int scan_size;
 	enum scan_type type;
 	uint8_t *buffer;
@@ -101,7 +101,7 @@ static int usbprog_execute_queue(void)
 			usbprog_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 			break;
 		case JTAG_RUNTEST:
-			LOG_DEBUG_IO("runtest %i cycles, end in %i",
+			LOG_DEBUG_IO("runtest %u cycles, end in %i",
 					cmd->cmd.runtest->num_cycles,
 					cmd->cmd.runtest->end_state);
 			usbprog_end_state(cmd->cmd.runtest->end_state);
@@ -113,7 +113,7 @@ static int usbprog_execute_queue(void)
 			usbprog_state_move();
 			break;
 		case JTAG_PATHMOVE:
-			LOG_DEBUG_IO("pathmove: %i states, end in %i",
+			LOG_DEBUG_IO("pathmove: %u states, end in %i",
 					cmd->cmd.pathmove->num_states,
 					cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]);
 			usbprog_path_move(cmd->cmd.pathmove);
@@ -189,7 +189,7 @@ static void usbprog_state_move(void)
 
 static void usbprog_path_move(struct pathmove_command *cmd)
 {
-	int num_states = cmd->num_states;
+	unsigned int num_states = cmd->num_states;
 	int state_count;
 
 	/* There may be queued transitions, and before following a specified
@@ -222,10 +222,8 @@ static void usbprog_path_move(struct pathmove_command *cmd)
 	tap_set_end_state(tap_get_state());
 }
 
-static void usbprog_runtest(int num_cycles)
+static void usbprog_runtest(unsigned int num_cycles)
 {
-	int i;
-
 	/* only do a state_move when we're not already in IDLE */
 	if (tap_get_state() != TAP_IDLE) {
 		usbprog_end_state(TAP_IDLE);
@@ -241,7 +239,7 @@ static void usbprog_runtest(int num_cycles)
 		/* LOG_INFO("NUM CYCLES %i",num_cycles); */
 	}
 
-	for (i = 0; i < num_cycles; i++) {
+	for (unsigned int i = 0; i < num_cycles; i++) {
 		usbprog_write(1, 0, 0);
 		usbprog_write(0, 0, 0);
 	}
@@ -341,7 +339,7 @@ struct usbprog_jtag *usbprog_jtag_open(void)
 	const uint16_t pids[] = { PID, 0 };
 	struct libusb_device_handle *dev;
 
-	if (jtag_libusb_open(vids, pids, &dev, NULL) != ERROR_OK)
+	if (jtag_libusb_open(vids, pids, NULL, &dev, NULL) != ERROR_OK)
 		return NULL;
 
 	struct usbprog_jtag *tmp = malloc(sizeof(struct usbprog_jtag));

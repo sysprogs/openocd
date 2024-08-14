@@ -37,9 +37,7 @@ static const struct adapter_gpio_config *adapter_gpio_config;
  */
 static bool is_gpio_config_valid(enum adapter_gpio_config_index idx)
 {
-	return adapter_gpio_config[idx].chip_num >= 0
-		&& adapter_gpio_config[idx].chip_num < 1000
-		&& adapter_gpio_config[idx].gpio_num >= 0
+	return adapter_gpio_config[idx].chip_num < 1000
 		&& adapter_gpio_config[idx].gpio_num < 10000;
 }
 
@@ -159,7 +157,7 @@ static int linuxgpiod_swd_write(int swclk, int swdio)
 	int retval;
 
 	if (!swdio_input) {
-		if (!last_stored || (swdio != last_swdio)) {
+		if (!last_stored || swdio != last_swdio) {
 			retval = gpiod_line_set_value(gpiod_line[ADAPTER_GPIO_IDX_SWDIO], swdio);
 			if (retval < 0)
 				LOG_WARNING("Fail set swdio");
@@ -167,7 +165,7 @@ static int linuxgpiod_swd_write(int swclk, int swdio)
 	}
 
 	/* write swclk last */
-	if (!last_stored || (swclk != last_swclk)) {
+	if (!last_stored || swclk != last_swclk) {
 		retval = gpiod_line_set_value(gpiod_line[ADAPTER_GPIO_IDX_SWCLK], swclk);
 		if (retval < 0)
 			LOG_WARNING("Fail set swclk");
@@ -322,12 +320,12 @@ static int helper_get_line(enum adapter_gpio_config_index idx)
 
 	switch (adapter_gpio_config[idx].pull) {
 	case ADAPTER_GPIO_PULL_NONE:
-#ifdef GPIOD_LINE_REQUEST_FLAG_BIAS_DISABLE
+#ifdef HAVE_LIBGPIOD1_FLAGS_BIAS
 		flags |= GPIOD_LINE_REQUEST_FLAG_BIAS_DISABLE;
 #endif
 		break;
 	case ADAPTER_GPIO_PULL_UP:
-#ifdef GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP
+#ifdef HAVE_LIBGPIOD1_FLAGS_BIAS
 		flags |= GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP;
 #else
 		LOG_WARNING("linuxgpiod: ignoring request for pull-up on %s: not supported by gpiod v%s",
@@ -335,7 +333,7 @@ static int helper_get_line(enum adapter_gpio_config_index idx)
 #endif
 		break;
 	case ADAPTER_GPIO_PULL_DOWN:
-#ifdef GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_DOWN
+#ifdef HAVE_LIBGPIOD1_FLAGS_BIAS
 		flags |= GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_DOWN;
 #else
 		LOG_WARNING("linuxgpiod: ignoring request for pull-down on %s: not supported by gpiod v%s",
@@ -380,12 +378,12 @@ static int linuxgpiod_init(void)
 			goto out_error;
 		}
 
-		if (helper_get_line(ADAPTER_GPIO_IDX_TDO) != ERROR_OK ||
-			helper_get_line(ADAPTER_GPIO_IDX_TDI) != ERROR_OK ||
-			helper_get_line(ADAPTER_GPIO_IDX_TCK) != ERROR_OK ||
-			helper_get_line(ADAPTER_GPIO_IDX_TMS) != ERROR_OK ||
-			helper_get_line(ADAPTER_GPIO_IDX_TRST) != ERROR_OK)
-				goto out_error;
+		if (helper_get_line(ADAPTER_GPIO_IDX_TDO) != ERROR_OK
+				|| helper_get_line(ADAPTER_GPIO_IDX_TDI) != ERROR_OK
+				|| helper_get_line(ADAPTER_GPIO_IDX_TCK) != ERROR_OK
+				|| helper_get_line(ADAPTER_GPIO_IDX_TMS) != ERROR_OK
+				|| helper_get_line(ADAPTER_GPIO_IDX_TRST) != ERROR_OK)
+			goto out_error;
 	}
 
 	if (transport_is_swd()) {
@@ -415,9 +413,9 @@ static int linuxgpiod_init(void)
 			goto out_error;
 	}
 
-	if (helper_get_line(ADAPTER_GPIO_IDX_SRST) != ERROR_OK ||
-		helper_get_line(ADAPTER_GPIO_IDX_LED) != ERROR_OK)
-			goto out_error;
+	if (helper_get_line(ADAPTER_GPIO_IDX_SRST) != ERROR_OK
+			|| helper_get_line(ADAPTER_GPIO_IDX_LED) != ERROR_OK)
+		goto out_error;
 
 	return ERROR_OK;
 
