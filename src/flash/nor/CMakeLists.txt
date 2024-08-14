@@ -79,4 +79,5 @@ add_library(ocdflashnor
 	pic32mm.c
 	npcx.c
 	rsl10.c
-	qn908x.c)
+	qn908x.c
+	eneispif.c)
