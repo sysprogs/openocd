@@ -17,8 +17,8 @@ add_library(libusb1 STATIC
 	${LIBUSB_SOURCE_DIR}/io.c
 	${LIBUSB_SOURCE_DIR}/strerror.c
 	${LIBUSB_SOURCE_DIR}/sync.c
-	${LIBUSB_SOURCE_DIR}/os/poll_windows.c
-	${LIBUSB_SOURCE_DIR}/os/windows_nt_common.c
+	${LIBUSB_SOURCE_DIR}/os/events_windows.c
+	${LIBUSB_SOURCE_DIR}/os/windows_common.c
 	${LIBUSB_SOURCE_DIR}/os/windows_usbdk.c
 	${LIBUSB_SOURCE_DIR}/os/windows_winusb.c
 	${LIBUSB_SOURCE_DIR}/os/threads_windows.c)
