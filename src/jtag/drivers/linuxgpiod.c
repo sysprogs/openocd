@@ -42,7 +42,7 @@ static bool is_gpio_config_valid(enum adapter_gpio_config_index idx)
 }
 
 /* Bitbang interface read of TDO */
-static bb_value_t linuxgpiod_read(void)
+static enum bb_value linuxgpiod_read(void)
 {
 	int retval;
 
@@ -178,20 +178,20 @@ static int linuxgpiod_swd_write(int swclk, int swdio)
 	return ERROR_OK;
 }
 
-static int linuxgpiod_blink(int on)
+static int linuxgpiod_blink(bool on)
 {
 	int retval;
 
 	if (!is_gpio_config_valid(ADAPTER_GPIO_IDX_LED))
 		return ERROR_OK;
 
-	retval = gpiod_line_set_value(gpiod_line[ADAPTER_GPIO_IDX_LED], on);
+	retval = gpiod_line_set_value(gpiod_line[ADAPTER_GPIO_IDX_LED], on ? 1 : 0);
 	if (retval < 0)
 		LOG_WARNING("Fail set led");
 	return retval;
 }
 
-static struct bitbang_interface linuxgpiod_bitbang = {
+static const struct bitbang_interface linuxgpiod_bitbang = {
 	.read = linuxgpiod_read,
 	.write = linuxgpiod_write,
 	.swdio_read = linuxgpiod_swdio_read,

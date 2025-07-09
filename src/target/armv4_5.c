@@ -168,9 +168,9 @@ static const struct {
 };
 
 /** Map PSR mode bits to the name of an ARM processor operating mode. */
-const char *arm_mode_name(unsigned psr_mode)
+const char *arm_mode_name(unsigned int psr_mode)
 {
-	for (unsigned i = 0; i < ARRAY_SIZE(arm_mode_data); i++) {
+	for (unsigned int i = 0; i < ARRAY_SIZE(arm_mode_data); i++) {
 		if (arm_mode_data[i].psr == psr_mode)
 			return arm_mode_data[i].name;
 	}
@@ -179,9 +179,9 @@ const char *arm_mode_name(unsigned psr_mode)
 }
 
 /** Return true iff the parameter denotes a valid ARM processor mode. */
-bool is_arm_mode(unsigned psr_mode)
+bool is_arm_mode(unsigned int psr_mode)
 {
-	for (unsigned i = 0; i < ARRAY_SIZE(arm_mode_data); i++) {
+	for (unsigned int i = 0; i < ARRAY_SIZE(arm_mode_data); i++) {
 		if (arm_mode_data[i].psr == psr_mode)
 			return true;
 	}
@@ -248,7 +248,11 @@ enum arm_mode armv4_5_number_to_mode(int number)
 }
 
 static const char *arm_state_strings[] = {
-	"ARM", "Thumb", "Jazelle", "ThumbEE",
+	[ARM_STATE_ARM]      = "ARM",
+	[ARM_STATE_THUMB]    = "Thumb",
+	[ARM_STATE_JAZELLE]  = "Jazelle",
+	[ARM_STATE_THUMB_EE] = "ThumbEE",
+	[ARM_STATE_AARCH64]  = "AArch64",
 };
 
 /* Templates for ARM core registers.
@@ -272,8 +276,8 @@ static const struct {
 	 * CPSR -or- SPSR depending on whether 'mode' is MODE_ANY.
 	 * (Exception modes have both CPSR and SPSR registers ...)
 	 */
-	unsigned cookie;
-	unsigned gdb_index;
+	unsigned int cookie;
+	unsigned int gdb_index;
 	enum arm_mode mode;
 } arm_core_regs[] = {
 	/* IMPORTANT:  we guarantee that the first eight cached registers
@@ -430,6 +434,16 @@ const int armv4_5_core_reg_map[9][17] = {
 	}
 };
 
+static const char *arm_core_state_string(struct arm *arm)
+{
+	if (arm->core_state > ARRAY_SIZE(arm_state_strings)) {
+		LOG_ERROR("core_state exceeds table size");
+		return "Unknown";
+	}
+
+	return arm_state_strings[arm->core_state];
+}
+
 /**
  * Configures host-side ARM records to reflect the specified CPSR.
  * Later, code can use arm_reg_current() to map register numbers
@@ -482,9 +496,9 @@ void arm_set_cpsr(struct arm *arm, uint32_t cpsr)
 	}
 	arm->core_state = state;
 
-	LOG_DEBUG("set CPSR %#8.8x: %s mode, %s state", (unsigned) cpsr,
+	LOG_DEBUG("set CPSR %#8.8" PRIx32 ": %s mode, %s state", cpsr,
 		arm_mode_name(mode),
-		arm_state_strings[arm->core_state]);
+		arm_core_state_string(arm));
 }
 
 /**
@@ -499,7 +513,7 @@ void arm_set_cpsr(struct arm *arm, uint32_t cpsr)
  *	However, R8..R14, and SPSR (arm->spsr) *must* be mapped.
  *	CPSR (arm->cpsr) is also not mapped.
  */
-struct reg *arm_reg_current(struct arm *arm, unsigned regnum)
+struct reg *arm_reg_current(struct arm *arm, unsigned int regnum)
 {
 	struct reg *r;
 
@@ -794,7 +808,7 @@ int arm_arch_state(struct target *target)
 
 	LOG_USER("target halted in %s state due to %s, current mode: %s\n"
 		"cpsr: 0x%8.8" PRIx32 " pc: 0x%8.8" PRIx32 "%s%s",
-		arm_state_strings[arm->core_state],
+		arm_core_state_string(arm),
 		debug_reason_name(target),
 		arm_mode_name(arm->core_mode),
 		buf_get_u32(arm->cpsr->value, 0, 32),
@@ -840,7 +854,7 @@ COMMAND_HANDLER(handle_armv4_5_reg_command)
 
 	regs = arm->core_cache->reg_list;
 
-	for (unsigned mode = 0; mode < ARRAY_SIZE(arm_mode_data); mode++) {
+	for (unsigned int mode = 0; mode < ARRAY_SIZE(arm_mode_data); mode++) {
 		const char *name;
 		char *sep = "\n";
 		char *shadow = "";
@@ -875,11 +889,11 @@ COMMAND_HANDLER(handle_armv4_5_reg_command)
 			sep, name, shadow);
 
 		/* display N rows of up to 4 registers each */
-		for (unsigned i = 0; i < arm_mode_data[mode].n_indices; ) {
+		for (unsigned int i = 0; i < arm_mode_data[mode].n_indices; ) {
 			char output[80];
 			int output_len = 0;
 
-			for (unsigned j = 0; j < 4; j++, i++) {
+			for (unsigned int j = 0; j < 4; j++, i++) {
 				uint32_t value;
 				struct reg *reg = regs;
 
@@ -929,7 +943,7 @@ COMMAND_HANDLER(handle_arm_core_state_command)
 			arm->core_state = ARM_STATE_THUMB;
 	}
 
-	command_print(CMD, "core state: %s", arm_state_strings[arm->core_state]);
+	command_print(CMD, "core state: %s", arm_core_state_string(arm));
 
 	return ret;
 }
@@ -1287,11 +1301,11 @@ int arm_get_gdb_reg_list(struct target *target,
 		*reg_list = malloc(sizeof(struct reg *) * (*reg_list_size));
 
 		for (i = 0; i < 16; i++)
-				(*reg_list)[i] = arm_reg_current(arm, i);
+			(*reg_list)[i] = arm_reg_current(arm, i);
 
 		/* For GDB compatibility, take FPA registers size into account and zero-fill it*/
 		for (i = 16; i < 24; i++)
-				(*reg_list)[i] = &arm_gdb_dummy_fp_reg;
+			(*reg_list)[i] = &arm_gdb_dummy_fp_reg;
 		(*reg_list)[24] = &arm_gdb_dummy_fps_reg;
 
 		(*reg_list)[25] = arm->cpsr;
@@ -1316,25 +1330,25 @@ int arm_get_gdb_reg_list(struct target *target,
 		*reg_list = malloc(sizeof(struct reg *) * (*reg_list_size));
 
 		for (i = 0; i < 16; i++)
-				(*reg_list)[i] = arm_reg_current(arm, i);
+			(*reg_list)[i] = arm_reg_current(arm, i);
 
 		for (i = 13; i < ARRAY_SIZE(arm_core_regs); i++) {
-				int reg_index = arm->core_cache->reg_list[i].number;
+			int reg_index = arm->core_cache->reg_list[i].number;
 
-				if (arm_core_regs[i].mode == ARM_MODE_MON
+			if (arm_core_regs[i].mode == ARM_MODE_MON
 					&& arm->core_type != ARM_CORE_TYPE_SEC_EXT
 					&& arm->core_type != ARM_CORE_TYPE_VIRT_EXT)
-					continue;
-				if (arm_core_regs[i].mode == ARM_MODE_HYP
+				continue;
+			if (arm_core_regs[i].mode == ARM_MODE_HYP
 					&& arm->core_type != ARM_CORE_TYPE_VIRT_EXT)
-					continue;
-				(*reg_list)[reg_index] = &(arm->core_cache->reg_list[i]);
+				continue;
+			(*reg_list)[reg_index] = &arm->core_cache->reg_list[i];
 		}
 
 		/* When we supply the target description, there is no need for fake FPA */
 		for (i = 16; i < 24; i++) {
-				(*reg_list)[i] = &arm_gdb_dummy_fp_reg;
-				(*reg_list)[i]->size = 0;
+			(*reg_list)[i] = &arm_gdb_dummy_fp_reg;
+			(*reg_list)[i]->size = 0;
 		}
 		(*reg_list)[24] = &arm_gdb_dummy_fps_reg;
 		(*reg_list)[24]->size = 0;
@@ -1500,7 +1514,7 @@ int armv4_5_run_algorithm_inner(struct target *target,
 		}
 	}
 
-	retval = target_resume(target, 0, entry_point, 1, 1);
+	retval = target_resume(target, false, entry_point, true, true);
 	if (retval != ERROR_OK)
 		return retval;
 	retval = run_it(target, exit_point, timeout_ms, arch_info);
@@ -1750,7 +1764,7 @@ cleanup:
 static int arm_full_context(struct target *target)
 {
 	struct arm *arm = target_to_arm(target);
-	unsigned num_regs = arm->core_cache->num_regs;
+	unsigned int num_regs = arm->core_cache->num_regs;
 	struct reg *reg = arm->core_cache->reg_list;
 	int retval = ERROR_OK;
 

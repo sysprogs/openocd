@@ -30,8 +30,8 @@
 #endif
 
 
-static int arm11_step(struct target *target, int current,
-		target_addr_t address, int handle_breakpoints);
+static int arm11_step(struct target *target, bool current,
+		target_addr_t address, bool handle_breakpoints);
 
 
 /** Check and if necessary take control of the system
@@ -43,7 +43,7 @@ static int arm11_check_init(struct arm11_common *arm11)
 	CHECK_RETVAL(arm11_read_dscr(arm11));
 
 	if (!(arm11->dscr & DSCR_HALT_DBG_MODE)) {
-		LOG_DEBUG("DSCR %08x", (unsigned) arm11->dscr);
+		LOG_DEBUG("DSCR %08" PRIx32, arm11->dscr);
 		LOG_DEBUG("Bringing target into debug mode");
 
 		arm11->dscr |= DSCR_HALT_DBG_MODE;
@@ -241,8 +241,7 @@ static int arm11_leave_debug_state(struct arm11_common *arm11, bool bpwp)
 			registers hold data that was written by one side (CPU or JTAG) and not
 			read out by the other side.
 			*/
-			LOG_ERROR("wDTR/rDTR inconsistent (DSCR %08x)",
-				(unsigned) arm11->dscr);
+			LOG_ERROR("wDTR/rDTR inconsistent (DSCR %08" PRIx32 ")", arm11->dscr);
 			return ERROR_FAIL;
 		}
 	}
@@ -402,7 +401,8 @@ static int arm11_halt(struct target *target)
 	return ERROR_OK;
 }
 
-static uint32_t arm11_nextpc(struct arm11_common *arm11, int current, uint32_t address)
+static uint32_t arm11_nextpc(struct arm11_common *arm11, bool current,
+		uint32_t address)
 {
 	void *value = arm11->arm.pc->value;
 
@@ -436,8 +436,8 @@ static uint32_t arm11_nextpc(struct arm11_common *arm11, int current, uint32_t a
 	return address;
 }
 
-static int arm11_resume(struct target *target, int current,
-	target_addr_t address, int handle_breakpoints, int debug_execution)
+static int arm11_resume(struct target *target, bool current,
+	target_addr_t address, bool handle_breakpoints, bool debug_execution)
 {
 	/*	  LOG_DEBUG("current %d  address %08x  handle_breakpoints %d  debug_execution %d", */
 	/*	current, address, handle_breakpoints, debug_execution); */
@@ -470,7 +470,7 @@ static int arm11_resume(struct target *target, int current,
 		for (bp = target->breakpoints; bp; bp = bp->next) {
 			if (bp->address == address) {
 				LOG_DEBUG("must step over %08" TARGET_PRIxADDR "", bp->address);
-				arm11_step(target, 1, 0, 0);
+				arm11_step(target, true, 0, false);
 				break;
 			}
 		}
@@ -479,7 +479,7 @@ static int arm11_resume(struct target *target, int current,
 	/* activate all breakpoints */
 	if (true) {
 		struct breakpoint *bp;
-		unsigned brp_num = 0;
+		unsigned int brp_num = 0;
 
 		for (bp = target->breakpoints; bp; bp = bp->next) {
 			struct arm11_sc7_action brp[2];
@@ -516,7 +516,7 @@ static int arm11_resume(struct target *target, int current,
 	while (1) {
 		CHECK_RETVAL(arm11_read_dscr(arm11));
 
-		LOG_DEBUG("DSCR %08x", (unsigned) arm11->dscr);
+		LOG_DEBUG("DSCR %08" PRIx32, arm11->dscr);
 
 		if (arm11->dscr & DSCR_CORE_RESTARTED)
 			break;
@@ -544,8 +544,8 @@ static int arm11_resume(struct target *target, int current,
 	return ERROR_OK;
 }
 
-static int arm11_step(struct target *target, int current,
-	target_addr_t address, int handle_breakpoints)
+static int arm11_step(struct target *target, bool current,
+	target_addr_t address, bool handle_breakpoints)
 {
 	LOG_DEBUG("target->state: %s",
 		target_state_name(target));
@@ -570,13 +570,13 @@ static int arm11_step(struct target *target, int current,
 
 	/* skip over BKPT */
 	if ((next_instruction & 0xFFF00070) == 0xe1200070) {
-		address = arm11_nextpc(arm11, 0, address + 4);
+		address = arm11_nextpc(arm11, false, address + 4);
 		LOG_DEBUG("Skipping BKPT %08" TARGET_PRIxADDR, address);
 	}
 	/* skip over Wait for interrupt / Standby
 	 * mcr	15, 0, r?, cr7, cr0, {4} */
 	else if ((next_instruction & 0xFFFF0FFF) == 0xee070f90) {
-		address = arm11_nextpc(arm11, 0, address + 4);
+		address = arm11_nextpc(arm11, false, address + 4);
 		LOG_DEBUG("Skipping WFI %08" TARGET_PRIxADDR, address);
 	}
 	/* ignore B to self */
@@ -662,7 +662,7 @@ static int arm11_step(struct target *target, int current,
 				| DSCR_CORE_HALTED;
 
 			CHECK_RETVAL(arm11_read_dscr(arm11));
-			LOG_DEBUG("DSCR %08x e", (unsigned) arm11->dscr);
+			LOG_DEBUG("DSCR %08" PRIx32 " e", arm11->dscr);
 
 			if ((arm11->dscr & mask) == mask)
 				break;
@@ -1012,10 +1012,8 @@ static int arm11_write_memory_inner(struct target *target,
 			return retval;
 
 		if (address + size * count != r0) {
-			LOG_ERROR("Data transfer failed. Expected end "
-				"address 0x%08x, got 0x%08x",
-				(unsigned) (address + size * count),
-				(unsigned) r0);
+			LOG_ERROR("Data transfer failed. Expected end address 0x%08" PRIx32 ", got 0x%08" PRIx32,
+				address + size * count, r0);
 
 			if (burst)
 				LOG_ERROR(

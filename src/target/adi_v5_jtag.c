@@ -431,7 +431,7 @@ static int jtagdp_overrun_check(struct adiv5_dap *dap)
 	struct dap_cmd *el, *tmp, *prev = NULL;
 	int found_wait = 0;
 	int64_t time_now;
-	LIST_HEAD(replay_list);
+	OOCD_LIST_HEAD(replay_list);
 
 	/* make sure all queued transactions are complete */
 	retval = jtag_execute_queue();
@@ -736,7 +736,7 @@ static int jtag_send_sequence(struct adiv5_dap *dap, enum swd_special_seq seq)
 	return retval;
 }
 
-static int jtag_dp_q_read(struct adiv5_dap *dap, unsigned reg,
+static int jtag_dp_q_read(struct adiv5_dap *dap, unsigned int reg,
 		uint32_t *data)
 {
 	int retval = jtag_limit_queue_size(dap);
@@ -749,7 +749,7 @@ static int jtag_dp_q_read(struct adiv5_dap *dap, unsigned reg,
 	return retval;
 }
 
-static int jtag_dp_q_write(struct adiv5_dap *dap, unsigned reg,
+static int jtag_dp_q_write(struct adiv5_dap *dap, unsigned int reg,
 		uint32_t data)
 {
 	int retval = jtag_limit_queue_size(dap);
@@ -763,7 +763,7 @@ static int jtag_dp_q_write(struct adiv5_dap *dap, unsigned reg,
 }
 
 /** Select the AP register bank */
-static int jtag_ap_q_bankselect(struct adiv5_ap *ap, unsigned reg)
+static int jtag_ap_q_bankselect(struct adiv5_ap *ap, unsigned int reg)
 {
 	int retval;
 	struct adiv5_dap *dap = ap->dap;
@@ -818,7 +818,7 @@ static int jtag_ap_q_bankselect(struct adiv5_ap *ap, unsigned reg)
 	return ERROR_OK;
 }
 
-static int jtag_ap_q_read(struct adiv5_ap *ap, unsigned reg,
+static int jtag_ap_q_read(struct adiv5_ap *ap, unsigned int reg,
 		uint32_t *data)
 {
 	int retval = jtag_limit_queue_size(ap->dap);
@@ -840,7 +840,7 @@ static int jtag_ap_q_read(struct adiv5_ap *ap, unsigned reg,
 	return retval;
 }
 
-static int jtag_ap_q_write(struct adiv5_ap *ap, unsigned reg,
+static int jtag_ap_q_write(struct adiv5_ap *ap, unsigned int reg,
 		uint32_t data)
 {
 	int retval = jtag_limit_queue_size(ap->dap);

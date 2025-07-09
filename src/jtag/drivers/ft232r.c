@@ -177,7 +177,7 @@ static void ft232r_increase_buf_size(size_t new_buf_size)
  */
 static void ft232r_write(int tck, int tms, int tdi)
 {
-	unsigned out_value = (1<<ntrst_gpio) | (1<<nsysrst_gpio);
+	unsigned int out_value = (1 << ntrst_gpio) | (1 << nsysrst_gpio);
 	if (tck)
 		out_value |= (1<<tck_gpio);
 	if (tms)
@@ -201,7 +201,7 @@ static void ft232r_write(int tck, int tms, int tdi)
  */
 static void ft232r_reset(int trst, int srst)
 {
-	unsigned out_value = (1<<ntrst_gpio) | (1<<nsysrst_gpio);
+	unsigned int out_value = (1 << ntrst_gpio) | (1 << nsysrst_gpio);
 	LOG_DEBUG("ft232r_reset(%d,%d)", trst, srst);
 
 	if (trst == 1)
@@ -281,7 +281,7 @@ static int ft232r_init(void)
 	}
 
 	/* Exactly 500 nsec between updates. */
-	unsigned divisor = 1;
+	unsigned int divisor = 1;
 	unsigned char latency_timer = 1;
 
 	/* Frequency divisor is 14-bit non-zero value. */
@@ -622,7 +622,7 @@ static const struct command_registration ft232r_command_handlers[] = {
  * Synchronous bitbang protocol implementation.
  */
 
-static void syncbb_end_state(tap_state_t state)
+static void syncbb_end_state(enum tap_state state)
 {
 	if (tap_is_state_stable(state))
 		tap_set_end_state(state);
@@ -654,13 +654,13 @@ static void syncbb_state_move(int skip)
  */
 static int syncbb_execute_tms(struct jtag_command *cmd)
 {
-	unsigned num_bits = cmd->cmd.tms->num_bits;
+	unsigned int num_bits = cmd->cmd.tms->num_bits;
 	const uint8_t *bits = cmd->cmd.tms->bits;
 
 	LOG_DEBUG_IO("TMS: %u bits", num_bits);
 
 	int tms = 0;
-	for (unsigned i = 0; i < num_bits; i++) {
+	for (unsigned int i = 0; i < num_bits; i++) {
 		tms = ((bits[i/8] >> (i % 8)) & 1);
 		ft232r_write(0, tms, 0);
 		ft232r_write(1, tms, 0);
@@ -705,7 +705,7 @@ static void syncbb_path_move(struct pathmove_command *cmd)
 static void syncbb_runtest(unsigned int num_cycles)
 {
 
-	tap_state_t saved_end_state = tap_get_end_state();
+	enum tap_state saved_end_state = tap_get_end_state();
 
 	/* only do a state_move when we're not already in IDLE */
 	if (tap_get_state() != TAP_IDLE) {
@@ -747,7 +747,7 @@ static void syncbb_stableclocks(unsigned int num_cycles)
 
 static void syncbb_scan(bool ir_scan, enum scan_type type, uint8_t *buffer, int scan_size)
 {
-	tap_state_t saved_end_state = tap_get_end_state();
+	enum tap_state saved_end_state = tap_get_end_state();
 	int bit_cnt, bit0_index;
 
 	if (!((!ir_scan && (tap_get_state() == TAP_DRSHIFT)) || (ir_scan && (tap_get_state() == TAP_IRSHIFT)))) {

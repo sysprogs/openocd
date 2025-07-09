@@ -36,7 +36,7 @@ static const char * const armv8_state_strings[] = {
 
 static const struct {
 	const char *name;
-	unsigned psr;
+	unsigned int psr;
 } armv8_mode_data[] = {
 	{
 		.name = "USR",
@@ -105,9 +105,9 @@ static const struct {
 };
 
 /** Map PSR mode bits to the name of an ARM processor operating mode. */
-const char *armv8_mode_name(unsigned psr_mode)
+const char *armv8_mode_name(unsigned int psr_mode)
 {
-	for (unsigned i = 0; i < ARRAY_SIZE(armv8_mode_data); i++) {
+	for (unsigned int i = 0; i < ARRAY_SIZE(armv8_mode_data); i++) {
 		if (armv8_mode_data[i].psr == psr_mode)
 			return armv8_mode_data[i].name;
 	}
@@ -683,7 +683,7 @@ static int armv8_read_reg_simdfp_aarch32(struct armv8_common *armv8, int regnum,
 	struct arm_dpm *dpm = &armv8->dpm;
 	struct reg *reg_r1 = dpm->arm->core_cache->reg_list + ARMV8_R1;
 	uint32_t value_r0 = 0, value_r1 = 0;
-	unsigned num = (regnum - ARMV8_V0) << 1;
+	unsigned int num = (regnum - ARMV8_V0) << 1;
 
 	switch (regnum) {
 	case ARMV8_V0 ... ARMV8_V15:
@@ -817,7 +817,7 @@ static int armv8_write_reg_simdfp_aarch32(struct armv8_common *armv8, int regnum
 	struct arm_dpm *dpm = &armv8->dpm;
 	struct reg *reg_r1 = dpm->arm->core_cache->reg_list + ARMV8_R1;
 	uint32_t value_r0 = 0, value_r1 = 0;
-	unsigned num = (regnum - ARMV8_V0) << 1;
+	unsigned int num = (regnum - ARMV8_V0) << 1;
 
 	switch (regnum) {
 	case ARMV8_V0 ... ARMV8_V15:
@@ -961,7 +961,7 @@ void armv8_set_cpsr(struct arm *arm, uint32_t cpsr)
 	arm->core_state = state;
 	arm->core_mode = mode;
 
-	LOG_DEBUG("set CPSR %#8.8x: %s mode, %s state", (unsigned) cpsr,
+	LOG_DEBUG("set CPSR %#8.8" PRIx32 ": %s mode, %s state", cpsr,
 		armv8_mode_name(arm->core_mode),
 		armv8_state_strings[arm->core_state]);
 }
@@ -1010,7 +1010,7 @@ static void armv8_show_fault_registers32(struct armv8_common *armv8)
 		", IFAR: %8.8" PRIx32, ifsr, ifar);
 
 done:
-	/* (void) */ dpm->finish(dpm);
+	dpm->finish(dpm);
 }
 
 static __attribute__((unused)) void armv8_show_fault_registers(struct target *target)
@@ -1019,12 +1019,6 @@ static __attribute__((unused)) void armv8_show_fault_registers(struct target *ta
 
 	if (armv8->arm.core_state != ARM_STATE_AARCH64)
 		armv8_show_fault_registers32(armv8);
-}
-
-/*  method adapted to cortex A : reused arm v4 v5 method*/
-int armv8_mmu_translate_va(struct target *target,  target_addr_t va, target_addr_t *val)
-{
-	return ERROR_OK;
 }
 
 static void armv8_decode_cacheability(int attr)
@@ -1506,9 +1500,9 @@ static struct reg_data_type aarch64_flags_cpsr[] = {
 };
 
 static const struct {
-	unsigned id;
+	unsigned int id;
 	const char *name;
-	unsigned bits;
+	unsigned int bits;
 	enum arm_mode mode;
 	enum reg_type type;
 	const char *group;
@@ -1611,10 +1605,10 @@ static const struct {
 };
 
 static const struct {
-	unsigned id;
-	unsigned mapping;
+	unsigned int id;
+	unsigned int mapping;
 	const char *name;
-	unsigned bits;
+	unsigned int bits;
 	enum arm_mode mode;
 	enum reg_type type;
 	const char *group;
@@ -1692,12 +1686,12 @@ static int armv8_set_core_reg(struct reg *reg, uint8_t *buf)
 	struct arm_reg *armv8_reg = reg->arch_info;
 	struct target *target = armv8_reg->target;
 	struct arm *arm = target_to_arm(target);
-	uint64_t value = buf_get_u64(buf, 0, reg->size);
 
 	if (target->state != TARGET_HALTED)
 		return ERROR_TARGET_NOT_HALTED;
 
 	if (reg->size <= 64) {
+		uint64_t value = buf_get_u64(buf, 0, reg->size);
 		if (reg == arm->cpsr)
 			armv8_set_cpsr(arm, (uint32_t)value);
 		else {
@@ -1705,6 +1699,7 @@ static int armv8_set_core_reg(struct reg *reg, uint8_t *buf)
 			reg->valid = true;
 		}
 	} else if (reg->size <= 128) {
+		uint64_t value = buf_get_u64(buf, 0, 64);
 		uint64_t hvalue = buf_get_u64(buf + 8, 0, reg->size - 64);
 
 		buf_set_u64(reg->value, 0, 64, value);
@@ -1881,7 +1876,7 @@ struct reg_cache *armv8_build_reg_cache(struct target *target)
 	return cache;
 }
 
-struct reg *armv8_reg_current(struct arm *arm, unsigned regnum)
+struct reg *armv8_reg_current(struct arm *arm, unsigned int regnum)
 {
 	struct reg *r;
 
@@ -1972,7 +1967,7 @@ int armv8_get_gdb_reg_list(struct target *target,
 			*reg_list = malloc(sizeof(struct reg *) * (*reg_list_size));
 
 			for (i = 0; i < *reg_list_size; i++)
-					(*reg_list)[i] = armv8_reg_current(arm, i);
+				(*reg_list)[i] = armv8_reg_current(arm, i);
 			return ERROR_OK;
 
 		case REG_CLASS_ALL:
@@ -1980,7 +1975,7 @@ int armv8_get_gdb_reg_list(struct target *target,
 			*reg_list = malloc(sizeof(struct reg *) * (*reg_list_size));
 
 			for (i = 0; i < *reg_list_size; i++)
-					(*reg_list)[i] = armv8_reg_current(arm, i);
+				(*reg_list)[i] = armv8_reg_current(arm, i);
 
 			return ERROR_OK;
 

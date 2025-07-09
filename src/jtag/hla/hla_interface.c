@@ -30,7 +30,6 @@ static struct hl_interface hl_if = {
 		.pid = { 0 },
 		.transport = HL_TRANSPORT_UNKNOWN,
 		.connect_under_reset = false,
-		.initial_interface_speed = -1,
 		.use_stlink_tcp = false,
 		.stlink_tcp_port = 7184,
 	},
@@ -76,7 +75,7 @@ int hl_interface_init_target(struct target *t)
 	if (res != ERROR_OK)
 		return res;
 
-	unsigned ii, limit = t->tap->expected_ids_cnt;
+	unsigned int ii, limit = t->tap->expected_ids_cnt;
 	int found = 0;
 
 	for (ii = 0; ii < limit; ii++) {
@@ -165,11 +164,8 @@ static int hl_interface_speed(int speed)
 	if (!hl_if.layout->api->speed)
 		return ERROR_OK;
 
-	if (!hl_if.handle) {
-		/* pass speed as initial param as interface not open yet */
-		hl_if.param.initial_interface_speed = speed;
+	if (!hl_if.handle)
 		return ERROR_OK;
-	}
 
 	hl_if.layout->api->speed(hl_if.handle, speed, false);
 
@@ -264,7 +260,7 @@ COMMAND_HANDLER(hl_interface_handle_vid_pid_command)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 	}
 
-	unsigned i;
+	unsigned int i;
 	for (i = 0; i < CMD_ARGC; i += 2) {
 		COMMAND_PARSE_NUMBER(u16, CMD_ARGV[i], hl_if.param.vid[i / 2]);
 		COMMAND_PARSE_NUMBER(u16, CMD_ARGV[i + 1], hl_if.param.pid[i / 2]);
@@ -348,7 +344,7 @@ static const struct command_registration hl_interface_subcommand_handlers[] = {
 	 .help = "select which ST-Link backend to use",
 	 .usage = "usb | tcp [port]",
 	},
-	 {
+	{
 	 .name = "command",
 	 .handler = &interface_handle_hla_command,
 	 .mode = COMMAND_EXEC,

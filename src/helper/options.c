@@ -304,12 +304,14 @@ int parse_cmdline_args(struct command_context *cmd_ctx, int argc, char *argv[])
 				break;
 			}
 			case 'l':		/* --log_output | -l */
-				if (optarg)
-					command_run_linef(cmd_ctx, "log_output %s", optarg);
+			{
+				int retval = command_run_linef(cmd_ctx, "log_output %s", optarg);
+				if (retval != ERROR_OK)
+					return retval;
 				break;
+			}
 			case 'c':		/* --command | -c */
-				if (optarg)
-				    add_config_command(optarg);
+				add_config_command(optarg);
 				break;
 			case 'e':
 				if (optarg)
@@ -341,7 +343,7 @@ int parse_cmdline_args(struct command_context *cmd_ctx, int argc, char *argv[])
 		LOG_OUTPUT("             | -d<n>\tset debug level to <level>\n");
 		LOG_OUTPUT("--log_output | -l\tredirect log output to file <name>\n");
 		LOG_OUTPUT("--command    | -c\trun <command>\n");
-		exit(-1);
+		exit(0);
 	}
 
 	if (version_flag) {

@@ -476,7 +476,7 @@ static void riscv_free_registers(struct target *target)
 		if (target->reg_cache->reg_list) {
 			free(target->reg_cache->reg_list[0].arch_info);
 			/* Free the ones we allocated separately. */
-			for (unsigned i = GDB_REGNO_COUNT; i < target->reg_cache->num_regs; i++)
+			for (unsigned int i = GDB_REGNO_COUNT; i < target->reg_cache->num_regs; i++)
 				free(target->reg_cache->reg_list[i].arch_info);
 			for (unsigned int i = 0; i < target->reg_cache->num_regs; i++)
 				free(target->reg_cache->reg_list[i].value);
@@ -1096,16 +1096,15 @@ static int riscv_hit_watchpoint(struct target *target, struct watchpoint **hit_w
 	return ERROR_FAIL;
 }
 
-
-static int oldriscv_step(struct target *target, int current, uint32_t address,
-		int handle_breakpoints)
+static int oldriscv_step(struct target *target, bool current, uint32_t address,
+		bool handle_breakpoints)
 {
 	struct target_type *tt = get_target_type(target);
 	return tt->step(target, current, address, handle_breakpoints);
 }
 
-static int old_or_new_riscv_step(struct target *target, int current,
-		target_addr_t address, int handle_breakpoints)
+static int old_or_new_riscv_step(struct target *target, bool current,
+		target_addr_t address, bool handle_breakpoints)
 {
 	RISCV_INFO(r);
 	LOG_DEBUG("handle_breakpoints=%d", handle_breakpoints);
@@ -1114,7 +1113,6 @@ static int old_or_new_riscv_step(struct target *target, int current,
 	else
 		return riscv_openocd_step(target, current, address, handle_breakpoints);
 }
-
 
 static int riscv_examine(struct target *target)
 {
@@ -1395,8 +1393,8 @@ static int enable_triggers(struct target *target, riscv_reg_t *state)
 /**
  * Get everything ready to resume.
  */
-static int resume_prep(struct target *target, int current,
-		target_addr_t address, int handle_breakpoints, int debug_execution)
+static int resume_prep(struct target *target, bool current,
+		target_addr_t address, bool handle_breakpoints, bool debug_execution)
 {
 	RISCV_INFO(r);
 	LOG_DEBUG("[%d]", target->coreid);
@@ -1434,8 +1432,8 @@ static int resume_prep(struct target *target, int current,
  * Resume all the harts that have been prepped, as close to instantaneous as
  * possible.
  */
-static int resume_go(struct target *target, int current,
-		target_addr_t address, int handle_breakpoints, int debug_execution)
+static int resume_go(struct target *target, bool current,
+		target_addr_t address, bool handle_breakpoints, bool debug_execution)
 {
 	RISCV_INFO(r);
 	int result;
@@ -1465,10 +1463,10 @@ static int resume_finish(struct target *target)
  */
 static int riscv_resume(
 		struct target *target,
-		int current,
+		bool current,
 		target_addr_t address,
-		int handle_breakpoints,
-		int debug_execution,
+		bool handle_breakpoints,
+		bool debug_execution,
 		bool single_hart)
 {
 	LOG_DEBUG("handle_breakpoints=%d", handle_breakpoints);
@@ -1515,8 +1513,8 @@ static int riscv_resume(
 	return result;
 }
 
-static int riscv_target_resume(struct target *target, int current, target_addr_t address,
-		int handle_breakpoints, int debug_execution)
+static int riscv_target_resume(struct target *target, bool current,
+		target_addr_t address, bool handle_breakpoints, bool debug_execution)
 {
 	return riscv_resume(target, current, address, handle_breakpoints,
 			debug_execution, false);
@@ -1583,7 +1581,7 @@ static int riscv_address_translate(struct target *target,
 	if (result != ERROR_OK)
 		return result;
 
-	unsigned xlen = riscv_xlen(target);
+	unsigned int xlen = riscv_xlen(target);
 	mode = get_field(satp_value, RISCV_SATP_MODE(xlen));
 	switch (mode) {
 		case SATP_MODE_SV32:
@@ -1904,7 +1902,7 @@ static int riscv_run_algorithm(struct target *target, int num_mem_params,
 
 	/* Run algorithm */
 	LOG_DEBUG("resume at 0x%" TARGET_PRIxADDR, entry_point);
-	if (riscv_resume(target, 0, entry_point, 0, 0, true) != ERROR_OK)
+	if (riscv_resume(target, false, entry_point, false, false, true) != ERROR_OK)
 		return ERROR_FAIL;
 
 	int64_t start = timeval_ms();
@@ -1927,7 +1925,7 @@ static int riscv_run_algorithm(struct target *target, int num_mem_params,
 				GDB_REGNO_PC,
 				GDB_REGNO_MSTATUS, GDB_REGNO_MEPC, GDB_REGNO_MCAUSE,
 			};
-			for (unsigned i = 0; i < ARRAY_SIZE(regnums); i++) {
+			for (unsigned int i = 0; i < ARRAY_SIZE(regnums); i++) {
 				enum gdb_regno regno = regnums[i];
 				riscv_reg_t reg_value;
 				if (riscv_get_register(target, &reg_value, regno) != ERROR_OK)
@@ -2007,8 +2005,8 @@ static int riscv_checksum_memory(struct target *target,
 
 	static const uint8_t *crc_code;
 
-	unsigned xlen = riscv_xlen(target);
-	unsigned crc_code_size;
+	unsigned int xlen = riscv_xlen(target);
+	unsigned int crc_code_size;
 	if (xlen == 32) {
 		crc_code = riscv32_crc_code;
 		crc_code_size = sizeof(riscv32_crc_code);
@@ -2187,8 +2185,8 @@ int riscv_openocd_poll(struct target *target)
 	int halted_hart = -1;
 
 	if (target->smp) {
-		unsigned should_remain_halted = 0;
-		unsigned should_resume = 0;
+		unsigned int should_remain_halted = 0;
+		unsigned int should_resume = 0;
 		struct target_list *list;
 		foreach_smp_target(list, target->smp_targets) {
 			struct target *t = list->target;
@@ -2245,7 +2243,7 @@ int riscv_openocd_poll(struct target *target)
 			riscv_halt(target);
 		} else if (should_resume) {
 			LOG_DEBUG("resume all");
-			riscv_resume(target, true, 0, 0, 0, false);
+			riscv_resume(target, true, 0, false, false, false);
 		}
 
 		/* Sample memory if any target is running. */
@@ -2287,7 +2285,7 @@ int riscv_openocd_poll(struct target *target)
 				target_call_event_callbacks(target, TARGET_EVENT_HALTED);
 				break;
 			case SEMIHOSTING_HANDLED:
-				if (riscv_resume(target, true, 0, 0, 0, false) != ERROR_OK)
+				if (riscv_resume(target, true, 0, false, false, false) != ERROR_OK)
 					return ERROR_FAIL;
 				break;
 			case SEMIHOSTING_ERROR:
@@ -2300,8 +2298,8 @@ int riscv_openocd_poll(struct target *target)
 	return ERROR_OK;
 }
 
-int riscv_openocd_step(struct target *target, int current,
-		target_addr_t address, int handle_breakpoints)
+int riscv_openocd_step(struct target *target, bool current,
+		target_addr_t address, bool handle_breakpoints)
 {
 	LOG_DEBUG("stepping rtos hart");
 
@@ -2436,8 +2434,8 @@ static int parse_ranges(struct list_head *ranges, const char *tcl_arg, const cha
 	/* For backward compatibility, allow multiple parameters within one TCL argument, separated by ',' */
 	char *arg = strtok(args, ",");
 	while (arg) {
-		unsigned low = 0;
-		unsigned high = 0;
+		unsigned int low = 0;
+		unsigned int high = 0;
 		char *name = NULL;
 
 		char *dash = strchr(arg, '-');
@@ -3055,7 +3053,7 @@ static const struct command_registration riscv_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-static unsigned riscv_xlen_nonconst(struct target *target)
+static unsigned int riscv_xlen_nonconst(struct target *target)
 {
 	return riscv_xlen(target);
 }
@@ -3194,7 +3192,7 @@ static int riscv_step_rtos_hart(struct target *target)
 bool riscv_supports_extension(struct target *target, char letter)
 {
 	RISCV_INFO(r);
-	unsigned num;
+	unsigned int num;
 	if (letter >= 'a' && letter <= 'z')
 		num = letter - 'a';
 	else if (letter >= 'A' && letter <= 'Z')
@@ -3204,7 +3202,7 @@ bool riscv_supports_extension(struct target *target, char letter)
 	return r->misa & BIT(num);
 }
 
-unsigned riscv_xlen(const struct target *target)
+unsigned int riscv_xlen(const struct target *target)
 {
 	RISCV_INFO(r);
 	return r->xlen;
@@ -3778,7 +3776,7 @@ static struct reg_arch_type riscv_reg_arch_type = {
 };
 
 struct csr_info {
-	unsigned number;
+	unsigned int number;
 	const char *name;
 };
 
@@ -3958,7 +3956,7 @@ int riscv_init_registers(struct target *target)
 	};
 	/* encoding.h does not contain the registers in sorted order. */
 	qsort(csr_info, ARRAY_SIZE(csr_info), sizeof(*csr_info), cmp_csr_info);
-	unsigned csr_info_index = 0;
+	unsigned int csr_info_index = 0;
 
 	int custom_within_range = 0;
 
@@ -4213,7 +4211,7 @@ int riscv_init_registers(struct target *target)
 		} else if (number >= GDB_REGNO_CSR0 && number <= GDB_REGNO_CSR4095) {
 			r->group = "csr";
 			r->feature = &feature_csr;
-			unsigned csr_number = number - GDB_REGNO_CSR0;
+			unsigned int csr_number = number - GDB_REGNO_CSR0;
 
 			while (csr_info[csr_info_index].number < csr_number &&
 					csr_info_index < ARRAY_SIZE(csr_info) - 1) {
@@ -4376,7 +4374,7 @@ int riscv_init_registers(struct target *target)
 
 			range_list_t *range = list_first_entry(&info->expose_custom, range_list_t, list);
 
-			unsigned custom_number = range->low + custom_within_range;
+			unsigned int custom_number = range->low + custom_within_range;
 
 			r->group = "custom";
 			r->feature = &feature_custom;

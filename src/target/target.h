@@ -184,7 +184,7 @@ struct target {
 	bool rtos_auto_detect;				/* A flag that indicates that the RTOS has been specified as "auto"
 										 * and must be detected when symbols are offered */
 	struct backoff_timer backoff;
-	int smp;							/* Unique non-zero number for each SMP group */
+	unsigned int smp;					/* Unique non-zero number for each SMP group */
     int frozen;                         /* frozen targets won't be auto-resumed when receiving a 'step' or 'continue' command from gdb*/
     int report_flash_progress;          /* If set to 1, FLASH writing operations will generate detailed progress messages */
 	struct list_head *smp_targets;		/* list all targets in this smp group/cluster
@@ -392,8 +392,8 @@ int target_unregister_trace_callback(
  * yet it is possible to detect error conditions.
  */
 int target_poll(struct target *target);
-int target_resume(struct target *target, int current, target_addr_t address,
-		int handle_breakpoints, int debug_execution);
+int target_resume(struct target *target, bool current, target_addr_t address,
+		bool handle_breakpoints, bool debug_execution);
 int target_halt(struct target *target);
 int target_call_event_callbacks(struct target *target, enum target_event event);
 int target_call_reset_callbacks(struct target *target, enum target_reset_mode reset_mode);
@@ -542,7 +542,7 @@ bool target_supports_gdb_connection(const struct target *target);
  * This routine is a wrapper for target->type->step.
  */
 int target_step(struct target *target,
-		int current, target_addr_t address, int handle_breakpoints);
+		bool current, target_addr_t address, bool handle_breakpoints);
 /**
  * Run an algorithm on the @a target given.
  *
@@ -691,7 +691,7 @@ target_addr_t target_address_max(struct target *target);
  *
  * This routine is a wrapper for target->type->address_bits.
  */
-unsigned target_address_bits(struct target *target);
+unsigned int target_address_bits(struct target *target);
 
 /**
  * Return the number of data bits this target supports.
@@ -784,8 +784,8 @@ int target_arch_state(struct target *target);
 void target_handle_event(struct target *t, enum target_event e);
 
 void target_handle_md_output(struct command_invocation *cmd,
-	struct target *target, target_addr_t address, unsigned size,
-	unsigned count, const uint8_t *buffer);
+	struct target *target, target_addr_t address, unsigned int size,
+	unsigned int count, const uint8_t *buffer);
 
 int target_profiling_default(struct target *target, uint32_t *samples, uint32_t
 		max_num_samples, uint32_t *num_samples, uint32_t seconds);

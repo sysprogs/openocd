@@ -27,13 +27,13 @@
 
 struct mips64_pracc_context {
 	uint64_t *local_iparam;
-	unsigned num_iparam;
+	unsigned int num_iparam;
 	uint64_t *local_oparam;
-	unsigned num_oparam;
+	unsigned int num_oparam;
 	const uint32_t *code;
-	unsigned code_len;
+	unsigned int code_len;
 	uint64_t stack[STACK_DEPTH];
-	unsigned stack_offset;
+	unsigned int stack_offset;
 	struct mips_ejtag *ejtag_info;
 };
 
@@ -65,7 +65,7 @@ static int wait_for_pracc_rw(struct mips_ejtag *ejtag_info, uint32_t *ctrl)
 static int mips64_pracc_exec_read(struct mips64_pracc_context *ctx, uint64_t address)
 {
 	struct mips_ejtag *ejtag_info = ctx->ejtag_info;
-	unsigned offset;
+	unsigned int offset;
 	uint32_t ejtag_ctrl;
 	uint64_t data;
 	int rc;
@@ -76,12 +76,12 @@ static int mips64_pracc_exec_read(struct mips64_pracc_context *ctx, uint64_t add
 		offset = (address - MIPS64_PRACC_PARAM_IN) / MIPS64_PRACC_DATA_STEP;
 
 		if (offset >= MIPS64_PRACC_PARAM_IN_SIZE) {
-			LOG_ERROR("Error: iparam size exceeds MIPS64_PRACC_PARAM_IN_SIZE");
+			LOG_ERROR("iparam size exceeds MIPS64_PRACC_PARAM_IN_SIZE");
 			return ERROR_JTAG_DEVICE_ERROR;
 		}
 
 		if (!ctx->local_iparam) {
-			LOG_ERROR("Error: unexpected reading of input parameter");
+			LOG_ERROR("unexpected reading of input parameter");
 			return ERROR_JTAG_DEVICE_ERROR;
 		}
 
@@ -93,7 +93,7 @@ static int mips64_pracc_exec_read(struct mips64_pracc_context *ctx, uint64_t add
 
 		offset = (address - MIPS64_PRACC_PARAM_OUT) / MIPS64_PRACC_DATA_STEP;
 		if (!ctx->local_oparam) {
-			LOG_ERROR("Error: unexpected reading of output parameter");
+			LOG_ERROR("unexpected reading of output parameter");
 			return ERROR_JTAG_DEVICE_ERROR;
 		}
 
@@ -154,7 +154,7 @@ static int mips64_pracc_exec_write(struct mips64_pracc_context *ctx, uint64_t ad
 {
 	uint32_t ejtag_ctrl;
 	uint64_t data;
-	unsigned offset;
+	unsigned int offset;
 	struct mips_ejtag *ejtag_info = ctx->ejtag_info;
 	int rc;
 
@@ -181,7 +181,7 @@ static int mips64_pracc_exec_write(struct mips64_pracc_context *ctx, uint64_t ad
 		&& (address < MIPS64_PRACC_PARAM_IN + ctx->num_iparam * MIPS64_PRACC_DATA_STEP)) {
 		offset = (address - MIPS64_PRACC_PARAM_IN) / MIPS64_PRACC_DATA_STEP;
 		if (!ctx->local_iparam) {
-			LOG_ERROR("Error: unexpected writing of input parameter");
+			LOG_ERROR("unexpected writing of input parameter");
 			return ERROR_JTAG_DEVICE_ERROR;
 		}
 		ctx->local_iparam[offset] = data;
@@ -189,14 +189,14 @@ static int mips64_pracc_exec_write(struct mips64_pracc_context *ctx, uint64_t ad
 		&& (address < MIPS64_PRACC_PARAM_OUT + ctx->num_oparam * MIPS64_PRACC_DATA_STEP)) {
 		offset = (address - MIPS64_PRACC_PARAM_OUT) / MIPS64_PRACC_DATA_STEP;
 		if (!ctx->local_oparam) {
-			LOG_ERROR("Error: unexpected writing of output parameter");
+			LOG_ERROR("unexpected writing of output parameter");
 			return ERROR_JTAG_DEVICE_ERROR;
 		}
 		ctx->local_oparam[offset] = data;
 	} else if (address == MIPS64_PRACC_STACK) {
 		/* save data onto our stack */
 		if (ctx->stack_offset >= STACK_DEPTH) {
-			LOG_ERROR("Error: PrAcc stack depth exceeded");
+			LOG_ERROR("PrAcc stack depth exceeded");
 			return ERROR_FAIL;
 		}
 		ctx->stack[ctx->stack_offset++] = data;
@@ -209,9 +209,9 @@ static int mips64_pracc_exec_write(struct mips64_pracc_context *ctx, uint64_t ad
 }
 
 int mips64_pracc_exec(struct mips_ejtag *ejtag_info,
-		      unsigned code_len, const uint32_t *code,
-		      unsigned num_param_in, uint64_t *param_in,
-		      unsigned num_param_out, uint64_t *param_out)
+		      unsigned int code_len, const uint32_t *code,
+		      unsigned int num_param_in, uint64_t *param_in,
+		      unsigned int num_param_out, uint64_t *param_out)
 {
 	uint32_t ejtag_ctrl;
 	uint64_t address = 0, address_prev = 0;
@@ -219,7 +219,7 @@ int mips64_pracc_exec(struct mips_ejtag *ejtag_info,
 	int retval;
 	int pass = 0;
 	bool first_time_call = true;
-	unsigned i;
+	unsigned int i;
 
 	for (i = 0; i < code_len; i++)
 		LOG_DEBUG("%08" PRIx32, code[i]);
@@ -354,11 +354,11 @@ static int mips64_pracc_read_u64(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 static int mips64_pracc_read_mem64(struct mips_ejtag *ejtag_info, uint64_t addr,
-			    unsigned count, uint64_t *buf)
+			    unsigned int count, uint64_t *buf)
 {
 	int retval = ERROR_OK;
 
-	for (unsigned i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < count; i++) {
 		retval = mips64_pracc_read_u64(ejtag_info, addr + 8*i, &buf[i]);
 		if (retval != ERROR_OK)
 			return retval;
@@ -414,11 +414,11 @@ static int mips64_pracc_read_u32(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 static int mips64_pracc_read_mem32(struct mips_ejtag *ejtag_info, uint64_t addr,
-				   unsigned count, uint32_t *buf)
+				   unsigned int count, uint32_t *buf)
 {
 	int retval = ERROR_OK;
 
-	for (unsigned i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < count; i++) {
 		retval = mips64_pracc_read_u32(ejtag_info, addr + 4 * i, &buf[i]);
 		if (retval != ERROR_OK)
 			return retval;
@@ -474,11 +474,11 @@ static int mips64_pracc_read_u16(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 static int mips64_pracc_read_mem16(struct mips_ejtag *ejtag_info, uint64_t addr,
-			    unsigned count, uint16_t *buf)
+			    unsigned int count, uint16_t *buf)
 {
 	int retval = ERROR_OK;
 
-	for (unsigned i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < count; i++) {
 		retval = mips64_pracc_read_u16(ejtag_info, addr + 2*i, &buf[i]);
 		if (retval != ERROR_OK)
 			return retval;
@@ -534,11 +534,11 @@ static int mips64_pracc_read_u8(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 static int mips64_pracc_read_mem8(struct mips_ejtag *ejtag_info, uint64_t addr,
-			  unsigned count, uint8_t *buf)
+			  unsigned int count, uint8_t *buf)
 {
 	int retval = ERROR_OK;
 
-	for (unsigned i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < count; i++) {
 		retval = mips64_pracc_read_u8(ejtag_info, addr + i, &buf[i]);
 		if (retval != ERROR_OK)
 			return retval;
@@ -547,7 +547,7 @@ static int mips64_pracc_read_mem8(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 int mips64_pracc_read_mem(struct mips_ejtag *ejtag_info, uint64_t addr,
-			  unsigned size, unsigned count, void *buf)
+			  unsigned int size, unsigned int count, void *buf)
 {
 	switch (size) {
 	case 1:
@@ -612,11 +612,11 @@ static int mips64_pracc_write_u64(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 static int mips64_pracc_write_mem64(struct mips_ejtag *ejtag_info,
-			     uint64_t addr, unsigned count, uint64_t *buf)
+			     uint64_t addr, unsigned int count, uint64_t *buf)
 {
 	int retval = ERROR_OK;
 
-	for (unsigned i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < count; i++) {
 		retval = mips64_pracc_write_u64(ejtag_info, addr + 8 * i, &buf[i]);
 		if (retval != ERROR_OK)
 			return retval;
@@ -674,11 +674,11 @@ static int mips64_pracc_write_u32(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 static int mips64_pracc_write_mem32(struct mips_ejtag *ejtag_info, uint64_t addr,
-			     unsigned count, uint32_t *buf)
+			     unsigned int count, uint32_t *buf)
 {
 	int retval = ERROR_OK;
 
-	for (unsigned i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < count; i++) {
 		retval = mips64_pracc_write_u32(ejtag_info, addr + 4 * i, &buf[i]);
 		if (retval != ERROR_OK)
 			return retval;
@@ -734,11 +734,11 @@ static int mips64_pracc_write_u16(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 static int mips64_pracc_write_mem16(struct mips_ejtag *ejtag_info,
-			     uint64_t addr, unsigned count, uint16_t *buf)
+			     uint64_t addr, unsigned int count, uint16_t *buf)
 {
 	int retval = ERROR_OK;
 
-	for (unsigned i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < count; i++) {
 		retval = mips64_pracc_write_u16(ejtag_info, addr + 2 * i, &buf[i]);
 		if (retval != ERROR_OK)
 			return retval;
@@ -795,11 +795,11 @@ static int mips64_pracc_write_u8(struct mips_ejtag *ejtag_info, uint64_t addr,
 }
 
 static int mips64_pracc_write_mem8(struct mips_ejtag *ejtag_info,
-			    uint64_t addr, unsigned count, uint8_t *buf)
+			    uint64_t addr, unsigned int count, uint8_t *buf)
 {
 	int retval = ERROR_OK;
 
-	for (unsigned i = 0; i < count; i++) {
+	for (unsigned int i = 0; i < count; i++) {
 		retval = mips64_pracc_write_u8(ejtag_info, addr + i, &buf[i]);
 		if (retval != ERROR_OK)
 			return retval;
@@ -808,8 +808,8 @@ static int mips64_pracc_write_mem8(struct mips_ejtag *ejtag_info,
 }
 
 int mips64_pracc_write_mem(struct mips_ejtag *ejtag_info,
-			   uint64_t addr, unsigned size,
-			   unsigned count, void *buf)
+			   uint64_t addr, unsigned int size,
+			   unsigned int count, void *buf)
 {
 	switch (size) {
 	case 1:
@@ -1270,7 +1270,7 @@ int mips64_pracc_read_regs(struct mips_ejtag *ejtag_info, uint64_t *regs)
 int mips64_pracc_fastdata_xfer(struct mips_ejtag *ejtag_info,
 			       struct working_area *source,
 			       bool write_t, uint64_t addr,
-			       unsigned count, uint64_t *buf)
+			       unsigned int count, uint64_t *buf)
 {
 	uint32_t handler_code[] = {
 		/* caution when editing, table is modified below */
@@ -1321,7 +1321,7 @@ int mips64_pracc_fastdata_xfer(struct mips_ejtag *ejtag_info,
 	};
 
 	int retval;
-	unsigned i;
+	unsigned int i;
 	uint32_t ejtag_ctrl, address32;
 	uint64_t address, val;
 
@@ -1385,7 +1385,7 @@ int mips64_pracc_fastdata_xfer(struct mips_ejtag *ejtag_info,
 	mips64_ejtag_fastdata_scan(ejtag_info, 1, &val);
 
 	/* like in legacy code */
-	unsigned num_clocks = 0;
+	unsigned int num_clocks = 0;
 	if (ejtag_info->mode != 0)
 		num_clocks = ((uint64_t)(ejtag_info->scan_delay) * adapter_get_speed_khz() + 500000) / 1000000;
 	LOG_DEBUG("num_clocks=%d", num_clocks);

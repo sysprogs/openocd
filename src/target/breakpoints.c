@@ -114,7 +114,7 @@ static int context_breakpoint_add_internal(struct target *target,
 			 * breakpoint" ... check all the parameters before
 			 * succeeding.
 			 */
-			LOG_ERROR("Duplicate Breakpoint asid: 0x%08" PRIx32 " (BP %" PRIu32 ")",
+			LOG_TARGET_ERROR(target, "Duplicate Breakpoint asid: 0x%08" PRIx32 " (BP %" PRIu32 ")",
 				asid, breakpoint->unique_id);
 			return ERROR_TARGET_DUPLICATE_BREAKPOINT;
 		}
@@ -500,7 +500,7 @@ struct breakpoint *breakpoint_find(struct target *target, target_addr_t address)
 }
 
 static int watchpoint_add_internal(struct target *target, target_addr_t address,
-		unsigned int length, enum watchpoint_rw rw, uint32_t value, uint32_t mask)
+		unsigned int length, enum watchpoint_rw rw, uint64_t value, uint64_t mask)
 {
 	struct watchpoint *watchpoint = target->watchpoints;
 	struct watchpoint **watchpoint_p = &target->watchpoints;
@@ -643,8 +643,7 @@ int watchpoint_remove(struct target *target, target_addr_t address)
 
 int watchpoint_clear_target(struct target *target)
 {
-	LOG_DEBUG("Delete all watchpoints for target: %s",
-		target_name(target));
+	LOG_TARGET_DEBUG(target, "Delete all watchpoints");
 
 	struct watchpoint *watchpoint = target->watchpoints;
 	int retval = ERROR_OK;

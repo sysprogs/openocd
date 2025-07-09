@@ -66,6 +66,8 @@ static const struct gpio_map {
 	[ADAPTER_GPIO_IDX_LED] = { "led", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, },
 };
 
+static int adapter_config_khz(unsigned int khz);
+
 bool is_adapter_initialized(void)
 {
 	return adapter_config.adapter_initialized;
@@ -245,7 +247,8 @@ static int adapter_set_speed(int speed)
 	return is_adapter_initialized() ? adapter_driver->speed(speed) : ERROR_OK;
 }
 
-int adapter_config_khz(unsigned int khz)
+/** Attempt to configure the adapter for the specified kHz. */
+static int adapter_config_khz(unsigned int khz)
 {
 	LOG_DEBUG("handle adapter khz");
 	adapter_config.clock_mode = CLOCK_MODE_KHZ;
@@ -401,7 +404,7 @@ COMMAND_HANDLER(adapter_transports_command)
 	retval = allow_transports(CMD_CTX, (const char **)transports);
 
 	if (retval != ERROR_OK) {
-		for (unsigned i = 0; transports[i]; i++)
+		for (unsigned int i = 0; transports[i]; i++)
 			free(transports[i]);
 		free(transports);
 	}
@@ -414,7 +417,7 @@ COMMAND_HANDLER(handle_adapter_list_command)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
 	command_print(CMD, "The following debug adapters are available:");
-	for (unsigned i = 0; adapter_drivers[i]; i++) {
+	for (unsigned int i = 0; adapter_drivers[i]; i++) {
 		const char *name = adapter_drivers[i]->name;
 		command_print(CMD, "%u: %s", i + 1, name);
 	}
@@ -436,7 +439,7 @@ COMMAND_HANDLER(handle_adapter_driver_command)
 	if (CMD_ARGC != 1 || CMD_ARGV[0][0] == '\0')
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	for (unsigned i = 0; adapter_drivers[i]; i++) {
+	for (unsigned int i = 0; adapter_drivers[i]; i++) {
 		if (strcmp(CMD_ARGV[0], adapter_drivers[i]->name) != 0)
 			continue;
 
@@ -684,7 +687,7 @@ COMMAND_HANDLER(handle_adapter_srst_delay_command)
 	if (CMD_ARGC > 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 	if (CMD_ARGC == 1) {
-		unsigned delay;
+		unsigned int delay;
 		COMMAND_PARSE_NUMBER(uint, CMD_ARGV[0], delay);
 
 		jtag_set_nsrst_delay(delay);
@@ -698,7 +701,7 @@ COMMAND_HANDLER(handle_adapter_srst_pulse_width_command)
 	if (CMD_ARGC > 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 	if (CMD_ARGC == 1) {
-		unsigned width;
+		unsigned int width;
 		COMMAND_PARSE_NUMBER(uint, CMD_ARGV[0], width);
 
 		jtag_set_nsrst_assert_width(width);
@@ -714,7 +717,7 @@ COMMAND_HANDLER(handle_adapter_speed_command)
 
 	int retval = ERROR_OK;
 	if (CMD_ARGC == 1) {
-		unsigned khz = 0;
+		unsigned int khz = 0;
 		COMMAND_PARSE_NUMBER(uint, CMD_ARGV[0], khz);
 
 		retval = adapter_config_khz(khz);

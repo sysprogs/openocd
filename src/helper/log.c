@@ -30,6 +30,18 @@
 #else
 #error "malloc.h is required to use --enable-malloc-logging"
 #endif
+
+#ifdef __GLIBC__
+#if __GLIBC_PREREQ(2, 33)
+#define FORDBLKS_FORMAT " %zu"
+#else
+/* glibc older than 2.33 (2021-02-01) use mallinfo(). Overwrite it */
+#define mallinfo2 mallinfo
+#define FORDBLKS_FORMAT " %d"
+#endif
+#else
+#error "GNU glibc is required to use --enable-malloc-logging"
+#endif
 #endif
 
 int debug_level = LOG_LVL_INFO;
@@ -53,7 +65,7 @@ static const char * const log_strings[6] = {
 static int count;
 
 /* forward the log to the listeners */
-static void log_forward(const char *file, unsigned line, const char *function, const char *string)
+static void log_forward(const char *file, unsigned int line, const char *function, const char *string)
 {
 	struct log_callback *cb, *next;
 	cb = log_callbacks;
@@ -105,12 +117,11 @@ static void log_puts(enum log_levels level,
 		/* print with count and time information */
 		int64_t t = timeval_ms() - start;
 #ifdef _DEBUG_FREE_SPACE_
-		struct mallinfo info;
-		info = mallinfo();
+		struct mallinfo2 info = mallinfo2();
 #endif
 		fprintf(log_output, "%s%d %" PRId64 " %s:%d %s()"
 #ifdef _DEBUG_FREE_SPACE_
-			" %d"
+			FORDBLKS_FORMAT
 #endif
 			": %s", log_strings[level + 1], count, t, file, line, function,
 #ifdef _DEBUG_FREE_SPACE_
@@ -133,7 +144,7 @@ static void log_puts(enum log_levels level,
 
 void log_printf(enum log_levels level,
 	const char *file,
-	unsigned line,
+	unsigned int line,
 	const char *function,
 	const char *format,
 	...)
@@ -156,7 +167,7 @@ void log_printf(enum log_levels level,
 	va_end(ap);
 }
 
-void log_vprintf_lf(enum log_levels level, const char *file, unsigned line,
+void log_vprintf_lf(enum log_levels level, const char *file, unsigned int line,
 		const char *function, const char *format, va_list args)
 {
 	char *tmp;
@@ -182,7 +193,7 @@ void log_vprintf_lf(enum log_levels level, const char *file, unsigned line,
 
 void log_printf_lf(enum log_levels level,
 	const char *file,
-	unsigned line,
+	unsigned int line,
 	const char *function,
 	const char *format,
 	...)
@@ -272,10 +283,10 @@ void log_init(void)
 	if (debug_env) {
 		int value;
 		int retval = parse_int(debug_env, &value);
-		if (retval == ERROR_OK &&
-				debug_level >= LOG_LVL_SILENT &&
-				debug_level <= LOG_LVL_DEBUG_IO)
-				debug_level = value;
+		if (retval == ERROR_OK
+				&& debug_level >= LOG_LVL_SILENT
+				&& debug_level <= LOG_LVL_DEBUG_IO)
+			debug_level = value;
 	}
 
 	if (!log_output)
@@ -505,7 +516,7 @@ void log_socket_error(const char *socket_desc)
  * Find the first non-printable character in the char buffer, return a pointer to it.
  * If no such character exists, return NULL.
  */
-char *find_nonprint_char(char *buf, unsigned buf_len)
+const char *find_nonprint_char(const char *buf, unsigned int buf_len)
 {
 	for (unsigned int i = 0; i < buf_len; i++) {
 		if (!isprint(buf[i]))

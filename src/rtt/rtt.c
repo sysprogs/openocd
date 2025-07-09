@@ -140,8 +140,8 @@ int rtt_start(void)
 				addr);
 			rtt.ctrl.address = addr;
 		} else {
-			LOG_INFO("rtt: No control block found");
-			return ERROR_OK;
+			LOG_ERROR("rtt: No control block found");
+			return ERROR_FAIL;
 		}
 	}
 
@@ -295,11 +295,6 @@ int rtt_write_channel(unsigned int channel_index, const uint8_t *buffer,
 
 	return rtt.source.write(rtt.target, &rtt.ctrl, channel_index, buffer,
 		length, NULL);
-}
-
-bool rtt_started(void)
-{
-	return rtt.started;
 }
 
 bool rtt_configured(void)

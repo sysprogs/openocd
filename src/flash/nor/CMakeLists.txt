@@ -80,4 +80,6 @@ add_library(ocdflashnor
 	npcx.c
 	rsl10.c
 	qn908x.c
-	eneispif.c)
+	eneispif.c
+	dw-spi.c
+	mspm0.c)

@@ -531,7 +531,7 @@ static int fespi_write(struct flash_bank *bank, const uint8_t *buffer,
 		bin_size = sizeof(riscv64_bin);
 	}
 
-	unsigned data_wa_size = 0;
+	unsigned int data_wa_size = 0;
 	if (target_alloc_working_area(target, bin_size, &algorithm_wa) == ERROR_OK) {
 		retval = target_write_buffer(target, algorithm_wa->address,
 				bin_size, bin);
@@ -751,9 +751,9 @@ static int fespi_probe(struct flash_bank *bank)
 				target_device->name, bank->base);
 
 	} else {
-	  LOG_DEBUG("Assuming FESPI as specified at address " TARGET_ADDR_FMT
-			  " with ctrl at " TARGET_ADDR_FMT, fespi_info->ctrl_base,
-			  bank->base);
+		LOG_DEBUG("Assuming FESPI as specified at address " TARGET_ADDR_FMT
+				  " with ctrl at " TARGET_ADDR_FMT, fespi_info->ctrl_base,
+				  bank->base);
 	}
 
 	/* read and decode flash ID; returns in SW mode */

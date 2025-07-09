@@ -39,14 +39,22 @@
 #include "cmsis_dap.h"
 #include "libusb_helper.h"
 
-static const struct cmsis_dap_backend *const cmsis_dap_backends[] = {
-#if BUILD_CMSIS_DAP_USB == 1
-	&cmsis_dap_usb_backend,
+/* Create a dummy backend for 'backend' command if real one does not build */
+#if BUILD_CMSIS_DAP_USB == 0
+const struct cmsis_dap_backend cmsis_dap_usb_backend = {
+	.name = "usb_bulk",
+};
 #endif
 
-#if BUILD_CMSIS_DAP_HID == 1
-	&cmsis_dap_hid_backend,
+#if BUILD_CMSIS_DAP_HID == 0
+const struct cmsis_dap_backend cmsis_dap_hid_backend = {
+	.name = "hid"
+};
 #endif
+
+static const struct cmsis_dap_backend *const cmsis_dap_backends[] = {
+	&cmsis_dap_usb_backend,
+	&cmsis_dap_hid_backend,
 };
 
 /* USB Config */
@@ -225,12 +233,6 @@ struct pending_scan_result {
 	unsigned int buffer_offset;
 };
 
-/* Read mode */
-enum cmsis_dap_blocking {
-	CMSIS_DAP_NON_BLOCKING,
-	CMSIS_DAP_BLOCKING
-};
-
 /* Each block in FIFO can contain up to pending_queue_len transfers */
 static unsigned int pending_queue_len;
 static unsigned int tfer_max_command_size;
@@ -267,26 +269,32 @@ static int cmsis_dap_open(void)
 		return ERROR_FAIL;
 	}
 
+	int retval = ERROR_FAIL;
 	if (cmsis_dap_backend >= 0) {
 		/* Use forced backend */
 		backend = cmsis_dap_backends[cmsis_dap_backend];
-		if (backend->open(dap, cmsis_dap_vid, cmsis_dap_pid, adapter_get_required_serial()) != ERROR_OK)
-			backend = NULL;
+		if (backend->open)
+			retval = backend->open(dap, cmsis_dap_vid, cmsis_dap_pid, adapter_get_required_serial());
+		else
+			LOG_ERROR("Requested CMSIS-DAP backend is disabled by configure");
+
 	} else {
 		/* Try all backends */
 		for (unsigned int i = 0; i < ARRAY_SIZE(cmsis_dap_backends); i++) {
 			backend = cmsis_dap_backends[i];
-			if (backend->open(dap, cmsis_dap_vid, cmsis_dap_pid, adapter_get_required_serial()) == ERROR_OK)
+			if (!backend->open)
+				continue;
+
+			retval = backend->open(dap, cmsis_dap_vid, cmsis_dap_pid, adapter_get_required_serial());
+			if (retval == ERROR_OK)
 				break;
-			else
-				backend = NULL;
 		}
 	}
 
-	if (!backend) {
+	if (retval != ERROR_OK) {
 		LOG_ERROR("unable to find a matching CMSIS-DAP device");
 		free(dap);
-		return ERROR_FAIL;
+		return retval;
 	}
 
 	dap->backend = backend;
@@ -299,7 +307,8 @@ static int cmsis_dap_open(void)
 static void cmsis_dap_close(struct cmsis_dap *dap)
 {
 	if (dap->backend) {
-		dap->backend->close(dap);
+		if (dap->backend->close)
+			dap->backend->close(dap);
 		dap->backend = NULL;
 	}
 
@@ -321,7 +330,7 @@ static void cmsis_dap_flush_read(struct cmsis_dap *dap)
 	 * USB close/open so we need to flush up to 64 old packets
 	 * to be sure all buffers are empty */
 	for (i = 0; i < 64; i++) {
-		int retval = dap->backend->read(dap, 10, NULL);
+		int retval = dap->backend->read(dap, 10, CMSIS_DAP_BLOCKING);
 		if (retval == ERROR_TIMEOUT_REACHED)
 			break;
 	}
@@ -338,7 +347,7 @@ static int cmsis_dap_xfer(struct cmsis_dap *dap, int txlen)
 	if (dap->pending_fifo_block_count) {
 		LOG_ERROR("pending %u blocks, flushing", dap->pending_fifo_block_count);
 		while (dap->pending_fifo_block_count) {
-			dap->backend->read(dap, 10, NULL);
+			dap->backend->read(dap, 10, CMSIS_DAP_BLOCKING);
 			dap->pending_fifo_block_count--;
 		}
 		dap->pending_fifo_put_idx = 0;
@@ -351,7 +360,7 @@ static int cmsis_dap_xfer(struct cmsis_dap *dap, int txlen)
 		return retval;
 
 	/* get reply */
-	retval = dap->backend->read(dap, LIBUSB_TIMEOUT_MS, NULL);
+	retval = dap->backend->read(dap, LIBUSB_TIMEOUT_MS, CMSIS_DAP_BLOCKING);
 	if (retval < 0)
 		return retval;
 
@@ -563,7 +572,7 @@ static int cmsis_dap_cmd_dap_delay(uint16_t delay_us)
 static int cmsis_dap_metacmd_targetsel(uint32_t instance_id)
 {
 	uint8_t *command = cmsis_dap_handle->command;
-	const uint32_t SEQ_RD = 0x80, SEQ_WR = 0x00;
+	const uint32_t seq_rd = 0x80, seq_wr = 0x00;
 
 	/* SWD multi-drop requires a transfer ala CMD_DAP_TFER,
 	but with no expectation of an SWD ACK response.  In
@@ -579,14 +588,14 @@ static int cmsis_dap_metacmd_targetsel(uint32_t instance_id)
 	command[idx++] = 3;	/* sequence count */
 
 	/* sequence 0: packet request for TARGETSEL */
-	command[idx++] = SEQ_WR | 8;
+	command[idx++] = seq_wr | 8;
 	command[idx++] = SWD_CMD_START | swd_cmd(false, false, DP_TARGETSEL) | SWD_CMD_STOP | SWD_CMD_PARK;
 
 	/* sequence 1: read Trn ACK Trn, no expectation for target to ACK  */
-	command[idx++] = SEQ_RD | 5;
+	command[idx++] = seq_rd | 5;
 
 	/* sequence 2: WDATA plus parity */
-	command[idx++] = SEQ_WR | (32 + 1);
+	command[idx++] = seq_wr | (32 + 1);
 	h_u32_to_le(command + idx, instance_id);
 	idx += 4;
 	command[idx++] = parity_u32(instance_id);
@@ -885,7 +894,7 @@ static void cmsis_dap_swd_read_process(struct cmsis_dap *dap, enum cmsis_dap_blo
 
 	if (queued_retval != ERROR_OK) {
 		/* keep reading blocks until the pipeline is empty */
-		retval = dap->backend->read(dap, 10, NULL);
+		retval = dap->backend->read(dap, 10, CMSIS_DAP_BLOCKING);
 		if (retval == ERROR_TIMEOUT_REACHED || retval == 0) {
 			/* timeout means that we flushed the pipeline,
 			 * we can safely discard remaining pending requests */
@@ -896,11 +905,7 @@ static void cmsis_dap_swd_read_process(struct cmsis_dap *dap, enum cmsis_dap_blo
 	}
 
 	/* get reply */
-	struct timeval tv = {
-		.tv_sec = 0,
-		.tv_usec = 0
-	};
-	retval = dap->backend->read(dap, LIBUSB_TIMEOUT_MS, blocking ? NULL : &tv);
+	retval = dap->backend->read(dap, LIBUSB_TIMEOUT_MS, blocking);
 	bool timeout = (retval == ERROR_TIMEOUT_REACHED || retval == 0);
 	if (timeout && blocking == CMSIS_DAP_NON_BLOCKING)
 		return;
@@ -1512,7 +1517,7 @@ static int cmsis_dap_execute_tlr_reset(struct jtag_command *cmd)
 }
 
 /* Set new end state */
-static void cmsis_dap_end_state(tap_state_t state)
+static void cmsis_dap_end_state(enum tap_state state)
 {
 	if (tap_is_state_stable(state))
 		tap_set_end_state(state);
@@ -1841,7 +1846,7 @@ static void cmsis_dap_execute_scan(struct jtag_command *cmd)
 		tap_state_name(tap_get_end_state()));
 }
 
-static void cmsis_dap_pathmove(int num_states, tap_state_t *path)
+static void cmsis_dap_pathmove(int num_states, enum tap_state *path)
 {
 	uint8_t tms0 = 0x00;
 	uint8_t tms1 = 0xff;
@@ -1883,7 +1888,7 @@ static void cmsis_dap_stableclocks(unsigned int num_cycles)
 
 static void cmsis_dap_runtest(unsigned int num_cycles)
 {
-	tap_state_t saved_end_state = tap_get_end_state();
+	enum tap_state saved_end_state = tap_get_end_state();
 
 	/* Only do a state_move when we're not already in IDLE. */
 	if (tap_get_state() != TAP_IDLE) {
@@ -2153,7 +2158,7 @@ COMMAND_HANDLER(cmsis_dap_handle_cmd_command)
 {
 	uint8_t *command = cmsis_dap_handle->command;
 
-	for (unsigned i = 0; i < CMD_ARGC; i++)
+	for (unsigned int i = 0; i < CMD_ARGC; i++)
 		COMMAND_PARSE_NUMBER(u8, CMD_ARGV[i], command[i]);
 
 	int retval = cmsis_dap_xfer(cmsis_dap_handle, CMD_ARGC);
@@ -2185,7 +2190,7 @@ COMMAND_HANDLER(cmsis_dap_handle_vid_pid_command)
 		CMD_ARGC -= 1;
 	}
 
-	unsigned i;
+	unsigned int i;
 	for (i = 0; i < CMD_ARGC; i += 2) {
 		COMMAND_PARSE_NUMBER(u16, CMD_ARGV[i], cmsis_dap_vid[i >> 1]);
 		COMMAND_PARSE_NUMBER(u16, CMD_ARGV[i + 1], cmsis_dap_pid[i >> 1]);
@@ -2202,22 +2207,27 @@ COMMAND_HANDLER(cmsis_dap_handle_vid_pid_command)
 
 COMMAND_HANDLER(cmsis_dap_handle_backend_command)
 {
-	if (CMD_ARGC == 1) {
-		if (strcmp(CMD_ARGV[0], "auto") == 0) {
-			cmsis_dap_backend = -1; /* autoselect */
-		} else {
-			for (unsigned int i = 0; i < ARRAY_SIZE(cmsis_dap_backends); i++) {
-				if (strcasecmp(cmsis_dap_backends[i]->name, CMD_ARGV[0]) == 0) {
+	if (CMD_ARGC != 1)
+		return ERROR_COMMAND_SYNTAX_ERROR;
+
+	if (strcmp(CMD_ARGV[0], "auto") == 0) {
+		cmsis_dap_backend = -1; /* autoselect */
+	} else {
+		for (unsigned int i = 0; i < ARRAY_SIZE(cmsis_dap_backends); i++) {
+			if (strcasecmp(cmsis_dap_backends[i]->name, CMD_ARGV[0]) == 0) {
+				if (cmsis_dap_backends[i]->open) {
 					cmsis_dap_backend = i;
 					return ERROR_OK;
 				}
-			}
 
-			command_print(CMD, "invalid backend argument to cmsis-dap backend <backend>");
-			return ERROR_COMMAND_ARGUMENT_INVALID;
+				command_print(CMD, "Requested cmsis-dap backend %s is disabled by configure",
+							  cmsis_dap_backends[i]->name);
+				return ERROR_NOT_IMPLEMENTED;
+			}
 		}
-	} else {
-		return ERROR_COMMAND_SYNTAX_ERROR;
+
+		command_print(CMD, "invalid argument %s to cmsis-dap backend", CMD_ARGV[0]);
+		return ERROR_COMMAND_ARGUMENT_INVALID;
 	}
 
 	return ERROR_OK;

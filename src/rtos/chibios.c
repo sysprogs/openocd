@@ -31,7 +31,7 @@ struct chibios_chdebug {
 	char      ch_identifier[4];       /**< @brief Always set to "main".       */
 	uint8_t   ch_zero;                /**< @brief Must be zero.               */
 	uint8_t   ch_size;                /**< @brief Size of this structure.     */
-	uint16_t  ch_version;             /**< @brief Encoded ChibiOS/RT version. */
+	uint8_t   ch_version[2];          /**< @brief Encoded ChibiOS/RT version. */
 	uint8_t   ch_ptrsize;             /**< @brief Size of a pointer.          */
 	uint8_t   ch_timesize;            /**< @brief Size of a @p systime_t.     */
 	uint8_t   ch_threadsize;          /**< @brief Size of a @p Thread struct. */
@@ -171,13 +171,7 @@ static int chibios_update_memory_signature(struct rtos *rtos)
 					" expected. Assuming compatibility...");
 	}
 
-	/* Convert endianness of version field */
-	const uint8_t *versiontarget = (const uint8_t *)
-										&signature->ch_version;
-	signature->ch_version = rtos->target->endianness == TARGET_LITTLE_ENDIAN ?
-			le_to_h_u32(versiontarget) : be_to_h_u32(versiontarget);
-
-	const uint16_t ch_version = signature->ch_version;
+	const uint16_t ch_version = target_buffer_get_u16(rtos->target, signature->ch_version);
 	LOG_INFO("Successfully loaded memory map of ChibiOS/RT target "
 			"running version %i.%i.%i", GET_CH_KERNEL_MAJOR(ch_version),
 			GET_CH_KERNEL_MINOR(ch_version), GET_CH_KERNEL_PATCH(ch_version));
@@ -427,9 +421,11 @@ static int chibios_update_threads(struct rtos *rtos)
 		else
 			state_desc = "Unknown";
 
-		curr_thrd_details->extra_info_str = malloc(strlen(
-					state_desc)+8);
-		sprintf(curr_thrd_details->extra_info_str, "State: %s", state_desc);
+		curr_thrd_details->extra_info_str = alloc_printf("State: %s", state_desc);
+		if (!curr_thrd_details->extra_info_str) {
+			LOG_ERROR("Could not allocate space for thread state description");
+			return -1;
+		}
 
 		curr_thrd_details->exists = true;
 

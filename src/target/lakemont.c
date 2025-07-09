@@ -67,7 +67,7 @@ static const struct {
 	const char *name;
 	uint64_t op;
 	uint8_t pm_idx;
-	unsigned bits;
+	unsigned int bits;
 	enum reg_type type;
 	const char *group;
 	const char *feature;
@@ -597,7 +597,7 @@ static int read_all_core_hw_regs(struct target *t)
 {
 	int err;
 	uint32_t regval;
-	unsigned i;
+	unsigned int i;
 	struct x86_32_common *x86_32 = target_to_x86_32(t);
 	for (i = 0; i < (x86_32->cache->num_regs); i++) {
 		if (regs[i].pm_idx == NOT_AVAIL_REG)
@@ -616,7 +616,7 @@ static int read_all_core_hw_regs(struct target *t)
 static int write_all_core_hw_regs(struct target *t)
 {
 	int err;
-	unsigned i;
+	unsigned int i;
 	struct x86_32_common *x86_32 = target_to_x86_32(t);
 	for (i = 0; i < (x86_32->cache->num_regs); i++) {
 		if (regs[i].pm_idx == NOT_AVAIL_REG)
@@ -988,8 +988,8 @@ int lakemont_halt(struct target *t)
 	}
 }
 
-int lakemont_resume(struct target *t, int current, target_addr_t address,
-			int handle_breakpoints, int debug_execution)
+int lakemont_resume(struct target *t, bool current, target_addr_t address,
+		bool handle_breakpoints, bool debug_execution)
 {
 	struct breakpoint *bp = NULL;
 	struct x86_32_common *x86_32 = target_to_x86_32(t);
@@ -1004,7 +1004,7 @@ int lakemont_resume(struct target *t, int current, target_addr_t address,
 		bp = breakpoint_find(t, eip);
 		if (bp /*&& bp->type == BKPT_SOFT*/) {
 			/* the step will step over the breakpoint */
-			if (lakemont_step(t, 0, 0, 1) != ERROR_OK) {
+			if (lakemont_step(t, false, 0, true) != ERROR_OK) {
 				LOG_ERROR("%s stepping over a software breakpoint at 0x%08" PRIx32 " "
 						"failed to resume the target", __func__, eip);
 				return ERROR_FAIL;
@@ -1029,8 +1029,8 @@ int lakemont_resume(struct target *t, int current, target_addr_t address,
 	return ERROR_OK;
 }
 
-int lakemont_step(struct target *t, int current,
-			target_addr_t address, int handle_breakpoints)
+int lakemont_step(struct target *t, bool current, target_addr_t address,
+		bool handle_breakpoints)
 {
 	struct x86_32_common *x86_32 = target_to_x86_32(t);
 	uint32_t eflags = buf_get_u32(x86_32->cache->reg_list[EFLAGS].value, 0, 32);

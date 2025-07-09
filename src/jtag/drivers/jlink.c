@@ -78,9 +78,9 @@ static struct device_config config;
 static struct device_config tmp_config;
 
 /* Queue command functions */
-static void jlink_end_state(tap_state_t state);
+static void jlink_end_state(enum tap_state state);
 static void jlink_state_move(void);
-static void jlink_path_move(unsigned int num_states, tap_state_t *path);
+static void jlink_path_move(unsigned int num_states, enum tap_state *path);
 static void jlink_stableclocks(unsigned int num_cycles);
 static void jlink_runtest(unsigned int num_cycles);
 static void jlink_reset(int trst, int srst);
@@ -104,10 +104,10 @@ static int jlink_flush(void);
  * @param in_offset A bit offset for TDO data.
  * @param length Amount of bits to transfer out and in.
  */
-static void jlink_clock_data(const uint8_t *out, unsigned out_offset,
-			     const uint8_t *tms_out, unsigned tms_offset,
-			     uint8_t *in, unsigned in_offset,
-			     unsigned length);
+static void jlink_clock_data(const uint8_t *out, unsigned int out_offset,
+			     const uint8_t *tms_out, unsigned int tms_offset,
+			     uint8_t *in, unsigned int in_offset,
+			     unsigned int length);
 
 static enum tap_state jlink_last_state = TAP_RESET;
 static int queued_retval;
@@ -179,7 +179,7 @@ static void jlink_execute_scan(struct jtag_command *cmd)
 	jlink_end_state(cmd->cmd.scan->end_state);
 
 	struct scan_field *field = cmd->cmd.scan->fields;
-	unsigned scan_size = 0;
+	unsigned int scan_size = 0;
 
 	for (unsigned int i = 0; i < cmd->cmd.scan->num_fields; i++, field++) {
 		scan_size += field->num_bits;
@@ -875,7 +875,7 @@ static int jlink_quit(void)
 /***************************************************************************/
 /* Queue command implementations */
 
-static void jlink_end_state(tap_state_t state)
+static void jlink_end_state(enum tap_state state)
 {
 	if (tap_is_state_stable(state))
 		tap_set_end_state(state);
@@ -899,7 +899,7 @@ static void jlink_state_move(void)
 	tap_set_state(tap_get_end_state());
 }
 
-static void jlink_path_move(unsigned int num_states, tap_state_t *path)
+static void jlink_path_move(unsigned int num_states, enum tap_state *path)
 {
 	uint8_t tms = 0xff;
 
@@ -930,7 +930,7 @@ static void jlink_stableclocks(unsigned int num_cycles)
 
 static void jlink_runtest(unsigned int num_cycles)
 {
-	tap_state_t saved_end_state = tap_get_end_state();
+	enum tap_state saved_end_state = tap_get_end_state();
 
 	/* Only do a state_move when we're not already in IDLE. */
 	if (tap_get_state() != TAP_IDLE) {
@@ -1962,7 +1962,7 @@ static void jlink_swd_read_reg(uint8_t cmd, uint32_t *value, uint32_t ap_delay_c
 /***************************************************************************/
 /* J-Link tap functions */
 
-static unsigned tap_length;
+static unsigned int tap_length;
 /* In SWD mode use tms buffer for direction control */
 static uint8_t tms_buffer[JLINK_TAP_BUFFER_SIZE];
 static uint8_t tdi_buffer[JLINK_TAP_BUFFER_SIZE];
@@ -1970,13 +1970,13 @@ static uint8_t tdo_buffer[JLINK_TAP_BUFFER_SIZE];
 
 struct pending_scan_result {
 	/** First bit position in tdo_buffer to read. */
-	unsigned first;
+	unsigned int first;
 	/** Number of bits to read. */
-	unsigned length;
+	unsigned int length;
 	/** Location to store the result */
 	void *buffer;
 	/** Offset in the destination buffer */
-	unsigned buffer_offset;
+	unsigned int buffer_offset;
 	/** SWD command */
 	uint8_t swd_cmd;
 };
@@ -1994,13 +1994,13 @@ static void jlink_tap_init(void)
 	memset(tdi_buffer, 0, sizeof(tdi_buffer));
 }
 
-static void jlink_clock_data(const uint8_t *out, unsigned out_offset,
-			     const uint8_t *tms_out, unsigned tms_offset,
-			     uint8_t *in, unsigned in_offset,
-			     unsigned length)
+static void jlink_clock_data(const uint8_t *out, unsigned int out_offset,
+			     const uint8_t *tms_out, unsigned int tms_offset,
+			     uint8_t *in, unsigned int in_offset,
+			     unsigned int length)
 {
 	do {
-		unsigned available_length = JLINK_TAP_BUFFER_SIZE - tap_length / 8;
+		unsigned int available_length = JLINK_TAP_BUFFER_SIZE - tap_length / 8;
 
 		if (!available_length ||
 		    (in && pending_scan_results_length == MAX_PENDING_SCAN_RESULTS)) {
@@ -2012,7 +2012,7 @@ static void jlink_clock_data(const uint8_t *out, unsigned out_offset,
 		struct pending_scan_result *pending_scan_result =
 			&pending_scan_results_buffer[pending_scan_results_length];
 
-		unsigned scan_length = length > available_length ?
+		unsigned int scan_length = length > available_length ?
 			available_length : length;
 
 		if (out)

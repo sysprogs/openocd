@@ -8,7 +8,7 @@ add_library(xsvf xsvf/xsvf.c)
 add_library(pld pld/pld.c pld/xilinx_bit.c pld/virtex2.c pld/efinix.c pld/certus.c pld/ecp2_3.c pld/ecp5.c pld/gatemate.c pld/gowin.c pld/intel.c pld/lattice.c pld/lattice_bit.c pld/raw_bit.c)
 add_library(rtt rtt/rtt.c rtt/tcl.c)
 add_library(server server/server.c server/telnet_server.c server/gdb_server.c server/rtt_server.c server/tcl_server.c server/ipdbg.c)
-add_library(rtos rtos/rtos.c rtos/rtos_standard_stackings.c rtos/rtos_ecos_stackings.c rtos/rtos_chibios_stackings.c rtos/rtos_embkernel_stackings.c rtos/rtos_mqx_stackings.c rtos/FreeRTOS.c rtos/ThreadX.c rtos/eCos.c rtos/linux.c rtos/ChibiOS.c rtos/embKernel.c rtos/mqx.c rtos/rtos_ucos_iii_stackings.c rtos/uCOS-III.c rtos/nuttx.c rtos/chromium-ec.c rtos/hwthread.c rtos/riot.c rtos/rtos_riot_stackings.c rtos/zephyr.c rtos/rtkernel.c rtos/rtos_nuttx_stackings.c)
+add_library(rtos rtos/rtos.c rtos/rtos_standard_stackings.c rtos/rtos_ecos_stackings.c rtos/rtos_chibios_stackings.c rtos/rtos_embkernel_stackings.c rtos/rtos_mqx_stackings.c rtos/FreeRTOS.c rtos/ThreadX.c rtos/eCos.c rtos/linux.c rtos/ChibiOS.c rtos/embKernel.c rtos/mqx.c rtos/rtos_ucos_iii_stackings.c rtos/nuttx.c rtos/chromium-ec.c rtos/hwthread.c rtos/riot.c rtos/rtos_riot_stackings.c rtos/zephyr.c rtos/rtkernel.c rtos/rtos_nuttx_stackings.c rtos/ucos_iii.c)
 
 add_subdirectory(target)
 add_subdirectory(jtag)

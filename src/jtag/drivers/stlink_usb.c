@@ -2754,7 +2754,7 @@ static int stlink_usb_read_mem32_noaddrinc(void *handle, uint8_t ap_num, uint32_
 {
 	struct stlink_usb_handle *h = handle;
 
-	assert(handle != NULL);
+	assert(handle);
 
 	if (!(h->version.flags & STLINK_F_HAS_MEM_RD_NO_INC))
 		return ERROR_COMMAND_NOTFOUND;
@@ -2796,7 +2796,7 @@ static int stlink_usb_write_mem32_noaddrinc(void *handle, uint8_t ap_num, uint32
 {
 	struct stlink_usb_handle *h = handle;
 
-	assert(handle != NULL);
+	assert(handle);
 
 	if (!(h->version.flags & STLINK_F_HAS_MEM_WR_NO_INC))
 		return ERROR_COMMAND_NOTFOUND;
@@ -3740,7 +3740,7 @@ static int stlink_open(struct hl_interface_param *param, enum stlink_mode mode, 
 
 	h->st_mode = mode;
 
-	for (unsigned i = 0; param->vid[i]; i++) {
+	for (unsigned int i = 0; param->vid[i]; i++) {
 		LOG_DEBUG("transport: %d vid: 0x%04x pid: 0x%04x serial: %s",
 			  h->st_mode, param->vid[i], param->pid[i],
 			  adapter_get_required_serial() ? adapter_get_required_serial() : "");
@@ -3781,7 +3781,7 @@ static int stlink_open(struct hl_interface_param *param, enum stlink_mode mode, 
 	}
 
 	/* initialize the debug hardware */
-	err = stlink_usb_init_mode(h, param->connect_under_reset, param->initial_interface_speed);
+	err = stlink_usb_init_mode(h, param->connect_under_reset, adapter_get_speed_khz());
 
 	if (err != ERROR_OK) {
 		LOG_ERROR("init mode failed (unable to connect to the target)");
@@ -3947,7 +3947,7 @@ static int stlink_usb_rw_misc_out(void *handle, uint32_t items, const uint8_t *b
 
 	LOG_DEBUG_IO("%s(%" PRIu32 ")", __func__, items);
 
-	assert(handle != NULL);
+	assert(handle);
 
 	if (!(h->version.flags & STLINK_F_HAS_RW_MISC))
 		return ERROR_COMMAND_NOTFOUND;
@@ -3968,7 +3968,7 @@ static int stlink_usb_rw_misc_in(void *handle, uint32_t items, uint8_t *buffer)
 
 	LOG_DEBUG_IO("%s(%" PRIu32 ")", __func__, items);
 
-	assert(handle != NULL);
+	assert(handle);
 
 	if (!(h->version.flags & STLINK_F_HAS_RW_MISC))
 		return ERROR_COMMAND_NOTFOUND;
@@ -5174,7 +5174,6 @@ static int stlink_dap_speed(int speed)
 		return ERROR_JTAG_NOT_IMPLEMENTED;
 	}
 
-	stlink_dap_param.initial_interface_speed = speed;
 	stlink_speed(stlink_dap_handle, speed, false);
 	return ERROR_OK;
 }

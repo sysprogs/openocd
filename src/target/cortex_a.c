@@ -571,7 +571,7 @@ static int cortex_a_instr_read_data_r0_r1(struct arm_dpm *dpm,
 	return retval;
 }
 
-static int cortex_a_bpwp_enable(struct arm_dpm *dpm, unsigned index_t,
+static int cortex_a_bpwp_enable(struct arm_dpm *dpm, unsigned int index_t,
 	uint32_t addr, uint32_t control)
 {
 	struct cortex_a_common *a = dpm_to_a(dpm);
@@ -595,8 +595,7 @@ static int cortex_a_bpwp_enable(struct arm_dpm *dpm, unsigned index_t,
 	vr += 4 * index_t;
 	cr += 4 * index_t;
 
-	LOG_DEBUG("A: bpwp enable, vr %08x cr %08x",
-		(unsigned) vr, (unsigned) cr);
+	LOG_DEBUG("A: bpwp enable, vr %08" PRIx32 " cr %08" PRIx32, vr, cr);
 
 	retval = mem_ap_write_atomic_u32(a->armv7a_common.debug_ap,
 			vr, addr);
@@ -607,7 +606,7 @@ static int cortex_a_bpwp_enable(struct arm_dpm *dpm, unsigned index_t,
 	return retval;
 }
 
-static int cortex_a_bpwp_disable(struct arm_dpm *dpm, unsigned index_t)
+static int cortex_a_bpwp_disable(struct arm_dpm *dpm, unsigned int index_t)
 {
 	struct cortex_a_common *a = dpm_to_a(dpm);
 	uint32_t cr;
@@ -625,7 +624,7 @@ static int cortex_a_bpwp_disable(struct arm_dpm *dpm, unsigned index_t)
 	}
 	cr += 4 * index_t;
 
-	LOG_DEBUG("A: bpwp disable, cr %08x", (unsigned) cr);
+	LOG_DEBUG("A: bpwp disable, cr %08" PRIx32, cr);
 
 	/* clear control register */
 	return mem_ap_write_atomic_u32(a->armv7a_common.debug_ap, cr, 0);
@@ -818,8 +817,8 @@ static int cortex_a_halt(struct target *target)
 	return ERROR_OK;
 }
 
-static int cortex_a_internal_restore(struct target *target, int current,
-	target_addr_t *address, int handle_breakpoints, int debug_execution)
+static int cortex_a_internal_restore(struct target *target, bool current,
+	target_addr_t *address, bool handle_breakpoints, bool debug_execution)
 {
 	struct armv7a_common *armv7a = target_to_armv7a(target);
 	struct arm *arm = &armv7a->arm;
@@ -850,7 +849,7 @@ static int cortex_a_internal_restore(struct target *target, int current,
 	}
 #endif
 
-	/* current = 1: continue on current pc, otherwise continue at <address> */
+	/* current = true: continue on current pc, otherwise continue at <address> */
 	resume_pc = buf_get_u32(arm->pc->value, 0, 32);
 	if (!current)
 		resume_pc = *address;
@@ -966,7 +965,7 @@ static int cortex_a_internal_restart(struct target *target)
 	return ERROR_OK;
 }
 
-static int cortex_a_restore_smp(struct target *target, int handle_breakpoints)
+static int cortex_a_restore_smp(struct target *target, bool handle_breakpoints)
 {
 	int retval = 0;
 	struct target_list *head;
@@ -976,16 +975,16 @@ static int cortex_a_restore_smp(struct target *target, int handle_breakpoints)
 		struct target *curr = head->target;
 		if ((curr != target) && (curr->state != TARGET_RUNNING)
 				&& target_was_examined(curr) && !curr->frozen) {			/*  resume current address , not in step mode */
-			retval += cortex_a_internal_restore(curr, 1, &address,
-					handle_breakpoints, 0);
+			retval += cortex_a_internal_restore(curr, true, &address,
+					handle_breakpoints, false);
 			retval += cortex_a_internal_restart(curr);
 		}
 	}
 	return retval;
 }
 
-static int cortex_a_resume(struct target *target, int current,
-	target_addr_t address, int handle_breakpoints, int debug_execution)
+static int cortex_a_resume(struct target *target, bool current,
+	target_addr_t address, bool handle_breakpoints, bool debug_execution)
 {
 	int retval = 0;
 	/* dummy resume for smp toggle in order to reduce gdb impact  */
@@ -997,7 +996,8 @@ static int cortex_a_resume(struct target *target, int current,
 		target_call_event_callbacks(target, TARGET_EVENT_RESUMED);
 		return 0;
 	}
-	cortex_a_internal_restore(target, current, &address, handle_breakpoints, debug_execution);
+	cortex_a_internal_restore(target, current, &address, handle_breakpoints,
+		debug_execution);
 	if (target->smp) {
 		target->gdb_service->core[0] = -1;
 		retval = cortex_a_restore_smp(target, handle_breakpoints);
@@ -1168,8 +1168,8 @@ static int cortex_a_set_dscr_bits(struct target *target,
 	return retval;
 }
 
-static int cortex_a_step(struct target *target, int current, target_addr_t address,
-	int handle_breakpoints)
+static int cortex_a_step(struct target *target, bool current, target_addr_t address,
+	bool handle_breakpoints)
 {
 	struct cortex_a_common *cortex_a = target_to_cortex_a(target);
 	struct armv7a_common *armv7a = target_to_armv7a(target);
@@ -1184,7 +1184,7 @@ static int cortex_a_step(struct target *target, int current, target_addr_t addre
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	/* current = 1: continue on current pc, otherwise continue at <address> */
+	/* current = true: continue on current pc, otherwise continue at <address> */
 	r = arm->pc;
 	if (!current)
 		buf_set_u32(r->value, 0, 32, address);
@@ -1195,7 +1195,7 @@ static int cortex_a_step(struct target *target, int current, target_addr_t addre
 	 * But since Cortex-A uses breakpoint for single step,
 	 * we MUST handle breakpoints.
 	 */
-	handle_breakpoints = 1;
+	handle_breakpoints = true;
 	if (handle_breakpoints) {
 		breakpoint = breakpoint_find(target, address);
 		if (breakpoint)
@@ -1222,7 +1222,7 @@ static int cortex_a_step(struct target *target, int current, target_addr_t addre
 
 	target->debug_reason = DBG_REASON_SINGLESTEP;
 
-	retval = cortex_a_resume(target, 1, address, 0, 0);
+	retval = cortex_a_resume(target, true, address, false, false);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -1324,21 +1324,21 @@ static int cortex_a_set_breakpoint(struct target *target,
 			brp_list[brp_i].value);
 	} else if (breakpoint->type == BKPT_SOFT) {
 		uint8_t code[4];
-		/* length == 2: Thumb breakpoint */
-		if (breakpoint->length == 2)
+		if (breakpoint->length == 2) {
+			/* length == 2: Thumb breakpoint */
 			buf_set_u32(code, 0, 32, ARMV5_T_BKPT(0x11));
-		else
-		/* length == 3: Thumb-2 breakpoint, actual encoding is
-		 * a regular Thumb BKPT instruction but we replace a
-		 * 32bit Thumb-2 instruction, so fix-up the breakpoint
-		 * length
-		 */
-		if (breakpoint->length == 3) {
+		} else if (breakpoint->length == 3) {
+			/* length == 3: Thumb-2 breakpoint, actual encoding is
+			 * a regular Thumb BKPT instruction but we replace a
+			 * 32bit Thumb-2 instruction, so fix-up the breakpoint
+			 * length
+			 */
 			buf_set_u32(code, 0, 32, ARMV5_T_BKPT(0x11));
 			breakpoint->length = 4;
-		} else
+		} else {
 			/* length == 4, normal ARM breakpoint */
 			buf_set_u32(code, 0, 32, ARMV5_BKPT(0x11));
+		}
 
 		retval = target_read_memory(target,
 				breakpoint->address & 0xFFFFFFFE,
@@ -1348,8 +1348,7 @@ static int cortex_a_set_breakpoint(struct target *target,
 			return retval;
 
 		/* make sure data cache is cleaned & invalidated down to PoC */
-		armv7a_cache_flush_virt(target, breakpoint->address,
-						breakpoint->length);
+		armv7a_cache_flush_virt(target, breakpoint->address, breakpoint->length);
 
 		retval = target_write_memory(target,
 				breakpoint->address & 0xFFFFFFFE,
@@ -1358,10 +1357,8 @@ static int cortex_a_set_breakpoint(struct target *target,
 			return retval;
 
 		/* update i-cache at breakpoint location */
-		armv7a_l1_d_cache_inval_virt(target, breakpoint->address,
-					breakpoint->length);
-		armv7a_l1_i_cache_inval_virt(target, breakpoint->address,
-						 breakpoint->length);
+		armv7a_l1_d_cache_inval_virt(target, breakpoint->address, breakpoint->length);
+		armv7a_l1_i_cache_inval_virt(target, breakpoint->address, breakpoint->length);
 
 		breakpoint->is_set = true;
 	}

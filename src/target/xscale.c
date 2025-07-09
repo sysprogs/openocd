@@ -47,8 +47,8 @@
  */
 
 /* forward declarations */
-static int xscale_resume(struct target *, int current,
-	target_addr_t address, int handle_breakpoints, int debug_execution);
+static int xscale_resume(struct target *, bool current,
+	target_addr_t address, bool handle_breakpoints, bool debug_execution);
 static int xscale_debug_entry(struct target *);
 static int xscale_restore_banked(struct target *);
 static int xscale_get_reg(struct reg *reg);
@@ -137,7 +137,7 @@ static int xscale_verify_pointer(struct command_invocation *cmd,
 	return ERROR_OK;
 }
 
-static int xscale_jtag_set_instr(struct jtag_tap *tap, uint32_t new_instr, tap_state_t end_state)
+static int xscale_jtag_set_instr(struct jtag_tap *tap, uint32_t new_instr, enum tap_state end_state)
 {
 	assert(tap);
 
@@ -232,7 +232,7 @@ static int xscale_receive(struct target *target, uint32_t *buffer, int num_words
 
 	struct xscale_common *xscale = target_to_xscale(target);
 	int retval = ERROR_OK;
-	tap_state_t path[3];
+	enum tap_state path[3];
 	struct scan_field fields[3];
 	uint8_t *field0 = malloc(num_words * 1);
 	uint8_t field0_check_value = 0x2;
@@ -330,8 +330,8 @@ static int xscale_receive(struct target *target, uint32_t *buffer, int num_words
 static int xscale_read_tx(struct target *target, int consume)
 {
 	struct xscale_common *xscale = target_to_xscale(target);
-	tap_state_t path[3];
-	tap_state_t noconsume_path[6];
+	enum tap_state path[3];
+	enum tap_state noconsume_path[6];
 	int retval;
 	struct timeval timeout, now;
 	struct scan_field fields[3];
@@ -840,7 +840,7 @@ static int xscale_debug_entry(struct target *target)
 	struct arm *arm = &xscale->arm;
 	uint32_t pc;
 	uint32_t buffer[10];
-	unsigned i;
+	unsigned int i;
 	int retval;
 	uint32_t moe;
 
@@ -997,7 +997,7 @@ static int xscale_debug_entry(struct target *target)
 		 * can only happen in fill mode. */
 		if (xscale->arch_debug_reason == XSCALE_DBG_REASON_TB_FULL) {
 			if (--xscale->trace.fill_counter > 0)
-				xscale_resume(target, 1, 0x0, 1, 0);
+				xscale_resume(target, true, 0x0, true, false);
 		} else	/* entered debug for other reason; reset counter */
 			xscale->trace.fill_counter = 0;
 	}
@@ -1106,8 +1106,8 @@ static void xscale_free_trace_data(struct xscale_common *xscale)
 	xscale->trace.data = NULL;
 }
 
-static int xscale_resume(struct target *target, int current,
-	target_addr_t address, int handle_breakpoints, int debug_execution)
+static int xscale_resume(struct target *target, bool current,
+	target_addr_t address, bool handle_breakpoints, bool debug_execution)
 {
 	struct xscale_common *xscale = target_to_xscale(target);
 	struct arm *arm = &xscale->arm;
@@ -1130,7 +1130,7 @@ static int xscale_resume(struct target *target, int current,
 	if (retval != ERROR_OK)
 		return retval;
 
-	/* current = 1: continue on current pc, otherwise continue at <address> */
+	/* current = true: continue on current pc, otherwise continue at <address> */
 	if (!current)
 		buf_set_u32(arm->pc->value, 0, 32, address);
 
@@ -1277,8 +1277,8 @@ static int xscale_resume(struct target *target, int current,
 	return ERROR_OK;
 }
 
-static int xscale_step_inner(struct target *target, int current,
-	uint32_t address, int handle_breakpoints)
+static int xscale_step_inner(struct target *target, bool current,
+	uint32_t address, bool handle_breakpoints)
 {
 	struct xscale_common *xscale = target_to_xscale(target);
 	struct arm *arm = &xscale->arm;
@@ -1372,8 +1372,8 @@ static int xscale_step_inner(struct target *target, int current,
 	return ERROR_OK;
 }
 
-static int xscale_step(struct target *target, int current,
-	target_addr_t address, int handle_breakpoints)
+static int xscale_step(struct target *target, bool current,
+	target_addr_t address, bool handle_breakpoints)
 {
 	struct arm *arm = target_to_arm(target);
 	struct breakpoint *breakpoint = NULL;
@@ -1386,7 +1386,7 @@ static int xscale_step(struct target *target, int current,
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	/* current = 1: continue on current pc, otherwise continue at <address> */
+	/* current = true: continue on current pc, otherwise continue at <address> */
 	if (!current)
 		buf_set_u32(arm->pc->value, 0, 32, address);
 
@@ -1515,7 +1515,7 @@ static int xscale_deassert_reset(struct target *target)
 	 */
 	{
 		uint32_t address;
-		unsigned buf_cnt;
+		unsigned int buf_cnt;
 		const uint8_t *buffer = xscale_debug_handler;
 		int retval;
 
@@ -1539,11 +1539,11 @@ static int xscale_deassert_reset(struct target *target)
 		 * coprocessors, trace data, etc.
 		 */
 		address = xscale->handler_address;
-		for (unsigned binary_size = sizeof(xscale_debug_handler);
+		for (unsigned int binary_size = sizeof(xscale_debug_handler);
 			binary_size > 0;
 			binary_size -= buf_cnt, buffer += buf_cnt) {
 			uint32_t cache_line[8];
-			unsigned i;
+			unsigned int i;
 
 			buf_cnt = binary_size;
 			if (buf_cnt > 32)
@@ -1598,7 +1598,7 @@ static int xscale_deassert_reset(struct target *target)
 			target->state = TARGET_HALTED;
 
 			/* resume the target */
-			xscale_resume(target, 1, 0x0, 1, 0);
+			xscale_resume(target, true, 0x0, true, false);
 		}
 	}
 
@@ -3215,7 +3215,7 @@ COMMAND_HANDLER(xscale_handle_idcache_command)
 
 static const struct {
 	char name[15];
-	unsigned mask;
+	unsigned int mask;
 } vec_ids[] = {
 	{ "fiq",		DCSR_TF, },
 	{ "irq",		DCSR_TI, },
@@ -3250,7 +3250,7 @@ COMMAND_HANDLER(xscale_handle_vector_catch_command)
 			}
 		}
 		while (CMD_ARGC-- > 0) {
-			unsigned i;
+			unsigned int i;
 			for (i = 0; i < ARRAY_SIZE(vec_ids); i++) {
 				if (strcmp(CMD_ARGV[CMD_ARGC], vec_ids[i].name))
 					continue;
@@ -3268,7 +3268,7 @@ COMMAND_HANDLER(xscale_handle_vector_catch_command)
 	}
 
 	dcsr_value = buf_get_u32(dcsr_reg->value, 0, 32);
-	for (unsigned i = 0; i < ARRAY_SIZE(vec_ids); i++) {
+	for (unsigned int i = 0; i < ARRAY_SIZE(vec_ids); i++) {
 		command_print(CMD, "%15s: %s", vec_ids[i].name,
 			(dcsr_value & vec_ids[i].mask) ? "catch" : "ignore");
 	}

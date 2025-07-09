@@ -1532,6 +1532,7 @@ static const struct dap_part_nums {
 	{ ARM_ID, 0xc17, "Cortex-R7 Debug",            "(Debug Unit)", },
 	{ ARM_ID, 0xd03, "Cortex-A53 Debug",           "(Debug Unit)", },
 	{ ARM_ID, 0xd04, "Cortex-A35 Debug",           "(Debug Unit)", },
+	{ ARM_ID, 0xd05, "Cortex-A55 Debug",           "(Debug Unit)", },
 	{ ARM_ID, 0xd07, "Cortex-A57 Debug",           "(Debug Unit)", },
 	{ ARM_ID, 0xd08, "Cortex-A72 Debug",           "(Debug Unit)", },
 	{ ARM_ID, 0xd0b, "Cortex-A76 Debug",           "(Debug Unit)", },
@@ -2358,7 +2359,7 @@ static int adiv5_jim_spot_configure(struct jim_getopt_info *goi,
 
 	switch (n->value) {
 	case CFG_DAP:
-		if (goi->isconfigure) {
+		if (goi->is_configure) {
 			Jim_Obj *o_t;
 			struct adiv5_dap *dap;
 			e = jim_getopt_obj(goi, &o_t);
@@ -2387,7 +2388,7 @@ static int adiv5_jim_spot_configure(struct jim_getopt_info *goi,
 		break;
 
 	case CFG_AP_NUM:
-		if (goi->isconfigure) {
+		if (goi->is_configure) {
 			/* jim_wide is a signed 64 bits int, ap_num is unsigned with max 52 bits */
 			jim_wide ap_num;
 			e = jim_getopt_wide(goi, &ap_num);
@@ -2414,7 +2415,7 @@ static int adiv5_jim_spot_configure(struct jim_getopt_info *goi,
 		LOG_WARNING("DEPRECATED! use \'-baseaddr' not \'-ctibase\'");
 		/* fall through */
 	case CFG_BASEADDR:
-		if (goi->isconfigure) {
+		if (goi->is_configure) {
 			jim_wide base;
 			e = jim_getopt_wide(goi, &base);
 			if (e != JIM_OK)

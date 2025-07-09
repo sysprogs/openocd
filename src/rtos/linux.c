@@ -624,7 +624,7 @@ static struct threads *liste_add_task(struct threads *task_list, struct threads 
 {
 	t->next = NULL;
 
-	if (!*last)
+	if (!*last) {
 		if (!task_list) {
 			task_list = t;
 			return task_list;
@@ -637,7 +637,8 @@ static struct threads *liste_add_task(struct threads *task_list, struct threads 
 			temp->next = t;
 			*last = t;
 			return task_list;
-		} else {
+		}
+	} else {
 		(*last)->next = t;
 		*last = t;
 		return task_list;
@@ -1039,6 +1040,10 @@ static int linux_gdb_thread_packet(struct target *target,
 		return ERROR_TARGET_FAILURE;
 
 	char *out_str = calloc(MAX_THREADS * 17 + 10, 1);
+	if (!out_str) {
+		LOG_ERROR("Out of memory");
+		return ERROR_FAIL;
+	}
 	char *tmp_str = out_str;
 	tmp_str += sprintf(tmp_str, "m");
 	struct threads *temp = linux_os->thread_list;
