@@ -338,6 +338,13 @@
 		<ScriptFile>target/ti_msp432.cfg</ScriptFile>
 		<AdditionalInitializationDelay>10000</AdditionalInitializationDelay>
 	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>mspm0</ID>
+		<Name>Texas Instruments MSPM0xxxx</Name>
+		<MatchRegex>^MSP[MS]0.*</MatchRegex>
+		<ScriptFile>target/ti_mspm0.cfg</ScriptFile>
+		<RequiresResetAfterLoad>true</RequiresResetAfterLoad>
+	</TargetDeviceFamily>
 	<!-- ============================================ ARM mbed ============================================ -->
 	<TargetDeviceFamily>
 		<ID>STM32F0</ID>
@@ -735,6 +742,13 @@
 		<SuggestedTransport>swd</SuggestedTransport>
 	</TargetDeviceFamily>
 	<TargetDeviceFamily>
+		<ID>RP2350</ID>
+		<Name>Raspberry Pi Pico 2(RP2350)</Name>
+		<MatchRegex>^RP2350.*</MatchRegex>
+		<ScriptFile>target/rp2350.cfg</ScriptFile>
+		<SuggestedTransport>swd</SuggestedTransport>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
 		<ID>PIC32MX</ID>
 		<Name>PIC32MX</Name>
 		<MatchRegex>^PIC32MX.*</MatchRegex>
@@ -746,5 +760,4 @@
 		<MatchRegex>^PIC32MM.*</MatchRegex>
 		<ScriptFile>target/pic32mm.cfg</ScriptFile>
 	</TargetDeviceFamily>
-	
 </ArrayOfTargetDeviceFamily>
