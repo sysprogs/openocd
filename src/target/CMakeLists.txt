@@ -113,6 +113,12 @@ add_library(target
 	xtensa/xtensa_fileio.c
 	espressif/esp.c
 	espressif/esp_algorithm.c
-	espressif/esp_xtensa_algorithm.c)
+	espressif/esp_xtensa_algorithm.c
+	armv7m_cache.c
+	riscv/debug_defines.c
+	riscv/debug_reg_printer.c
+	riscv/riscv-011_reg.c
+	riscv/riscv-013_reg.c
+	riscv/riscv_reg.c)
 	
 SET_TARGET_PROPERTIES(target PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_BINARY_DIR})

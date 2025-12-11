@@ -1,6 +1,6 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/helper ${CMAKE_CURRENT_SOURCE_DIR}/../jimtcl ${CMAKE_CURRENT_BINARY_DIR}/../jimtcl-cmake ${CMAKE_CURRENT_BINARY_DIR})
 
-add_library(helper helper/binarybuffer.c helper/options.c helper/time_support_common.c helper/configuration.c helper/log.c helper/command.c helper/time_support.c helper/replacements.c helper/fileio.c helper/util.c helper/jim-nvp.c helper/jep106.c helper/unicode.c helper/crc32.c helper/nvp.c)
+add_library(helper helper/binarybuffer.c helper/options.c helper/time_support_common.c helper/configuration.c helper/log.c helper/command.c helper/time_support.c helper/replacements.c helper/fileio.c helper/util.c helper/jim-nvp.c helper/jep106.c helper/unicode.c helper/crc32.c helper/nvp.c helper/base64.c)
 
 add_library(transport transport/transport.c)
 add_library(svf svf/svf.c)

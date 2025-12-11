@@ -428,7 +428,7 @@ static bool usb_connect(void)
 
 	/* Log the results */
 	if (result == 0)
-		LOG_INFO("XDS110: connected");
+		LOG_DEBUG("XDS110: connected");
 	else
 		LOG_ERROR("XDS110: failed to connect");
 
@@ -448,7 +448,7 @@ static void usb_disconnect(void)
 		xds110.ctx = NULL;
 	}
 
-	LOG_INFO("XDS110: disconnected");
+	LOG_DEBUG("XDS110: disconnected");
 }
 
 static bool usb_read(unsigned char *buffer, int size, int *bytes_read,
@@ -1551,42 +1551,42 @@ static void xds110_flush(void)
 		while (xds110.txn_requests[request] != 0) {
 			command = xds110.txn_requests[request++];
 			switch (command) {
-				case CMD_IR_SCAN:
-				case CMD_DR_SCAN:
-					if (command == CMD_IR_SCAN)
-						shift_state = XDS_JTAG_STATE_SHIFT_IR;
-					else
-						shift_state = XDS_JTAG_STATE_SHIFT_DR;
-					end_state = (uint32_t)(xds110.txn_requests[request++]);
-					bits  = (uint32_t)(xds110.txn_requests[request++]) << 0;
-					bits |= (uint32_t)(xds110.txn_requests[request++]) << 8;
-					data_out = &xds110.txn_requests[request];
-					bytes = DIV_ROUND_UP(bits, 8);
-					xds110_legacy_scan(shift_state, bits, end_state, data_out,
-						&data_in[result]);
-					result += bytes;
-					request += bytes;
-					break;
-				case CMD_RUNTEST:
-					clocks  = (uint32_t)(xds110.txn_requests[request++]) <<  0;
-					clocks |= (uint32_t)(xds110.txn_requests[request++]) <<  8;
-					clocks |= (uint32_t)(xds110.txn_requests[request++]) << 16;
-					clocks |= (uint32_t)(xds110.txn_requests[request++]) << 24;
-					end_state = (uint32_t)xds110.txn_requests[request++];
-					xds110_legacy_runtest(clocks, end_state);
-					break;
-				case CMD_STABLECLOCKS:
-					clocks  = (uint32_t)(xds110.txn_requests[request++]) <<  0;
-					clocks |= (uint32_t)(xds110.txn_requests[request++]) <<  8;
-					clocks |= (uint32_t)(xds110.txn_requests[request++]) << 16;
-					clocks |= (uint32_t)(xds110.txn_requests[request++]) << 24;
-					xds110_legacy_stableclocks(clocks);
-					break;
-				default:
-					LOG_ERROR("BUG: unknown JTAG command type 0x%x encountered",
-						command);
-					exit(-1);
-					break;
+			case CMD_IR_SCAN:
+			case CMD_DR_SCAN:
+				if (command == CMD_IR_SCAN)
+					shift_state = XDS_JTAG_STATE_SHIFT_IR;
+				else
+					shift_state = XDS_JTAG_STATE_SHIFT_DR;
+				end_state = (uint32_t)(xds110.txn_requests[request++]);
+				bits  = (uint32_t)(xds110.txn_requests[request++]) << 0;
+				bits |= (uint32_t)(xds110.txn_requests[request++]) << 8;
+				data_out = &xds110.txn_requests[request];
+				bytes = DIV_ROUND_UP(bits, 8);
+				xds110_legacy_scan(shift_state, bits, end_state, data_out,
+					&data_in[result]);
+				result += bytes;
+				request += bytes;
+				break;
+			case CMD_RUNTEST:
+				clocks  = (uint32_t)(xds110.txn_requests[request++]) <<  0;
+				clocks |= (uint32_t)(xds110.txn_requests[request++]) <<  8;
+				clocks |= (uint32_t)(xds110.txn_requests[request++]) << 16;
+				clocks |= (uint32_t)(xds110.txn_requests[request++]) << 24;
+				end_state = (uint32_t)xds110.txn_requests[request++];
+				xds110_legacy_runtest(clocks, end_state);
+				break;
+			case CMD_STABLECLOCKS:
+				clocks  = (uint32_t)(xds110.txn_requests[request++]) <<  0;
+				clocks |= (uint32_t)(xds110.txn_requests[request++]) <<  8;
+				clocks |= (uint32_t)(xds110.txn_requests[request++]) << 16;
+				clocks |= (uint32_t)(xds110.txn_requests[request++]) << 24;
+				xds110_legacy_stableclocks(clocks);
+				break;
+			default:
+				LOG_ERROR("BUG: unknown JTAG command type 0x%x encountered",
+					command);
+				exit(-1);
+				break;
 			}
 		}
 	}
@@ -1809,32 +1809,32 @@ static void xds110_queue_stableclocks(struct jtag_command *cmd)
 static void xds110_execute_command(struct jtag_command *cmd)
 {
 	switch (cmd->type) {
-		case JTAG_SLEEP:
-			xds110_flush();
-			xds110_execute_sleep(cmd);
-			break;
-		case JTAG_TLR_RESET:
-			xds110_flush();
-			xds110_execute_tlr_reset(cmd);
-			break;
-		case JTAG_PATHMOVE:
-			xds110_flush();
-			xds110_execute_pathmove(cmd);
-			break;
-		case JTAG_SCAN:
-			xds110_queue_scan(cmd);
-			break;
-		case JTAG_RUNTEST:
-			xds110_queue_runtest(cmd);
-			break;
-		case JTAG_STABLECLOCKS:
-			xds110_queue_stableclocks(cmd);
-			break;
-		case JTAG_TMS:
-		default:
-			LOG_ERROR("BUG: unknown JTAG command type 0x%x encountered",
-				cmd->type);
-			exit(-1);
+	case JTAG_SLEEP:
+		xds110_flush();
+		xds110_execute_sleep(cmd);
+		break;
+	case JTAG_TLR_RESET:
+		xds110_flush();
+		xds110_execute_tlr_reset(cmd);
+		break;
+	case JTAG_PATHMOVE:
+		xds110_flush();
+		xds110_execute_pathmove(cmd);
+		break;
+	case JTAG_SCAN:
+		xds110_queue_scan(cmd);
+		break;
+	case JTAG_RUNTEST:
+		xds110_queue_runtest(cmd);
+		break;
+	case JTAG_STABLECLOCKS:
+		xds110_queue_stableclocks(cmd);
+		break;
+	case JTAG_TMS:
+	default:
+		LOG_ERROR("BUG: unknown JTAG command type 0x%x encountered",
+			cmd->type);
+		exit(-1);
 	}
 }
 
@@ -2058,15 +2058,14 @@ static const struct swd_driver xds110_swd_driver = {
 	.run = xds110_swd_run_queue,
 };
 
-static const char * const xds110_transport[] = { "swd", "jtag", NULL };
-
 static struct jtag_interface xds110_interface = {
 	.execute_queue = xds110_execute_queue,
 };
 
 struct adapter_driver xds110_adapter_driver = {
 	.name = "xds110",
-	.transports = xds110_transport,
+	.transport_ids = TRANSPORT_SWD | TRANSPORT_JTAG,
+	.transport_preferred_id = TRANSPORT_SWD,
 	.commands = xds110_command_handlers,
 
 	.init = xds110_init,

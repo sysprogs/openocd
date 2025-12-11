@@ -46,6 +46,8 @@ struct gdb_fileio_info;
  * not sure how this is used with all the recent changes)
  * TARGET_DEBUG_RUNNING = 4: the target is running, but it is executing code on
  * behalf of the debugger (e.g. algorithm for flashing)
+ * TARGET_UNAVAILABLE = 5: The target is unavailable for some reason. It might
+ * be powered down, for instance.
  *
  * also see: target_state_name();
  */
@@ -56,6 +58,7 @@ enum target_state {
 	TARGET_HALTED = 2,
 	TARGET_RESET = 3,
 	TARGET_DEBUG_RUNNING = 4,
+	TARGET_UNAVAILABLE = 5
 };
 
 enum target_reset_mode {
@@ -139,7 +142,7 @@ struct target {
 	 */
 	bool running_alg;
 
-	struct target_event_action *event_action;
+	struct list_head events_action;
 
 	bool reset_halt;						/* attempt resetting the CPU into the halted mode? */
 	target_addr_t working_area;				/* working area (initialised RAM). Evaluated
@@ -299,13 +302,6 @@ enum target_event {
 	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X105 = 0x105,
 	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X106 = 0x106,
 	TARGET_EVENT_SEMIHOSTING_USER_CMD_0X107 = 0x107,
-};
-
-struct target_event_action {
-	enum target_event event;
-	Jim_Interp *interp;
-	Jim_Obj *body;
-	struct target_event_action *next;
 };
 
 bool target_has_event_action(const struct target *target, enum target_event event);
@@ -785,7 +781,7 @@ void target_handle_event(struct target *t, enum target_event e);
 
 void target_handle_md_output(struct command_invocation *cmd,
 	struct target *target, target_addr_t address, unsigned int size,
-	unsigned int count, const uint8_t *buffer);
+	unsigned int count, const uint8_t *buffer, bool include_address);
 
 int target_profiling_default(struct target *target, uint32_t *samples, uint32_t
 		max_num_samples, uint32_t *num_samples, uint32_t seconds);
@@ -806,6 +802,7 @@ int target_profiling_default(struct target *target, uint32_t *samples, uint32_t
 #define ERROR_TARGET_SIZE_NOT_SUPPORTED  (-314)
 #define ERROR_TARGET_PACKING_NOT_SUPPORTED  (-315)
 #define ERROR_TARGET_HALTED_DO_RESUME  (-316)	/* used to workaround incorrect debug halt */
+#define ERROR_TARGET_INTERSECT_BREAKPOINT (-317)
 
 extern bool get_target_reset_nag(void);
 

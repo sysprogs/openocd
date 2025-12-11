@@ -15,6 +15,7 @@
 #define OPENOCD_TARGET_CORTEX_M_H
 
 #include "armv7m.h"
+#include "helper/bitfield.h"
 #include "helper/bits.h"
 
 #define CORTEX_M_COMMON_MAGIC 0x1A451A45U
@@ -35,6 +36,11 @@
 #define ARM_CPUID_IMPLEMENTER_MASK	(0xFF << ARM_CPUID_IMPLEMENTER_POS)
 #define ARM_CPUID_PARTNO_POS		4
 #define ARM_CPUID_PARTNO_MASK		(0xFFF << ARM_CPUID_PARTNO_POS)
+
+#define ARM_CPUID_ARCHITECTURE_POS	16
+#define ARM_CPUID_ARCHITECTURE_MASK	(0xF << ARM_CPUID_ARCHITECTURE_POS)
+#define ARM_CPUID_MAIN_EXTENSION	0xF
+#define ARM_CPUID_NO_MAIN_EXTENSION	0xC
 
 #define ARM_MAKE_CPUID(impl, partno)	((((impl) << ARM_CPUID_IMPLEMENTER_POS) & ARM_CPUID_IMPLEMENTER_MASK) | \
 	(((partno) << ARM_CPUID_PARTNO_POS)  & ARM_CPUID_PARTNO_MASK))
@@ -114,6 +120,45 @@ struct cortex_m_part_info {
 #define FPU_FPCAR	0xE000EF38
 #define FPU_FPDSCR	0xE000EF3C
 
+// Cache
+#define CCR			0xE000ED14
+#define CLIDR		0xE000ED78
+#define CTR			0xE000ED7C
+#define CCSIDR		0xE000ED80
+#define CSSELR		0xE000ED84
+#define ICIMVAU		0xE000EF58
+#define DCCIMVAC	0xE000EF70
+
+#define CCR_IC_MASK							BIT(17)
+#define CCR_DC_MASK							BIT(16)
+
+#define CLIDR_ICB_MASK						GENMASK(31, 30)
+#define CLIDR_LOUU_MASK						GENMASK(29, 27)
+#define CLIDR_LOC_MASK						GENMASK(26, 24)
+#define CLIDR_LOUIS_MASK					GENMASK(23, 21)
+#define CLIDR_CTYPE_MASK(i)					(GENMASK(2, 0) << (3 * (i) - 3))
+
+#define CLIDR_CTYPE_I_CACHE					BIT(0)
+#define CLIDR_CTYPE_D_CACHE					BIT(1)
+#define CLIDR_CTYPE_UNIFIED_CACHE			BIT(2)
+
+#define CTR_FORMAT_MASK						GENMASK(31, 29)
+#define CTR_CWG_MASK						GENMASK(27, 24)
+#define CTR_ERG_MASK						GENMASK(23, 20)
+#define CTR_DMINLINE_MASK					GENMASK(19, 16)
+#define CTR_IMINLINE_MASK					GENMASK(3, 0)
+
+#define CTR_FORMAT_PROVIDED					0x04
+
+#define CCSIDR_NUMSETS_MASK					GENMASK(27, 13)
+#define CCSIDR_ASSOCIATIVITY_MASK			GENMASK(12, 3)
+#define CCSIDR_LINESIZE_MASK				GENMASK(2, 0)
+
+#define CSSELR_LEVEL_MASK					GENMASK(3, 1)
+#define CSSELR_IND_MASK						BIT(0)
+#define CSSELR_IND_DATA_OR_UNIFIED_CACHE    0
+#define CSSELR_IND_INSTRUCTION_CACHE        1
+
 #define TPIU_SSPSR	0xE0040000
 #define TPIU_CSPSR	0xE0040004
 #define TPIU_ACPR	0xE0040010
@@ -167,6 +212,8 @@ struct cortex_m_part_info {
 #define NVIC_DFSR		0xE000ED30
 #define NVIC_MMFAR		0xE000ED34
 #define NVIC_BFAR		0xE000ED38
+#define MPU_CTRL		0xE000ED94
+#define SAU_CTRL		0xE000EDD0
 #define NVIC_SFSR		0xE000EDE4
 #define NVIC_SFAR		0xE000EDE8
 
@@ -183,6 +230,9 @@ struct cortex_m_part_info {
 #define DFSR_DWTTRAP		4
 #define DFSR_VCATCH			8
 #define DFSR_EXTERNAL		16
+
+#define MPU_CTRL_ENABLE		BIT(0)
+#define SAU_CTRL_ENABLE		BIT(0)
 
 #define FPCR_CODE 0
 #define FPCR_LITERAL 1
@@ -265,6 +315,15 @@ struct cortex_m_common {
 	bool incorrect_halt_erratum;
 };
 
+struct cortex_m_saved_security {
+	bool dscsr_dirty;
+	uint32_t dscsr;
+	bool sau_ctrl_dirty;
+	uint32_t sau_ctrl;
+	bool mpu_ctrl_dirty;
+	uint32_t mpu_ctrl;
+};
+
 static inline bool is_cortex_m_or_hla(const struct cortex_m_common *cortex_m)
 {
 	return cortex_m->common_magic == CORTEX_M_COMMON_MAGIC;
@@ -341,5 +400,18 @@ void cortex_m_enable_watchpoints(struct target *target);
 void cortex_m_deinit_target(struct target *target);
 int cortex_m_profiling(struct target *target, uint32_t *samples,
 	uint32_t max_num_samples, uint32_t *num_samples, uint32_t seconds);
+
+/**
+ * Forces Cortex-M core to the basic secure context with SAU and MPU off
+ * @param ssec pointer to save previous security state or NULL
+ * @returns error code or ERROR_OK if secure mode was set or is not applicable
+ * (not ARMv8M with security extension)
+ */
+int cortex_m_set_secure(struct target *target, struct cortex_m_saved_security *ssec);
+
+/**
+ * Restores saved security context to MPU_CTRL, SAU_CTRL and DSCSR
+ */
+int cortex_m_security_restore(struct target *target, struct cortex_m_saved_security *ssec);
 
 #endif /* OPENOCD_TARGET_CORTEX_M_H */

@@ -245,7 +245,7 @@ int mips_ejtag_enter_debug(struct mips_ejtag *ejtag_info)
 	/* break bit will be cleared by hardware */
 	ejtag_ctrl = ejtag_info->ejtag_ctrl;
 	mips_ejtag_drscan_32(ejtag_info, &ejtag_ctrl);
-	LOG_DEBUG("ejtag_ctrl: 0x%8.8" PRIx32 "", ejtag_ctrl);
+	LOG_DEBUG("ejtag_ctrl: 0x%8.8" PRIx32, ejtag_ctrl);
 	if ((ejtag_ctrl & EJTAG_CTRL_BRKST) == 0)
 		goto error;
 
@@ -342,18 +342,18 @@ void ejtag_main_print_imp(struct mips_ejtag *ejtag_info)
 		EJTAG_IMP_HAS(EJTAG_IMP_MIPS64) ? " MIPS64" : " MIPS32");
 
 	switch (ejtag_info->ejtag_version) {
-		case EJTAG_VERSION_20:
-			ejtag_v20_print_imp(ejtag_info);
-			break;
-		case EJTAG_VERSION_25:
-		case EJTAG_VERSION_26:
-		case EJTAG_VERSION_31:
-		case EJTAG_VERSION_41:
-		case EJTAG_VERSION_51:
-			ejtag_v26_print_imp(ejtag_info);
-			break;
-		default:
-			break;
+	case EJTAG_VERSION_20:
+		ejtag_v20_print_imp(ejtag_info);
+		break;
+	case EJTAG_VERSION_25:
+	case EJTAG_VERSION_26:
+	case EJTAG_VERSION_31:
+	case EJTAG_VERSION_41:
+	case EJTAG_VERSION_51:
+		ejtag_v26_print_imp(ejtag_info);
+		break;
+	default:
+		break;
 	}
 }
 
@@ -369,27 +369,27 @@ int mips_ejtag_init(struct mips_ejtag *ejtag_info)
 	ejtag_info->ejtag_version = ((ejtag_info->impcode >> 29) & 0x07);
 
 	switch (ejtag_info->ejtag_version) {
-		case EJTAG_VERSION_20:
-			LOG_DEBUG("EJTAG: Version 1 or 2.0 Detected");
-			break;
-		case EJTAG_VERSION_25:
-			LOG_DEBUG("EJTAG: Version 2.5 Detected");
-			break;
-		case EJTAG_VERSION_26:
-			LOG_DEBUG("EJTAG: Version 2.6 Detected");
-			break;
-		case EJTAG_VERSION_31:
-			LOG_DEBUG("EJTAG: Version 3.1 Detected");
-			break;
-		case EJTAG_VERSION_41:
-			LOG_DEBUG("EJTAG: Version 4.1 Detected");
-			break;
-		case EJTAG_VERSION_51:
-			LOG_DEBUG("EJTAG: Version 5.1 Detected");
-			break;
-		default:
-			LOG_DEBUG("EJTAG: Unknown Version Detected");
-			break;
+	case EJTAG_VERSION_20:
+		LOG_DEBUG("EJTAG: Version 1 or 2.0 Detected");
+		break;
+	case EJTAG_VERSION_25:
+		LOG_DEBUG("EJTAG: Version 2.5 Detected");
+		break;
+	case EJTAG_VERSION_26:
+		LOG_DEBUG("EJTAG: Version 2.6 Detected");
+		break;
+	case EJTAG_VERSION_31:
+		LOG_DEBUG("EJTAG: Version 3.1 Detected");
+		break;
+	case EJTAG_VERSION_41:
+		LOG_DEBUG("EJTAG: Version 4.1 Detected");
+		break;
+	case EJTAG_VERSION_51:
+		LOG_DEBUG("EJTAG: Version 5.1 Detected");
+		break;
+	default:
+		LOG_DEBUG("EJTAG: Unknown Version Detected");
+		break;
 	}
 	ejtag_main_print_imp(ejtag_info);
 

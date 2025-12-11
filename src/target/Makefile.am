@@ -75,6 +75,7 @@ ARMV6_SRC = \
 
 ARMV7_SRC = \
 	%D%/armv7m.c \
+	%D%/armv7m_cache.c \
 	%D%/armv7m_trace.c \
 	%D%/cortex_m.c \
 	%D%/armv7a.c \
@@ -183,6 +184,7 @@ ARC_SRC = \
 	%D%/armv4_5_cache.h \
 	%D%/armv7a.h \
 	%D%/armv7m.h \
+	%D%/armv7m_cache.h \
 	%D%/armv7m_trace.h \
 	%D%/armv8.h \
 	%D%/armv8_dpm.h \
@@ -224,7 +226,6 @@ ARC_SRC = \
 	%D%/avr32_mem.h \
 	%D%/avr32_regs.h \
 	%D%/semihosting_common.h \
-	%D%/stm8.h \
 	%D%/lakemont.h \
 	%D%/x86_32_common.h \
 	%D%/arm_cti.h \

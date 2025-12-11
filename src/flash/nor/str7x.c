@@ -131,21 +131,21 @@ static int str7x_build_block_list(struct flash_bank *bank)
 	int b0_sectors = 0, b1_sectors = 0;
 
 	switch (bank->size) {
-		case 16 * 1024:
-			b1_sectors = 2;
-			break;
-		case 64 * 1024:
-			b0_sectors = 5;
-			break;
-		case 128 * 1024:
-			b0_sectors = 6;
-			break;
-		case 256 * 1024:
-			b0_sectors = 8;
-			break;
-		default:
-			LOG_ERROR("BUG: unknown bank->size encountered");
-			exit(-1);
+	case 16 * 1024:
+		b1_sectors = 2;
+		break;
+	case 64 * 1024:
+		b0_sectors = 5;
+		break;
+	case 128 * 1024:
+		b0_sectors = 6;
+		break;
+	case 256 * 1024:
+		b0_sectors = 8;
+		break;
+	default:
+		LOG_ERROR("BUG: unknown bank->size encountered");
+		exit(-1);
 	}
 
 	num_sectors = b0_sectors + b1_sectors;
@@ -335,7 +335,7 @@ static int str7x_erase(struct flash_bank *bank, unsigned int first,
 	for (unsigned int i = first; i <= last; i++)
 		sectors |= str7x_info->sector_bits[i];
 
-	LOG_DEBUG("sectors: 0x%" PRIx32 "", sectors);
+	LOG_DEBUG("sectors: 0x%" PRIx32, sectors);
 
 	/* clear FLASH_ER register */
 	err = target_write_u32(target, str7x_get_flash_adr(bank, FLASH_ER), 0x0);

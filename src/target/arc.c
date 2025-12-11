@@ -769,7 +769,7 @@ static int arc_exit_debug(struct target *target)
 	target->state = TARGET_HALTED;
 	CHECK_RETVAL(target_call_event_callbacks(target, TARGET_EVENT_HALTED));
 
-	if (debug_level >= LOG_LVL_DEBUG) {
+	if (LOG_LEVEL_IS(LOG_LVL_DEBUG)) {
 		LOG_TARGET_DEBUG(target, "core stopped (halted) debug-reg: 0x%08" PRIx32, value);
 		CHECK_RETVAL(arc_jtag_read_aux_reg_one(&arc->jtag_info, AUX_STATUS32_REG, &value));
 		LOG_TARGET_DEBUG(target, "core STATUS32: 0x%08" PRIx32, value);
@@ -824,7 +824,7 @@ static int arc_halt(struct target *target)
 	CHECK_RETVAL(target_call_event_callbacks(target, TARGET_EVENT_HALTED));
 
 	/* some more debug information */
-	if (debug_level >= LOG_LVL_DEBUG) {
+	if (LOG_LEVEL_IS(LOG_LVL_DEBUG)) {
 		LOG_TARGET_DEBUG(target, "core stopped (halted) DEGUB-REG: 0x%08" PRIx32, value);
 		CHECK_RETVAL(arc_get_register_value(target, "status32", &value));
 		LOG_TARGET_DEBUG(target, "core STATUS32: 0x%08" PRIx32, value);
@@ -1148,7 +1148,7 @@ static int arc_arch_state(struct target *target)
 {
 	uint32_t pc_value;
 
-	if (debug_level < LOG_LVL_DEBUG)
+	if (!LOG_LEVEL_IS(LOG_LVL_DEBUG))
 		return ERROR_OK;
 
 	CHECK_RETVAL(arc_get_register_value(target, "pc", &pc_value));
@@ -1424,7 +1424,7 @@ static void arc_deinit_target(struct target *target)
 }
 
 
-static int arc_target_create(struct target *target, Jim_Interp *interp)
+static int arc_target_create(struct target *target)
 {
 	struct arc_common *arc = calloc(1, sizeof(*arc));
 
@@ -1892,18 +1892,18 @@ static int arc_set_watchpoint(struct target *target,
 
 	int enable = AP_AC_TT_DISABLE;
 	switch (watchpoint->rw) {
-		case WPT_READ:
-			enable = AP_AC_TT_READ;
-			break;
-		case WPT_WRITE:
-			enable = AP_AC_TT_WRITE;
-			break;
-		case WPT_ACCESS:
-			enable = AP_AC_TT_READWRITE;
-			break;
-		default:
-			LOG_TARGET_ERROR(target, "BUG: watchpoint->rw neither read, write nor access");
-			return ERROR_FAIL;
+	case WPT_READ:
+		enable = AP_AC_TT_READ;
+		break;
+	case WPT_WRITE:
+		enable = AP_AC_TT_WRITE;
+		break;
+	case WPT_ACCESS:
+		enable = AP_AC_TT_READWRITE;
+		break;
+	default:
+		LOG_TARGET_ERROR(target, "BUG: watchpoint->rw neither read, write nor access");
+		return ERROR_FAIL;
 	}
 
 	int retval =  arc_configure_actionpoint(target, wp_num,

@@ -426,17 +426,17 @@ static int dpmv8_bpwp_enable(struct arm_dpm *dpm, unsigned int index_t,
 	int retval;
 
 	switch (index_t) {
-		case 0 ... 15:	/* breakpoints */
-			vr += CPUV8_DBG_BVR_BASE;
-			cr += CPUV8_DBG_BCR_BASE;
-			break;
-		case 16 ... 31:	/* watchpoints */
-			vr += CPUV8_DBG_WVR_BASE;
-			cr += CPUV8_DBG_WCR_BASE;
-			index_t -= 16;
-			break;
-		default:
-			return ERROR_FAIL;
+	case 0 ... 15:	/* breakpoints */
+		vr += CPUV8_DBG_BVR_BASE;
+		cr += CPUV8_DBG_BCR_BASE;
+		break;
+	case 16 ... 31:	/* watchpoints */
+		vr += CPUV8_DBG_WVR_BASE;
+		cr += CPUV8_DBG_WCR_BASE;
+		index_t -= 16;
+		break;
+	default:
+		return ERROR_FAIL;
 	}
 	vr += 16 * index_t;
 	cr += 16 * index_t;
@@ -456,15 +456,15 @@ static int dpmv8_bpwp_disable(struct arm_dpm *dpm, unsigned int index_t)
 	uint32_t cr;
 
 	switch (index_t) {
-		case 0 ... 15:
-			cr = armv8->debug_base + CPUV8_DBG_BCR_BASE;
-			break;
-		case 16 ... 31:
-			cr = armv8->debug_base + CPUV8_DBG_WCR_BASE;
-			index_t -= 16;
-			break;
-		default:
-			return ERROR_FAIL;
+	case 0 ... 15:
+		cr = armv8->debug_base + CPUV8_DBG_BCR_BASE;
+		break;
+	case 16 ... 31:
+		cr = armv8->debug_base + CPUV8_DBG_WCR_BASE;
+		index_t -= 16;
+		break;
+	default:
+		return ERROR_FAIL;
 	}
 	cr += 16 * index_t;
 
@@ -542,6 +542,8 @@ int armv8_dpm_modeswitch(struct arm_dpm *dpm, enum arm_mode mode)
 	unsigned int target_el;
 	enum arm_state core_state;
 	uint32_t cpsr;
+	uint32_t rw = (dpm->dscr >> 10) & 0xF;
+	uint32_t ns = (dpm->dscr >> 18) & 0x1;
 
 	/* restore previous mode */
 	if (mode == ARM_MODE_ANY) {
@@ -564,7 +566,11 @@ int armv8_dpm_modeswitch(struct arm_dpm *dpm, enum arm_mode mode)
 	case ARM_MODE_IRQ:
 	case ARM_MODE_FIQ:
 	case ARM_MODE_SYS:
-		target_el = 1;
+		/* For Secure, EL1 if EL3 is aarch64, EL3 if EL3 is aarch32 */
+		if (ns || (rw & (1 << 3)))
+			target_el = 1;
+		else
+			target_el = 3;
 		break;
 	/*
 	 * TODO: handle ARM_MODE_HYP
@@ -598,8 +604,8 @@ int armv8_dpm_modeswitch(struct arm_dpm *dpm, enum arm_mode mode)
 	} else {
 		core_state = armv8_dpm_get_core_state(dpm);
 		if (core_state != ARM_STATE_AARCH64) {
-			/* cannot do DRPS/ERET when already in EL0 */
-			if (dpm->last_el != 0) {
+			/* cannot do DRPS/ERET when in EL0 or in SYS mode */
+			if (dpm->last_el != 0 && dpm->arm->core_mode != ARM_MODE_SYS) {
 				/* load SPSR with the desired mode and execute DRPS */
 				LOG_DEBUG("SPSR = 0x%08"PRIx32, cpsr);
 				retval = dpm->instr_write_data_r0(dpm,
@@ -1121,26 +1127,26 @@ static int dpmv8_bpwp_setup(struct arm_dpm *dpm, struct dpm_bpwp *xp,
 	 * v7 hardware, unaligned 4-byte ones too.
 	 */
 	switch (length) {
-		case 1:
-			control |= (1 << (addr & 3)) << 5;
+	case 1:
+		control |= (1 << (addr & 3)) << 5;
+		break;
+	case 2:
+		/* require 2-byte alignment */
+		if (!(addr & 1)) {
+			control |= (3 << (addr & 2)) << 5;
 			break;
-		case 2:
-			/* require 2-byte alignment */
-			if (!(addr & 1)) {
-				control |= (3 << (addr & 2)) << 5;
-				break;
-			}
-		/* FALL THROUGH */
-		case 4:
-			/* require 4-byte alignment */
-			if (!(addr & 3)) {
-				control |= 0xf << 5;
-				break;
-			}
-		/* FALL THROUGH */
-		default:
-			LOG_ERROR("unsupported {break,watch}point length/alignment");
-			return ERROR_COMMAND_SYNTAX_ERROR;
+		}
+	/* FALL THROUGH */
+	case 4:
+		/* require 4-byte alignment */
+		if (!(addr & 3)) {
+			control |= 0xf << 5;
+			break;
+		}
+	/* FALL THROUGH */
+	default:
+		LOG_ERROR("unsupported {break,watch}point length/alignment");
+		return ERROR_COMMAND_SYNTAX_ERROR;
 	}
 
 	/* other shared control bits:
@@ -1227,15 +1233,15 @@ static int dpmv8_watchpoint_setup(struct arm_dpm *dpm, unsigned int index_t,
 
 	control = dwp->bpwp.control;
 	switch (wp->rw) {
-		case WPT_READ:
-			control |= 1 << 3;
-			break;
-		case WPT_WRITE:
-			control |= 2 << 3;
-			break;
-		case WPT_ACCESS:
-			control |= 3 << 3;
-			break;
+	case WPT_READ:
+		control |= 1 << 3;
+		break;
+	case WPT_WRITE:
+		control |= 2 << 3;
+		break;
+	case WPT_ACCESS:
+		control |= 3 << 3;
+		break;
 	}
 	dwp->bpwp.control = control;
 
@@ -1357,31 +1363,31 @@ void armv8_dpm_report_dscr(struct arm_dpm *dpm, uint32_t dscr)
 
 	/* Examine debug reason */
 	switch (DSCR_ENTRY(dscr)) {
-		/* FALL THROUGH -- assume a v6 core in abort mode */
-		case DSCRV8_ENTRY_EXT_DEBUG:	/* EDBGRQ */
-			target->debug_reason = DBG_REASON_DBGRQ;
-			break;
-		case DSCRV8_ENTRY_HALT_STEP_EXECLU:	/* HALT step */
-		case DSCRV8_ENTRY_HALT_STEP_NORMAL: /* Halt step*/
-		case DSCRV8_ENTRY_HALT_STEP:
-			target->debug_reason = DBG_REASON_SINGLESTEP;
-			break;
-		case DSCRV8_ENTRY_HLT:	/* HLT instruction (software breakpoint) */
-		case DSCRV8_ENTRY_BKPT:	/* SW BKPT (?) */
-		case DSCRV8_ENTRY_RESET_CATCH:	/* Reset catch */
-		case DSCRV8_ENTRY_OS_UNLOCK:  /*OS unlock catch*/
-		case DSCRV8_ENTRY_SW_ACCESS_DBG: /*SW access dbg register*/
-			target->debug_reason = DBG_REASON_BREAKPOINT;
-			break;
-		case DSCRV8_ENTRY_WATCHPOINT:	/* asynch watchpoint */
-			target->debug_reason = DBG_REASON_WATCHPOINT;
-			break;
-		case DSCRV8_ENTRY_EXCEPTION_CATCH:  /*exception catch*/
-			target->debug_reason = DBG_REASON_EXC_CATCH;
-			break;
-		default:
-			target->debug_reason = DBG_REASON_UNDEFINED;
-			break;
+	/* FALL THROUGH -- assume a v6 core in abort mode */
+	case DSCRV8_ENTRY_EXT_DEBUG:	/* EDBGRQ */
+		target->debug_reason = DBG_REASON_DBGRQ;
+		break;
+	case DSCRV8_ENTRY_HALT_STEP_EXECLU:	/* HALT step */
+	case DSCRV8_ENTRY_HALT_STEP_NORMAL: /* Halt step*/
+	case DSCRV8_ENTRY_HALT_STEP:
+		target->debug_reason = DBG_REASON_SINGLESTEP;
+		break;
+	case DSCRV8_ENTRY_HLT:	/* HLT instruction (software breakpoint) */
+	case DSCRV8_ENTRY_BKPT:	/* SW BKPT (?) */
+	case DSCRV8_ENTRY_RESET_CATCH:	/* Reset catch */
+	case DSCRV8_ENTRY_OS_UNLOCK:  /*OS unlock catch*/
+	case DSCRV8_ENTRY_SW_ACCESS_DBG: /*SW access dbg register*/
+		target->debug_reason = DBG_REASON_BREAKPOINT;
+		break;
+	case DSCRV8_ENTRY_WATCHPOINT:	/* asynch watchpoint */
+		target->debug_reason = DBG_REASON_WATCHPOINT;
+		break;
+	case DSCRV8_ENTRY_EXCEPTION_CATCH:  /*exception catch*/
+		target->debug_reason = DBG_REASON_EXC_CATCH;
+		break;
+	default:
+		target->debug_reason = DBG_REASON_UNDEFINED;
+		break;
 	}
 
 }

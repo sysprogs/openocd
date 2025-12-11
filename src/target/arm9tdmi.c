@@ -398,15 +398,15 @@ static void arm9tdmi_read_core_regs_target_buffer(struct target *target,
 		if (mask & (1 << i))
 			/* nothing fetched, STM in MEMORY (i'th cycle) */
 			switch (size) {
-				case 4:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u32++, 4, be);
-					break;
-				case 2:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u16++, 2, be);
-					break;
-				case 1:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u8++, 1, be);
-					break;
+			case 4:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u32++, 4, be);
+				break;
+			case 2:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u16++, 2, be);
+				break;
+			case 1:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u8++, 1, be);
+				break;
 			}
 	}
 }
@@ -765,7 +765,7 @@ int arm9tdmi_init_arch_info(struct target *target,
 	return ERROR_OK;
 }
 
-static int arm9tdmi_target_create(struct target *target, Jim_Interp *interp)
+static int arm9tdmi_target_create(struct target *target)
 {
 	struct arm7_9_common *arm7_9 = calloc(1, sizeof(struct arm7_9_common));
 

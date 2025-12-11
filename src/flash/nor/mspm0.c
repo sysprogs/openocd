@@ -429,7 +429,7 @@ static int mspm0_read_part_info(struct flash_bank *bank)
 		LOG_WARNING("Unknown Device ID[0x%" PRIx32 "], cannot identify target",
 			did);
 		LOG_DEBUG("did 0x%" PRIx32 ", traceid 0x%" PRIx32 ", userid 0x%" PRIx32
-			", flashram 0x%" PRIx32 "", did, mspm0_info->traceid, userid,
+			", flashram 0x%" PRIx32, did, mspm0_info->traceid, userid,
 			flashram);
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
@@ -737,10 +737,10 @@ static int mspm0_fctl_wait_cmd_ok(struct flash_bank *bank)
 			return retval;
 
 		elapsed_ms = timeval_ms() - start_ms;
-		if (elapsed_ms > 500)
-			keep_alive();
 		if (elapsed_ms > MSPM0_FLASH_TIMEOUT_MS)
 			break;
+
+		keep_alive();
 	}
 
 	if ((return_code & FCTL_STATCMD_CMDPASS_MASK) != FCTL_STATCMD_CMDPASS_STATPASS) {

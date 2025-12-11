@@ -274,18 +274,18 @@ static void usbprog_scan(bool ir_scan, enum scan_type type, uint8_t *buffer, int
 
 	void (*f)(struct usbprog_jtag *usbprog_jtag, char *buffer_local, int size);
 	switch (type) {
-		case SCAN_OUT:
-			f = &usbprog_jtag_write_tdi;
-			break;
-		case SCAN_IN:
-			f = &usbprog_jtag_read_tdo;
-			break;
-		case SCAN_IO:
-			f = &usbprog_jtag_write_and_read;
-			break;
-		default:
-			LOG_ERROR("unknown scan type: %i", type);
-			exit(-1);
+	case SCAN_OUT:
+		f = &usbprog_jtag_write_tdi;
+		break;
+	case SCAN_IN:
+		f = &usbprog_jtag_read_tdo;
+		break;
+	case SCAN_IO:
+		f = &usbprog_jtag_write_and_read;
+		break;
+	default:
+		LOG_ERROR("unknown scan type: %i", type);
+		exit(-1);
 	}
 	f(usbprog_jtag_handle, (char *)buffer, scan_size);
 
@@ -590,7 +590,8 @@ static struct jtag_interface usbprog_interface = {
 
 struct adapter_driver usbprog_adapter_driver = {
 	.name = "usbprog",
-	.transports = jtag_only,
+	.transport_ids = TRANSPORT_JTAG,
+	.transport_preferred_id = TRANSPORT_JTAG,
 
 	.init = usbprog_init,
 	.quit = usbprog_quit,

@@ -96,7 +96,7 @@ int x86_32_common_init_arch_info(struct target *t, struct x86_32_common *x86_32)
 	return ERROR_OK;
 }
 
-int x86_32_common_mmu(struct target *t, int *enabled)
+int x86_32_common_mmu(struct target *t, bool *enabled)
 {
 	*enabled = true;
 	return ERROR_OK;
@@ -331,27 +331,27 @@ static int read_mem(struct target *t, uint32_t size,
 	}
 
 	switch (size) {
-		case BYTE:
-			if (use32)
-				retval = x86_32->submit_instruction(t, MEMRDB32);
-			else
-				retval = x86_32->submit_instruction(t, MEMRDB16);
-			break;
-		case WORD:
-			if (use32)
-				retval = x86_32->submit_instruction(t, MEMRDH32);
-			else
-				retval = x86_32->submit_instruction(t, MEMRDH16);
-			break;
-		case DWORD:
-			if (use32)
-				retval = x86_32->submit_instruction(t, MEMRDW32);
-			else
-				retval = x86_32->submit_instruction(t, MEMRDW16);
-			break;
-		default:
-			LOG_ERROR("%s invalid read mem size", __func__);
-			break;
+	case BYTE:
+		if (use32)
+			retval = x86_32->submit_instruction(t, MEMRDB32);
+		else
+			retval = x86_32->submit_instruction(t, MEMRDB16);
+		break;
+	case WORD:
+		if (use32)
+			retval = x86_32->submit_instruction(t, MEMRDH32);
+		else
+			retval = x86_32->submit_instruction(t, MEMRDH16);
+		break;
+	case DWORD:
+		if (use32)
+			retval = x86_32->submit_instruction(t, MEMRDW32);
+		else
+			retval = x86_32->submit_instruction(t, MEMRDW16);
+		break;
+	default:
+		LOG_ERROR("%s invalid read mem size", __func__);
+		break;
 	}
 
 	if (retval != ERROR_OK)
@@ -407,27 +407,27 @@ static int write_mem(struct target *t, uint32_t size,
 		return retval;
 	}
 	switch (size) {
-		case BYTE:
-			if (use32)
-				retval = x86_32->submit_instruction(t, MEMWRB32);
-			else
-				retval = x86_32->submit_instruction(t, MEMWRB16);
-			break;
-		case WORD:
-			if (use32)
-				retval = x86_32->submit_instruction(t, MEMWRH32);
-			else
-				retval = x86_32->submit_instruction(t, MEMWRH16);
-			break;
-		case DWORD:
-			if (use32)
-				retval = x86_32->submit_instruction(t, MEMWRW32);
-			else
-				retval = x86_32->submit_instruction(t, MEMWRW16);
-			break;
-		default:
-			LOG_ERROR("%s invalid write mem size", __func__);
-			return ERROR_FAIL;
+	case BYTE:
+		if (use32)
+			retval = x86_32->submit_instruction(t, MEMWRB32);
+		else
+			retval = x86_32->submit_instruction(t, MEMWRB16);
+		break;
+	case WORD:
+		if (use32)
+			retval = x86_32->submit_instruction(t, MEMWRH32);
+		else
+			retval = x86_32->submit_instruction(t, MEMWRH16);
+		break;
+	case DWORD:
+		if (use32)
+			retval = x86_32->submit_instruction(t, MEMWRW32);
+		else
+			retval = x86_32->submit_instruction(t, MEMWRW16);
+		break;
+	default:
+		LOG_ERROR("%s invalid write mem size", __func__);
+		return ERROR_FAIL;
 	}
 
 	if (retval != ERROR_OK)
@@ -706,27 +706,27 @@ static int x86_32_common_read_io(struct target *t, uint32_t addr,
 		pg_disabled = true;
 	}
 	switch (size) {
-		case BYTE:
-			if (use32)
-				retval = x86_32->submit_instruction(t, IORDB32);
-			else
-				retval = x86_32->submit_instruction(t, IORDB16);
-			break;
-		case WORD:
-			if (use32)
-				retval = x86_32->submit_instruction(t, IORDH32);
-			else
-				retval = x86_32->submit_instruction(t, IORDH16);
-			break;
-		case DWORD:
-			if (use32)
-				retval = x86_32->submit_instruction(t, IORDW32);
-			else
-				retval = x86_32->submit_instruction(t, IORDW16);
-			break;
-		default:
-			LOG_ERROR("%s invalid read io size", __func__);
-			return ERROR_FAIL;
+	case BYTE:
+		if (use32)
+			retval = x86_32->submit_instruction(t, IORDB32);
+		else
+			retval = x86_32->submit_instruction(t, IORDB16);
+		break;
+	case WORD:
+		if (use32)
+			retval = x86_32->submit_instruction(t, IORDH32);
+		else
+			retval = x86_32->submit_instruction(t, IORDH16);
+		break;
+	case DWORD:
+		if (use32)
+			retval = x86_32->submit_instruction(t, IORDW32);
+		else
+			retval = x86_32->submit_instruction(t, IORDW16);
+		break;
+	default:
+		LOG_ERROR("%s invalid read io size", __func__);
+		return ERROR_FAIL;
 	}
 
 	/* restore CR0.PG bit if needed */
@@ -795,27 +795,27 @@ int x86_32_common_write_io(struct target *t, uint32_t addr,
 		pg_disabled = true;
 	}
 	switch (size) {
-		case BYTE:
-			if (use32)
-				retval = x86_32->submit_instruction(t, IOWRB32);
-			else
-				retval = x86_32->submit_instruction(t, IOWRB16);
-			break;
-		case WORD:
-			if (use32)
-				retval = x86_32->submit_instruction(t, IOWRH32);
-			else
-				retval = x86_32->submit_instruction(t, IOWRH16);
-			break;
-		case DWORD:
-			if (use32)
-				retval = x86_32->submit_instruction(t, IOWRW32);
-			else
-				retval = x86_32->submit_instruction(t, IOWRW16);
-			break;
-		default:
-			LOG_ERROR("%s invalid write io size", __func__);
-			return ERROR_FAIL;
+	case BYTE:
+		if (use32)
+			retval = x86_32->submit_instruction(t, IOWRB32);
+		else
+			retval = x86_32->submit_instruction(t, IOWRB16);
+		break;
+	case WORD:
+		if (use32)
+			retval = x86_32->submit_instruction(t, IOWRH32);
+		else
+			retval = x86_32->submit_instruction(t, IOWRH16);
+		break;
+	case DWORD:
+		if (use32)
+			retval = x86_32->submit_instruction(t, IOWRW32);
+		else
+			retval = x86_32->submit_instruction(t, IOWRW16);
+		break;
+	default:
+		LOG_ERROR("%s invalid write io size", __func__);
+		return ERROR_FAIL;
 	}
 
 	/* restore CR0.PG bit if needed */
@@ -899,29 +899,29 @@ static int set_debug_regs(struct target *t, uint32_t address,
 	}
 
 	switch (bp_type) {
-		case 0:
-			/* 00 - only on instruction execution */
-			DR7_SET_EXE(dr7, bp_num);
-			DR7_SET_LENGTH(dr7, bp_num, bp_length);
-		break;
-		case 1:
-			/* 01 - only on data writes */
-			DR7_SET_WRITE(dr7, bp_num);
-			DR7_SET_LENGTH(dr7, bp_num, bp_length);
-		break;
-		case 2:
-			/* 10 UNSUPPORTED - an I/O read and I/O write */
-			LOG_ERROR("%s unsupported feature bp_type=%d", __func__, bp_type);
-			return ERROR_FAIL;
-		break;
-		case 3:
-			/* on data read or data write */
-			DR7_SET_ACCESS(dr7, bp_num);
-			DR7_SET_LENGTH(dr7, bp_num, bp_length);
-		break;
-		default:
-			LOG_ERROR("%s invalid request [only 0-3] bp_type=%d", __func__, bp_type);
-			return ERROR_FAIL;
+	case 0:
+		/* 00 - only on instruction execution */
+		DR7_SET_EXE(dr7, bp_num);
+		DR7_SET_LENGTH(dr7, bp_num, bp_length);
+	break;
+	case 1:
+		/* 01 - only on data writes */
+		DR7_SET_WRITE(dr7, bp_num);
+		DR7_SET_LENGTH(dr7, bp_num, bp_length);
+	break;
+	case 2:
+		/* 10 UNSUPPORTED - an I/O read and I/O write */
+		LOG_ERROR("%s unsupported feature bp_type=%d", __func__, bp_type);
+		return ERROR_FAIL;
+	break;
+	case 3:
+		/* on data read or data write */
+		DR7_SET_ACCESS(dr7, bp_num);
+		DR7_SET_LENGTH(dr7, bp_num, bp_length);
+	break;
+	default:
+		LOG_ERROR("%s invalid request [only 0-3] bp_type=%d", __func__, bp_type);
+		return ERROR_FAIL;
 	}
 
 	/* update regs in the reg cache ready to be written to hardware
@@ -1027,7 +1027,7 @@ static int set_swbp(struct target *t, struct breakpoint *bp)
 	if (read_phys_mem(t, physaddr, 1, 1, bp->orig_instr))
 		return ERROR_FAIL;
 
-	LOG_DEBUG("set software breakpoint - orig byte=0x%02" PRIx8 "", *bp->orig_instr);
+	LOG_DEBUG("set software breakpoint - orig byte=0x%02" PRIx8, *bp->orig_instr);
 
 	/* just write the instruction trap byte */
 	if (write_phys_mem(t, physaddr, 1, 1, &opcode))
@@ -1040,7 +1040,7 @@ static int set_swbp(struct target *t, struct breakpoint *bp)
 	if (readback != SW_BP_OPCODE) {
 		LOG_ERROR("%s software breakpoint error at " TARGET_ADDR_FMT ", check memory",
 				__func__, bp->address);
-		LOG_ERROR("%s readback=0x%02" PRIx8 " orig=0x%02" PRIx8 "",
+		LOG_ERROR("%s readback=0x%02" PRIx8 " orig=0x%02" PRIx8,
 				__func__, readback, *bp->orig_instr);
 		return ERROR_FAIL;
 	}
@@ -1089,7 +1089,7 @@ static int unset_swbp(struct target *t, struct breakpoint *bp)
 	} else {
 		LOG_ERROR("%s software breakpoint remove error at " TARGET_ADDR_FMT ", check memory",
 				__func__, bp->address);
-		LOG_ERROR("%s current=0x%02" PRIx8 " orig=0x%02" PRIx8 "",
+		LOG_ERROR("%s current=0x%02" PRIx8 " orig=0x%02" PRIx8,
 				__func__, current_instr, *bp->orig_instr);
 		return ERROR_FAIL;
 	}
@@ -1206,21 +1206,19 @@ static int set_watchpoint(struct target *t, struct watchpoint *wp)
 	}
 
 	switch (wp->rw) {
-		case WPT_WRITE:
-			if (set_debug_regs(t, wp->address, wp_num,
-						DR7_BP_WRITE, wp->length) != ERROR_OK) {
-				return ERROR_FAIL;
-			}
-			break;
-		case WPT_ACCESS:
-			if (set_debug_regs(t, wp->address, wp_num, DR7_BP_READWRITE,
-						wp->length) != ERROR_OK) {
-				return ERROR_FAIL;
-			}
-			break;
-		default:
-			LOG_ERROR("%s only 'access' or 'write' watchpoints are supported", __func__);
-			break;
+	case WPT_WRITE:
+		if (set_debug_regs(t, wp->address, wp_num,
+					DR7_BP_WRITE, wp->length) != ERROR_OK)
+			return ERROR_FAIL;
+		break;
+	case WPT_ACCESS:
+		if (set_debug_regs(t, wp->address, wp_num, DR7_BP_READWRITE,
+					wp->length) != ERROR_OK)
+			return ERROR_FAIL;
+		break;
+	default:
+		LOG_ERROR("%s only 'access' or 'write' watchpoints are supported", __func__);
+		break;
 	}
 	watchpoint_set(wp, wp_num);
 	debug_reg_list[wp_num].used = 1;
@@ -1460,17 +1458,17 @@ COMMAND_HANDLER(handle_iow_command)
 
 	unsigned int wordsize;
 	switch (CMD_NAME[2]) {
-		case 'w':
-			wordsize = 4;
-			break;
-		case 'h':
-			wordsize = 2;
-			break;
-		case 'b':
-			wordsize = 1;
-			break;
-		default:
-			return ERROR_COMMAND_SYNTAX_ERROR;
+	case 'w':
+		wordsize = 4;
+		break;
+	case 'h':
+		wordsize = 2;
+		break;
+	case 'b':
+		wordsize = 1;
+		break;
+	default:
+		return ERROR_COMMAND_SYNTAX_ERROR;
 	}
 	return target_fill_io(target, address, wordsize, value);
 }

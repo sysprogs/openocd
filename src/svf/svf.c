@@ -702,71 +702,71 @@ static int svf_read_command_from_file(FILE *fd)
 	ch = svf_read_line[0];
 	while (!cmd_ok && (ch != 0)) {
 		switch (ch) {
-			case '!':
+		case '!':
+			slash = 0;
+			if (svf_getline(&svf_read_line, &svf_read_line_size, svf_fd) <= 0)
+				return ERROR_FAIL;
+			svf_line_number++;
+			i = -1;
+			break;
+		case '/':
+			if (++slash == 2) {
 				slash = 0;
-				if (svf_getline(&svf_read_line, &svf_read_line_size, svf_fd) <= 0)
+				if (svf_getline(&svf_read_line, &svf_read_line_size,
+					svf_fd) <= 0)
 					return ERROR_FAIL;
 				svf_line_number++;
 				i = -1;
+			}
+			break;
+		case ';':
+			slash = 0;
+			cmd_ok = 1;
+			break;
+		case '\n':
+			svf_line_number++;
+			if (svf_getline(&svf_read_line, &svf_read_line_size, svf_fd) <= 0)
+				return ERROR_FAIL;
+			i = -1;
+			/* fallthrough */
+		case '\r':
+			slash = 0;
+			/* Don't save '\r' and '\n' if no data is parsed */
+			if (!cmd_pos)
 				break;
-			case '/':
-				if (++slash == 2) {
-					slash = 0;
-					if (svf_getline(&svf_read_line, &svf_read_line_size,
-						svf_fd) <= 0)
-						return ERROR_FAIL;
-					svf_line_number++;
-					i = -1;
-				}
-				break;
-			case ';':
-				slash = 0;
-				cmd_ok = 1;
-				break;
-			case '\n':
-				svf_line_number++;
-				if (svf_getline(&svf_read_line, &svf_read_line_size, svf_fd) <= 0)
+			/* fallthrough */
+		default:
+			/* The parsing code currently expects a space
+			 * before parentheses -- "TDI (123)".  Also a
+			 * space afterwards -- "TDI (123) TDO(456)".
+			 * But such spaces are optional... instead of
+			 * parser updates, cope with that by adding the
+			 * spaces as needed.
+			 *
+			 * Ensure there are 3 bytes available, for:
+			 *  - current character
+			 *  - added space.
+			 *  - terminating NUL ('\0')
+			 */
+			if (cmd_pos + 3 > svf_command_buffer_size) {
+				svf_command_buffer = realloc(svf_command_buffer, cmd_pos + 3);
+				svf_command_buffer_size = cmd_pos + 3;
+				if (!svf_command_buffer) {
+					LOG_ERROR("not enough memory");
 					return ERROR_FAIL;
-				i = -1;
-				/* fallthrough */
-			case '\r':
-				slash = 0;
-				/* Don't save '\r' and '\n' if no data is parsed */
-				if (!cmd_pos)
-					break;
-				/* fallthrough */
-			default:
-				/* The parsing code currently expects a space
-				 * before parentheses -- "TDI (123)".  Also a
-				 * space afterwards -- "TDI (123) TDO(456)".
-				 * But such spaces are optional... instead of
-				 * parser updates, cope with that by adding the
-				 * spaces as needed.
-				 *
-				 * Ensure there are 3 bytes available, for:
-				 *  - current character
-				 *  - added space.
-				 *  - terminating NUL ('\0')
-				 */
-				if (cmd_pos + 3 > svf_command_buffer_size) {
-					svf_command_buffer = realloc(svf_command_buffer, cmd_pos + 3);
-					svf_command_buffer_size = cmd_pos + 3;
-					if (!svf_command_buffer) {
-						LOG_ERROR("not enough memory");
-						return ERROR_FAIL;
-					}
 				}
+			}
 
-				/* insert a space before '(' */
-				if ('(' == ch)
-					svf_command_buffer[cmd_pos++] = ' ';
+			/* insert a space before '(' */
+			if ('(' == ch)
+				svf_command_buffer[cmd_pos++] = ' ';
 
-				svf_command_buffer[cmd_pos++] = (char)toupper(ch);
+			svf_command_buffer[cmd_pos++] = (char)toupper(ch);
 
-				/* insert a space after ')' */
-				if (')' == ch)
-					svf_command_buffer[cmd_pos++] = ' ';
-				break;
+			/* insert a space after ')' */
+			if (')' == ch)
+				svf_command_buffer[cmd_pos++] = ' ';
+			break;
 		}
 		ch = svf_read_line[++i];
 	}
@@ -780,31 +780,33 @@ static int svf_read_command_from_file(FILE *fd)
 
 static int svf_parse_cmd_string(char *str, int len, char **argus, int *num_of_argu)
 {
-	int pos = 0, num = 0, space_found = 1, in_bracket = 0;
+	bool space_found = true, in_bracket = false;
+	int pos = 0, num = 0;
 
 	while (pos < len) {
 		switch (str[pos]) {
-			case '!':
-			case '/':
-				LOG_ERROR("fail to parse svf command");
-				return ERROR_FAIL;
-			case '(':
-				in_bracket = 1;
-				goto parse_char;
-			case ')':
-				in_bracket = 0;
-				goto parse_char;
-			default:
-parse_char:
-				if (!in_bracket && isspace((int) str[pos])) {
-					space_found = 1;
-					str[pos] = '\0';
-				} else if (space_found) {
-					argus[num++] = &str[pos];
-					space_found = 0;
-				}
-				break;
+		case '!':
+		case '/':
+			LOG_ERROR("fail to parse svf command");
+			return ERROR_FAIL;
+		case '(':
+			in_bracket = true;
+			break;
+		case ')':
+			in_bracket = false;
+			break;
+		default:
+			break;
 		}
+
+		if (!in_bracket && isspace((int)str[pos])) {
+			space_found = true;
+			str[pos] = '\0';
+		} else if (space_found) {
+			argus[num++] = &str[pos];
+			space_found = false;
+		}
+
 		pos++;
 	}
 
@@ -979,10 +981,295 @@ static int svf_execute_tap(void)
 	return ERROR_OK;
 }
 
+static int svf_xxr_common(char **argus, int num_of_argu, char command, struct svf_xxr_para *xxr_para_tmp)
+{
+	int i, i_tmp;
+	uint8_t **pbuffer_tmp;
+	struct scan_field field;
+
+	/* XXR length [TDI (tdi)] [TDO (tdo)][MASK (mask)] [SMASK (smask)] */
+	if (num_of_argu > 10 || (num_of_argu % 2)) {
+		LOG_ERROR("invalid parameter of %s", argus[0]);
+		return ERROR_FAIL;
+	}
+	i_tmp = xxr_para_tmp->len;
+	xxr_para_tmp->len = atoi(argus[1]);
+	/* If we are to enlarge the buffers, all parts of xxr_para_tmp
+	 * need to be freed */
+	if (i_tmp < xxr_para_tmp->len) {
+		free(xxr_para_tmp->tdi);
+		xxr_para_tmp->tdi = NULL;
+		free(xxr_para_tmp->tdo);
+		xxr_para_tmp->tdo = NULL;
+		free(xxr_para_tmp->mask);
+		xxr_para_tmp->mask = NULL;
+		free(xxr_para_tmp->smask);
+		xxr_para_tmp->smask = NULL;
+	}
+
+	LOG_DEBUG("\tlength = %d", xxr_para_tmp->len);
+	xxr_para_tmp->data_mask = 0;
+	for (i = 2; i < num_of_argu; i += 2) {
+		if ((strlen(argus[i + 1]) < 3) || (argus[i + 1][0] != '(') ||
+				argus[i + 1][strlen(argus[i + 1]) - 1] != ')') {
+			LOG_ERROR("data section error");
+			return ERROR_FAIL;
+		}
+		argus[i + 1][strlen(argus[i + 1]) - 1] = '\0';
+		/* TDI, TDO, MASK, SMASK */
+		if (!strcmp(argus[i], "TDI")) {
+			/* TDI */
+			pbuffer_tmp = &xxr_para_tmp->tdi;
+			xxr_para_tmp->data_mask |= XXR_TDI;
+		} else if (!strcmp(argus[i], "TDO")) {
+			/* TDO */
+			pbuffer_tmp = &xxr_para_tmp->tdo;
+			xxr_para_tmp->data_mask |= XXR_TDO;
+		} else if (!strcmp(argus[i], "MASK")) {
+			/* MASK */
+			pbuffer_tmp = &xxr_para_tmp->mask;
+			xxr_para_tmp->data_mask |= XXR_MASK;
+		} else if (!strcmp(argus[i], "SMASK")) {
+			/* SMASK */
+			pbuffer_tmp = &xxr_para_tmp->smask;
+			xxr_para_tmp->data_mask |= XXR_SMASK;
+		} else {
+			LOG_ERROR("unknown parameter: %s", argus[i]);
+			return ERROR_FAIL;
+		}
+		if (svf_copy_hexstring_to_binary(&argus[i + 1][1], pbuffer_tmp, i_tmp,
+				xxr_para_tmp->len) != ERROR_OK) {
+			LOG_ERROR("fail to parse hex value");
+			return ERROR_FAIL;
+		}
+		SVF_BUF_LOG(DEBUG, *pbuffer_tmp, xxr_para_tmp->len, argus[i]);
+	}
+	/* If a command changes the length of the last scan of the same type and the
+	 * MASK parameter is absent, */
+	/* the mask pattern used is all cares */
+	if (!(xxr_para_tmp->data_mask & XXR_MASK) && i_tmp != xxr_para_tmp->len) {
+		/* MASK not defined and length changed */
+		if (svf_adjust_array_length(&xxr_para_tmp->mask, i_tmp, xxr_para_tmp->len)
+				!= ERROR_OK) {
+			LOG_ERROR("fail to adjust length of array");
+			return ERROR_FAIL;
+		}
+		buf_set_ones(xxr_para_tmp->mask, xxr_para_tmp->len);
+	}
+	/* If TDO is absent, no comparison is needed, set the mask to 0 */
+	if (!(xxr_para_tmp->data_mask & XXR_TDO)) {
+		if (!xxr_para_tmp->tdo) {
+			if (svf_adjust_array_length(&xxr_para_tmp->tdo, i_tmp, xxr_para_tmp->len)
+					!= ERROR_OK) {
+				LOG_ERROR("fail to adjust length of array");
+				return ERROR_FAIL;
+			}
+		}
+		if (!xxr_para_tmp->mask) {
+			if (svf_adjust_array_length(&xxr_para_tmp->mask, i_tmp, xxr_para_tmp->len)
+					!= ERROR_OK) {
+				LOG_ERROR("fail to adjust length of array");
+				return ERROR_FAIL;
+			}
+		}
+		memset(xxr_para_tmp->mask, 0, (xxr_para_tmp->len + 7) >> 3);
+	}
+	/* do scan if necessary */
+	if (command == SDR) {
+		/* check buffer size first, reallocate if necessary */
+		i = svf_para.hdr_para.len + svf_para.sdr_para.len +
+				svf_para.tdr_para.len;
+		if ((svf_buffer_size - svf_buffer_index) < ((i + 7) >> 3)) {
+			/* reallocate buffer */
+			if (svf_realloc_buffers(svf_buffer_index + ((i + 7) >> 3)) != ERROR_OK) {
+				LOG_ERROR("not enough memory");
+				return ERROR_FAIL;
+			}
+		}
+
+		/* assemble dr data */
+		i = 0;
+		buf_set_buf(svf_para.hdr_para.tdi,
+				0,
+				&svf_tdi_buffer[svf_buffer_index],
+				i,
+				svf_para.hdr_para.len);
+		i += svf_para.hdr_para.len;
+		buf_set_buf(svf_para.sdr_para.tdi,
+				0,
+				&svf_tdi_buffer[svf_buffer_index],
+				i,
+				svf_para.sdr_para.len);
+		i += svf_para.sdr_para.len;
+		buf_set_buf(svf_para.tdr_para.tdi,
+				0,
+				&svf_tdi_buffer[svf_buffer_index],
+				i,
+				svf_para.tdr_para.len);
+		i += svf_para.tdr_para.len;
+
+		/* add check data */
+		if (svf_para.sdr_para.data_mask & XXR_TDO) {
+			/* assemble dr mask data */
+			i = 0;
+			buf_set_buf(svf_para.hdr_para.mask,
+					0,
+					&svf_mask_buffer[svf_buffer_index],
+					i,
+					svf_para.hdr_para.len);
+			i += svf_para.hdr_para.len;
+			buf_set_buf(svf_para.sdr_para.mask,
+					0,
+					&svf_mask_buffer[svf_buffer_index],
+					i,
+					svf_para.sdr_para.len);
+			i += svf_para.sdr_para.len;
+			buf_set_buf(svf_para.tdr_para.mask,
+					0,
+					&svf_mask_buffer[svf_buffer_index],
+					i,
+					svf_para.tdr_para.len);
+
+			/* assemble dr check data */
+			i = 0;
+			buf_set_buf(svf_para.hdr_para.tdo,
+					0,
+					&svf_tdo_buffer[svf_buffer_index],
+					i,
+					svf_para.hdr_para.len);
+			i += svf_para.hdr_para.len;
+			buf_set_buf(svf_para.sdr_para.tdo,
+					0,
+					&svf_tdo_buffer[svf_buffer_index],
+					i,
+					svf_para.sdr_para.len);
+			i += svf_para.sdr_para.len;
+			buf_set_buf(svf_para.tdr_para.tdo,
+					0,
+					&svf_tdo_buffer[svf_buffer_index],
+					i,
+					svf_para.tdr_para.len);
+			i += svf_para.tdr_para.len;
+
+			svf_add_check_para(1, svf_buffer_index, i);
+		} else {
+			svf_add_check_para(0, svf_buffer_index, i);
+		}
+		field.num_bits = i;
+		field.out_value = &svf_tdi_buffer[svf_buffer_index];
+		field.in_value = (xxr_para_tmp->data_mask & XXR_TDO) ? &svf_tdi_buffer[svf_buffer_index] : NULL;
+		if (!svf_nil) {
+			/* NOTE:  doesn't use SVF-specified state paths */
+			jtag_add_plain_dr_scan(field.num_bits,
+					field.out_value,
+					field.in_value,
+					svf_para.dr_end_state);
+		}
+
+		if (svf_addcycles)
+			jtag_add_clocks(svf_addcycles);
+
+		svf_buffer_index += (i + 7) >> 3;
+	} else if (command == SIR) {
+		/* check buffer size first, reallocate if necessary */
+		i = svf_para.hir_para.len + svf_para.sir_para.len +
+				svf_para.tir_para.len;
+		if ((svf_buffer_size - svf_buffer_index) < ((i + 7) >> 3)) {
+			if (svf_realloc_buffers(svf_buffer_index + ((i + 7) >> 3)) != ERROR_OK) {
+				LOG_ERROR("not enough memory");
+				return ERROR_FAIL;
+			}
+		}
+
+		/* assemble ir data */
+		i = 0;
+		buf_set_buf(svf_para.hir_para.tdi,
+				0,
+				&svf_tdi_buffer[svf_buffer_index],
+				i,
+				svf_para.hir_para.len);
+		i += svf_para.hir_para.len;
+		buf_set_buf(svf_para.sir_para.tdi,
+				0,
+				&svf_tdi_buffer[svf_buffer_index],
+				i,
+				svf_para.sir_para.len);
+		i += svf_para.sir_para.len;
+		buf_set_buf(svf_para.tir_para.tdi,
+				0,
+				&svf_tdi_buffer[svf_buffer_index],
+				i,
+				svf_para.tir_para.len);
+		i += svf_para.tir_para.len;
+
+		/* add check data */
+		if (svf_para.sir_para.data_mask & XXR_TDO) {
+			/* assemble dr mask data */
+			i = 0;
+			buf_set_buf(svf_para.hir_para.mask,
+					0,
+					&svf_mask_buffer[svf_buffer_index],
+					i,
+					svf_para.hir_para.len);
+			i += svf_para.hir_para.len;
+			buf_set_buf(svf_para.sir_para.mask,
+					0,
+					&svf_mask_buffer[svf_buffer_index],
+					i,
+					svf_para.sir_para.len);
+			i += svf_para.sir_para.len;
+			buf_set_buf(svf_para.tir_para.mask,
+					0,
+					&svf_mask_buffer[svf_buffer_index],
+					i,
+					svf_para.tir_para.len);
+
+			/* assemble dr check data */
+			i = 0;
+			buf_set_buf(svf_para.hir_para.tdo,
+					0,
+					&svf_tdo_buffer[svf_buffer_index],
+					i,
+					svf_para.hir_para.len);
+			i += svf_para.hir_para.len;
+			buf_set_buf(svf_para.sir_para.tdo,
+					0,
+					&svf_tdo_buffer[svf_buffer_index],
+					i,
+					svf_para.sir_para.len);
+			i += svf_para.sir_para.len;
+			buf_set_buf(svf_para.tir_para.tdo,
+					0,
+					&svf_tdo_buffer[svf_buffer_index],
+					i,
+					svf_para.tir_para.len);
+			i += svf_para.tir_para.len;
+
+			svf_add_check_para(1, svf_buffer_index, i);
+		} else {
+			svf_add_check_para(0, svf_buffer_index, i);
+		}
+		field.num_bits = i;
+		field.out_value = &svf_tdi_buffer[svf_buffer_index];
+		field.in_value = (xxr_para_tmp->data_mask & XXR_TDO) ? &svf_tdi_buffer[svf_buffer_index] : NULL;
+		if (!svf_nil) {
+			/* NOTE:  doesn't use SVF-specified state paths */
+			jtag_add_plain_ir_scan(field.num_bits,
+					field.out_value,
+					field.in_value,
+					svf_para.ir_end_state);
+		}
+
+		svf_buffer_index += (i + 7) >> 3;
+	}
+
+	return ERROR_OK;
+}
+
 static int svf_run_command(struct command_context *cmd_ctx, char *cmd_str)
 {
 	char *argus[256], command;
-	int num_of_argu = 0, i;
+	int num_of_argu = 0, i, retval;
 
 	/* tmp variable */
 	int i_tmp;
@@ -990,10 +1277,6 @@ static int svf_run_command(struct command_context *cmd_ctx, char *cmd_str)
 	/* for RUNTEST */
 	int run_count;
 	float min_time;
-	/* for XXR */
-	struct svf_xxr_para *xxr_para_tmp;
-	uint8_t **pbuffer_tmp;
-	struct scan_field field;
 	/* for STATE */
 	enum tap_state *path = NULL, state;
 	/* flag padding commands skipped due to -tap command */
@@ -1009,594 +1292,327 @@ static int svf_run_command(struct command_context *cmd_ctx, char *cmd_str)
 	command = svf_find_string_in_array(argus[0],
 			(char **)svf_command_name, ARRAY_SIZE(svf_command_name));
 	switch (command) {
-		case ENDDR:
-		case ENDIR:
-			if (num_of_argu != 2) {
-				LOG_ERROR("invalid parameter of %s", argus[0]);
+	case ENDDR:
+	case ENDIR:
+		if (num_of_argu != 2) {
+			LOG_ERROR("invalid parameter of %s", argus[0]);
+			return ERROR_FAIL;
+		}
+
+		i_tmp = tap_state_by_name(argus[1]);
+
+		if (svf_tap_state_is_stable(i_tmp)) {
+			if (command == ENDIR) {
+				svf_para.ir_end_state = i_tmp;
+				LOG_DEBUG("\tIR end_state = %s",
+						tap_state_name(i_tmp));
+			} else {
+				svf_para.dr_end_state = i_tmp;
+				LOG_DEBUG("\tDR end_state = %s",
+						tap_state_name(i_tmp));
+			}
+		} else {
+			LOG_ERROR("%s: %s is not a stable state",
+					argus[0], argus[1]);
+			return ERROR_FAIL;
+		}
+		break;
+	case FREQUENCY:
+		if (num_of_argu != 1 && num_of_argu != 3) {
+			LOG_ERROR("invalid parameter of %s", argus[0]);
+			return ERROR_FAIL;
+		}
+		if (num_of_argu == 1) {
+			/* TODO: set jtag speed to full speed */
+			svf_para.frequency = 0;
+		} else {
+			if (strcmp(argus[2], "HZ")) {
+				LOG_ERROR("HZ not found in FREQUENCY command");
 				return ERROR_FAIL;
 			}
+			if (svf_execute_tap() != ERROR_OK)
+				return ERROR_FAIL;
+			svf_para.frequency = atof(argus[1]);
+			/* TODO: set jtag speed to */
+			if (svf_para.frequency > 0) {
+				command_run_linef(cmd_ctx,
+						"adapter speed %d",
+						(int)svf_para.frequency / 1000);
+				LOG_DEBUG("\tfrequency = %f", svf_para.frequency);
+			}
+		}
+		break;
+	case HDR:
+		if (svf_tap_is_specified) {
+			padding_command_skipped = 1;
+			break;
+		}
+		retval = svf_xxr_common(argus, num_of_argu, command, &svf_para.hdr_para);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case HIR:
+		if (svf_tap_is_specified) {
+			padding_command_skipped = 1;
+			break;
+		}
+		retval = svf_xxr_common(argus, num_of_argu, command, &svf_para.hir_para);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case TDR:
+		if (svf_tap_is_specified) {
+			padding_command_skipped = 1;
+			break;
+		}
+		retval = svf_xxr_common(argus, num_of_argu, command, &svf_para.tdr_para);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case TIR:
+		if (svf_tap_is_specified) {
+			padding_command_skipped = 1;
+			break;
+		}
+		retval = svf_xxr_common(argus, num_of_argu, command, &svf_para.tir_para);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case SDR:
+		retval = svf_xxr_common(argus, num_of_argu, command, &svf_para.sdr_para);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case SIR:
+		retval = svf_xxr_common(argus, num_of_argu, command, &svf_para.sir_para);
+		if (retval != ERROR_OK)
+			return retval;
+		break;
+	case PIO:
+	case PIOMAP:
+		LOG_ERROR("PIO and PIOMAP are not supported");
+		return ERROR_FAIL;
+	case RUNTEST:
+		/* RUNTEST [run_state] run_count run_clk [min_time SEC [MAXIMUM max_time
+		 * SEC]] [ENDSTATE end_state] */
+		/* RUNTEST [run_state] min_time SEC [MAXIMUM max_time SEC] [ENDSTATE
+		 * end_state] */
+		if (num_of_argu < 3 || num_of_argu > 11) {
+			LOG_ERROR("invalid parameter of %s", argus[0]);
+			return ERROR_FAIL;
+		}
+		/* init */
+		run_count = 0;
+		min_time = 0;
+		i = 1;
 
-			i_tmp = tap_state_by_name(argus[1]);
+		/* run_state */
+		i_tmp = tap_state_by_name(argus[i]);
+		if (i_tmp != TAP_INVALID) {
+			if (svf_tap_state_is_stable(i_tmp)) {
+				svf_para.runtest_run_state = i_tmp;
+
+				/* When a run_state is specified, the new
+				 * run_state becomes the default end_state.
+				 */
+				svf_para.runtest_end_state = i_tmp;
+				LOG_DEBUG("\trun_state = %s", tap_state_name(i_tmp));
+				i++;
+			} else {
+				LOG_ERROR("%s: %s is not a stable state", argus[0], tap_state_name(i_tmp));
+				return ERROR_FAIL;
+			}
+		}
+
+		/* run_count run_clk */
+		if (((i + 2) <= num_of_argu) && strcmp(argus[i + 1], "SEC")) {
+			if (!strcmp(argus[i + 1], "TCK")) {
+				/* clock source is TCK */
+				run_count = atoi(argus[i]);
+				LOG_DEBUG("\trun_count@TCK = %d", run_count);
+			} else {
+				LOG_ERROR("%s not supported for clock", argus[i + 1]);
+				return ERROR_FAIL;
+			}
+			i += 2;
+		}
+		/* min_time SEC */
+		if (((i + 2) <= num_of_argu) && !strcmp(argus[i + 1], "SEC")) {
+			min_time = atof(argus[i]);
+			LOG_DEBUG("\tmin_time = %fs", min_time);
+			i += 2;
+		}
+		/* MAXIMUM max_time SEC */
+		if (((i + 3) <= num_of_argu) &&
+		!strcmp(argus[i], "MAXIMUM") && !strcmp(argus[i + 2], "SEC")) {
+			float max_time = 0;
+			max_time = atof(argus[i + 1]);
+			LOG_DEBUG("\tmax_time = %fs", max_time);
+			i += 3;
+		}
+		/* ENDSTATE end_state */
+		if (((i + 2) <= num_of_argu) && !strcmp(argus[i], "ENDSTATE")) {
+			i_tmp = tap_state_by_name(argus[i + 1]);
 
 			if (svf_tap_state_is_stable(i_tmp)) {
-				if (command == ENDIR) {
-					svf_para.ir_end_state = i_tmp;
-					LOG_DEBUG("\tIR end_state = %s",
-							tap_state_name(i_tmp));
-				} else {
-					svf_para.dr_end_state = i_tmp;
-					LOG_DEBUG("\tDR end_state = %s",
-							tap_state_name(i_tmp));
-				}
+				svf_para.runtest_end_state = i_tmp;
+				LOG_DEBUG("\tend_state = %s", tap_state_name(i_tmp));
 			} else {
-				LOG_ERROR("%s: %s is not a stable state",
-						argus[0], argus[1]);
+				LOG_ERROR("%s: %s is not a stable state", argus[0], tap_state_name(i_tmp));
 				return ERROR_FAIL;
 			}
-			break;
-		case FREQUENCY:
-			if ((num_of_argu != 1) && (num_of_argu != 3)) {
-				LOG_ERROR("invalid parameter of %s", argus[0]);
-				return ERROR_FAIL;
-			}
-			if (num_of_argu == 1) {
-				/* TODO: set jtag speed to full speed */
-				svf_para.frequency = 0;
-			} else {
-				if (strcmp(argus[2], "HZ")) {
-					LOG_ERROR("HZ not found in FREQUENCY command");
-					return ERROR_FAIL;
-				}
-				if (svf_execute_tap() != ERROR_OK)
-					return ERROR_FAIL;
-				svf_para.frequency = atof(argus[1]);
-				/* TODO: set jtag speed to */
-				if (svf_para.frequency > 0) {
-					command_run_linef(cmd_ctx,
-							"adapter speed %d",
-							(int)svf_para.frequency / 1000);
-					LOG_DEBUG("\tfrequency = %f", svf_para.frequency);
-				}
-			}
-			break;
-		case HDR:
-			if (svf_tap_is_specified) {
-				padding_command_skipped = 1;
-				break;
-			}
-			xxr_para_tmp = &svf_para.hdr_para;
-			goto xxr_common;
-		case HIR:
-			if (svf_tap_is_specified) {
-				padding_command_skipped = 1;
-				break;
-			}
-			xxr_para_tmp = &svf_para.hir_para;
-			goto xxr_common;
-		case TDR:
-			if (svf_tap_is_specified) {
-				padding_command_skipped = 1;
-				break;
-			}
-			xxr_para_tmp = &svf_para.tdr_para;
-			goto xxr_common;
-		case TIR:
-			if (svf_tap_is_specified) {
-				padding_command_skipped = 1;
-				break;
-			}
-			xxr_para_tmp = &svf_para.tir_para;
-			goto xxr_common;
-		case SDR:
-			xxr_para_tmp = &svf_para.sdr_para;
-			goto xxr_common;
-		case SIR:
-			xxr_para_tmp = &svf_para.sir_para;
-			goto xxr_common;
-xxr_common:
-			/* XXR length [TDI (tdi)] [TDO (tdo)][MASK (mask)] [SMASK (smask)] */
-			if ((num_of_argu > 10) || (num_of_argu % 2)) {
-				LOG_ERROR("invalid parameter of %s", argus[0]);
-				return ERROR_FAIL;
-			}
-			i_tmp = xxr_para_tmp->len;
-			xxr_para_tmp->len = atoi(argus[1]);
-			/* If we are to enlarge the buffers, all parts of xxr_para_tmp
-			 * need to be freed */
-			if (i_tmp < xxr_para_tmp->len) {
-				free(xxr_para_tmp->tdi);
-				xxr_para_tmp->tdi = NULL;
-				free(xxr_para_tmp->tdo);
-				xxr_para_tmp->tdo = NULL;
-				free(xxr_para_tmp->mask);
-				xxr_para_tmp->mask = NULL;
-				free(xxr_para_tmp->smask);
-				xxr_para_tmp->smask = NULL;
-			}
+			i += 2;
+		}
 
-			LOG_DEBUG("\tlength = %d", xxr_para_tmp->len);
-			xxr_para_tmp->data_mask = 0;
-			for (i = 2; i < num_of_argu; i += 2) {
-				if ((strlen(argus[i + 1]) < 3) || (argus[i + 1][0] != '(') ||
-				(argus[i + 1][strlen(argus[i + 1]) - 1] != ')')) {
-					LOG_ERROR("data section error");
-					return ERROR_FAIL;
-				}
-				argus[i + 1][strlen(argus[i + 1]) - 1] = '\0';
-				/* TDI, TDO, MASK, SMASK */
-				if (!strcmp(argus[i], "TDI")) {
-					/* TDI */
-					pbuffer_tmp = &xxr_para_tmp->tdi;
-					xxr_para_tmp->data_mask |= XXR_TDI;
-				} else if (!strcmp(argus[i], "TDO")) {
-					/* TDO */
-					pbuffer_tmp = &xxr_para_tmp->tdo;
-					xxr_para_tmp->data_mask |= XXR_TDO;
-				} else if (!strcmp(argus[i], "MASK")) {
-					/* MASK */
-					pbuffer_tmp = &xxr_para_tmp->mask;
-					xxr_para_tmp->data_mask |= XXR_MASK;
-				} else if (!strcmp(argus[i], "SMASK")) {
-					/* SMASK */
-					pbuffer_tmp = &xxr_para_tmp->smask;
-					xxr_para_tmp->data_mask |= XXR_SMASK;
-				} else {
-					LOG_ERROR("unknown parameter: %s", argus[i]);
-					return ERROR_FAIL;
-				}
-				if (ERROR_OK !=
-				svf_copy_hexstring_to_binary(&argus[i + 1][1], pbuffer_tmp, i_tmp,
-					xxr_para_tmp->len)) {
-					LOG_ERROR("fail to parse hex value");
-					return ERROR_FAIL;
-				}
-				SVF_BUF_LOG(DEBUG, *pbuffer_tmp, xxr_para_tmp->len, argus[i]);
-			}
-			/* If a command changes the length of the last scan of the same type and the
-			 * MASK parameter is absent, */
-			/* the mask pattern used is all cares */
-			if (!(xxr_para_tmp->data_mask & XXR_MASK) && (i_tmp != xxr_para_tmp->len)) {
-				/* MASK not defined and length changed */
-				if (ERROR_OK !=
-				svf_adjust_array_length(&xxr_para_tmp->mask, i_tmp,
-					xxr_para_tmp->len)) {
-					LOG_ERROR("fail to adjust length of array");
-					return ERROR_FAIL;
-				}
-				buf_set_ones(xxr_para_tmp->mask, xxr_para_tmp->len);
-			}
-			/* If TDO is absent, no comparison is needed, set the mask to 0 */
-			if (!(xxr_para_tmp->data_mask & XXR_TDO)) {
-				if (!xxr_para_tmp->tdo) {
-					if (ERROR_OK !=
-					svf_adjust_array_length(&xxr_para_tmp->tdo, i_tmp,
-						xxr_para_tmp->len)) {
-						LOG_ERROR("fail to adjust length of array");
-						return ERROR_FAIL;
-					}
-				}
-				if (!xxr_para_tmp->mask) {
-					if (ERROR_OK !=
-					svf_adjust_array_length(&xxr_para_tmp->mask, i_tmp,
-						xxr_para_tmp->len)) {
-						LOG_ERROR("fail to adjust length of array");
-						return ERROR_FAIL;
-					}
-				}
-				memset(xxr_para_tmp->mask, 0, (xxr_para_tmp->len + 7) >> 3);
-			}
-			/* do scan if necessary */
-			if (command == SDR) {
-				/* check buffer size first, reallocate if necessary */
-				i = svf_para.hdr_para.len + svf_para.sdr_para.len +
-						svf_para.tdr_para.len;
-				if ((svf_buffer_size - svf_buffer_index) < ((i + 7) >> 3)) {
-					/* reallocate buffer */
-					if (svf_realloc_buffers(svf_buffer_index + ((i + 7) >> 3)) != ERROR_OK) {
-						LOG_ERROR("not enough memory");
-						return ERROR_FAIL;
-					}
-				}
-
-				/* assemble dr data */
-				i = 0;
-				buf_set_buf(svf_para.hdr_para.tdi,
-						0,
-						&svf_tdi_buffer[svf_buffer_index],
-						i,
-						svf_para.hdr_para.len);
-				i += svf_para.hdr_para.len;
-				buf_set_buf(svf_para.sdr_para.tdi,
-						0,
-						&svf_tdi_buffer[svf_buffer_index],
-						i,
-						svf_para.sdr_para.len);
-				i += svf_para.sdr_para.len;
-				buf_set_buf(svf_para.tdr_para.tdi,
-						0,
-						&svf_tdi_buffer[svf_buffer_index],
-						i,
-						svf_para.tdr_para.len);
-				i += svf_para.tdr_para.len;
-
-				/* add check data */
-				if (svf_para.sdr_para.data_mask & XXR_TDO) {
-					/* assemble dr mask data */
-					i = 0;
-					buf_set_buf(svf_para.hdr_para.mask,
-							0,
-							&svf_mask_buffer[svf_buffer_index],
-							i,
-							svf_para.hdr_para.len);
-					i += svf_para.hdr_para.len;
-					buf_set_buf(svf_para.sdr_para.mask,
-							0,
-							&svf_mask_buffer[svf_buffer_index],
-							i,
-							svf_para.sdr_para.len);
-					i += svf_para.sdr_para.len;
-					buf_set_buf(svf_para.tdr_para.mask,
-							0,
-							&svf_mask_buffer[svf_buffer_index],
-							i,
-							svf_para.tdr_para.len);
-
-					/* assemble dr check data */
-					i = 0;
-					buf_set_buf(svf_para.hdr_para.tdo,
-							0,
-							&svf_tdo_buffer[svf_buffer_index],
-							i,
-							svf_para.hdr_para.len);
-					i += svf_para.hdr_para.len;
-					buf_set_buf(svf_para.sdr_para.tdo,
-							0,
-							&svf_tdo_buffer[svf_buffer_index],
-							i,
-							svf_para.sdr_para.len);
-					i += svf_para.sdr_para.len;
-					buf_set_buf(svf_para.tdr_para.tdo,
-							0,
-							&svf_tdo_buffer[svf_buffer_index],
-							i,
-							svf_para.tdr_para.len);
-					i += svf_para.tdr_para.len;
-
-					svf_add_check_para(1, svf_buffer_index, i);
-				} else
-					svf_add_check_para(0, svf_buffer_index, i);
-				field.num_bits = i;
-				field.out_value = &svf_tdi_buffer[svf_buffer_index];
-				field.in_value = (xxr_para_tmp->data_mask & XXR_TDO) ? &svf_tdi_buffer[svf_buffer_index] : NULL;
-				if (!svf_nil) {
-					/* NOTE:  doesn't use SVF-specified state paths */
-					jtag_add_plain_dr_scan(field.num_bits,
-							field.out_value,
-							field.in_value,
-							svf_para.dr_end_state);
-				}
-
-				if (svf_addcycles)
-					jtag_add_clocks(svf_addcycles);
-
-				svf_buffer_index += (i + 7) >> 3;
-			} else if (command == SIR) {
-				/* check buffer size first, reallocate if necessary */
-				i = svf_para.hir_para.len + svf_para.sir_para.len +
-						svf_para.tir_para.len;
-				if ((svf_buffer_size - svf_buffer_index) < ((i + 7) >> 3)) {
-					if (svf_realloc_buffers(svf_buffer_index + ((i + 7) >> 3)) != ERROR_OK) {
-						LOG_ERROR("not enough memory");
-						return ERROR_FAIL;
-					}
-				}
-
-				/* assemble ir data */
-				i = 0;
-				buf_set_buf(svf_para.hir_para.tdi,
-						0,
-						&svf_tdi_buffer[svf_buffer_index],
-						i,
-						svf_para.hir_para.len);
-				i += svf_para.hir_para.len;
-				buf_set_buf(svf_para.sir_para.tdi,
-						0,
-						&svf_tdi_buffer[svf_buffer_index],
-						i,
-						svf_para.sir_para.len);
-				i += svf_para.sir_para.len;
-				buf_set_buf(svf_para.tir_para.tdi,
-						0,
-						&svf_tdi_buffer[svf_buffer_index],
-						i,
-						svf_para.tir_para.len);
-				i += svf_para.tir_para.len;
-
-				/* add check data */
-				if (svf_para.sir_para.data_mask & XXR_TDO) {
-					/* assemble dr mask data */
-					i = 0;
-					buf_set_buf(svf_para.hir_para.mask,
-							0,
-							&svf_mask_buffer[svf_buffer_index],
-							i,
-							svf_para.hir_para.len);
-					i += svf_para.hir_para.len;
-					buf_set_buf(svf_para.sir_para.mask,
-							0,
-							&svf_mask_buffer[svf_buffer_index],
-							i,
-							svf_para.sir_para.len);
-					i += svf_para.sir_para.len;
-					buf_set_buf(svf_para.tir_para.mask,
-							0,
-							&svf_mask_buffer[svf_buffer_index],
-							i,
-							svf_para.tir_para.len);
-
-					/* assemble dr check data */
-					i = 0;
-					buf_set_buf(svf_para.hir_para.tdo,
-							0,
-							&svf_tdo_buffer[svf_buffer_index],
-							i,
-							svf_para.hir_para.len);
-					i += svf_para.hir_para.len;
-					buf_set_buf(svf_para.sir_para.tdo,
-							0,
-							&svf_tdo_buffer[svf_buffer_index],
-							i,
-							svf_para.sir_para.len);
-					i += svf_para.sir_para.len;
-					buf_set_buf(svf_para.tir_para.tdo,
-							0,
-							&svf_tdo_buffer[svf_buffer_index],
-							i,
-							svf_para.tir_para.len);
-					i += svf_para.tir_para.len;
-
-					svf_add_check_para(1, svf_buffer_index, i);
-				} else
-					svf_add_check_para(0, svf_buffer_index, i);
-				field.num_bits = i;
-				field.out_value = &svf_tdi_buffer[svf_buffer_index];
-				field.in_value = (xxr_para_tmp->data_mask & XXR_TDO) ? &svf_tdi_buffer[svf_buffer_index] : NULL;
-				if (!svf_nil) {
-					/* NOTE:  doesn't use SVF-specified state paths */
-					jtag_add_plain_ir_scan(field.num_bits,
-							field.out_value,
-							field.in_value,
-							svf_para.ir_end_state);
-				}
-
-				svf_buffer_index += (i + 7) >> 3;
-			}
-			break;
-		case PIO:
-		case PIOMAP:
-			LOG_ERROR("PIO and PIOMAP are not supported");
-			return ERROR_FAIL;
-		case RUNTEST:
-			/* RUNTEST [run_state] run_count run_clk [min_time SEC [MAXIMUM max_time
-			 * SEC]] [ENDSTATE end_state] */
-			/* RUNTEST [run_state] min_time SEC [MAXIMUM max_time SEC] [ENDSTATE
-			 * end_state] */
-			if ((num_of_argu < 3) || (num_of_argu > 11)) {
-				LOG_ERROR("invalid parameter of %s", argus[0]);
-				return ERROR_FAIL;
-			}
-			/* init */
-			run_count = 0;
-			min_time = 0;
-			i = 1;
-
-			/* run_state */
-			i_tmp = tap_state_by_name(argus[i]);
-			if (i_tmp != TAP_INVALID) {
-				if (svf_tap_state_is_stable(i_tmp)) {
-					svf_para.runtest_run_state = i_tmp;
-
-					/* When a run_state is specified, the new
-					 * run_state becomes the default end_state.
-					 */
-					svf_para.runtest_end_state = i_tmp;
-					LOG_DEBUG("\trun_state = %s", tap_state_name(i_tmp));
-					i++;
-				} else {
-					LOG_ERROR("%s: %s is not a stable state", argus[0], tap_state_name(i_tmp));
-					return ERROR_FAIL;
-				}
-			}
-
-			/* run_count run_clk */
-			if (((i + 2) <= num_of_argu) && strcmp(argus[i + 1], "SEC")) {
-				if (!strcmp(argus[i + 1], "TCK")) {
-					/* clock source is TCK */
-					run_count = atoi(argus[i]);
-					LOG_DEBUG("\trun_count@TCK = %d", run_count);
-				} else {
-					LOG_ERROR("%s not supported for clock", argus[i + 1]);
-					return ERROR_FAIL;
-				}
-				i += 2;
-			}
-			/* min_time SEC */
-			if (((i + 2) <= num_of_argu) && !strcmp(argus[i + 1], "SEC")) {
-				min_time = atof(argus[i]);
-				LOG_DEBUG("\tmin_time = %fs", min_time);
-				i += 2;
-			}
-			/* MAXIMUM max_time SEC */
-			if (((i + 3) <= num_of_argu) &&
-			!strcmp(argus[i], "MAXIMUM") && !strcmp(argus[i + 2], "SEC")) {
-				float max_time = 0;
-				max_time = atof(argus[i + 1]);
-				LOG_DEBUG("\tmax_time = %fs", max_time);
-				i += 3;
-			}
-			/* ENDSTATE end_state */
-			if (((i + 2) <= num_of_argu) && !strcmp(argus[i], "ENDSTATE")) {
-				i_tmp = tap_state_by_name(argus[i + 1]);
-
-				if (svf_tap_state_is_stable(i_tmp)) {
-					svf_para.runtest_end_state = i_tmp;
-					LOG_DEBUG("\tend_state = %s", tap_state_name(i_tmp));
-				} else {
-					LOG_ERROR("%s: %s is not a stable state", argus[0], tap_state_name(i_tmp));
-					return ERROR_FAIL;
-				}
-				i += 2;
-			}
-
-			/* all parameter should be parsed */
-			if (i == num_of_argu) {
+		/* all parameter should be parsed */
+		if (i == num_of_argu) {
 #if 1
-				/* FIXME handle statemove failures */
-				uint32_t min_usec = 1000000 * min_time;
+			/* FIXME handle statemove failures */
+			uint32_t min_usec = 1000000 * min_time;
 
-				/* enter into run_state if necessary */
-				if (cmd_queue_cur_state != svf_para.runtest_run_state)
-					svf_add_statemove(svf_para.runtest_run_state);
+			/* enter into run_state if necessary */
+			if (cmd_queue_cur_state != svf_para.runtest_run_state)
+				svf_add_statemove(svf_para.runtest_run_state);
 
-				/* add clocks and/or min wait */
-				if (run_count > 0) {
-					if (!svf_nil)
-						jtag_add_clocks(run_count);
-				}
+			/* add clocks and/or min wait */
+			if (run_count > 0) {
+				if (!svf_nil)
+					jtag_add_clocks(run_count);
+			}
 
-				if (min_usec > 0) {
-					if (!svf_nil)
-						jtag_add_sleep(min_usec);
-				}
+			if (min_usec > 0) {
+				if (!svf_nil)
+					jtag_add_sleep(min_usec);
+			}
 
-				/* move to end_state if necessary */
-				if (svf_para.runtest_end_state != svf_para.runtest_run_state)
-					svf_add_statemove(svf_para.runtest_end_state);
+			/* move to end_state if necessary */
+			if (svf_para.runtest_end_state != svf_para.runtest_run_state)
+				svf_add_statemove(svf_para.runtest_end_state);
 
 #else
-				if (svf_para.runtest_run_state != TAP_IDLE) {
-					LOG_ERROR("cannot runtest in %s state",
-							tap_state_name(svf_para.runtest_run_state));
-					return ERROR_FAIL;
-				}
+			if (svf_para.runtest_run_state != TAP_IDLE) {
+				LOG_ERROR("cannot runtest in %s state",
+						tap_state_name(svf_para.runtest_run_state));
+				return ERROR_FAIL;
+			}
 
-				if (!svf_nil)
-					jtag_add_runtest(run_count, svf_para.runtest_end_state);
+			if (!svf_nil)
+				jtag_add_runtest(run_count, svf_para.runtest_end_state);
 #endif
-			} else {
-				LOG_ERROR("fail to parse parameter of RUNTEST, %d out of %d is parsed",
-						i,
-						num_of_argu);
+		} else {
+			LOG_ERROR("fail to parse parameter of RUNTEST, %d out of %d is parsed",
+					i,
+					num_of_argu);
+			return ERROR_FAIL;
+		}
+		break;
+	case STATE:
+		/* STATE [pathstate1 [pathstate2 ...[pathstaten]]] stable_state */
+		if (num_of_argu < 2) {
+			LOG_ERROR("invalid parameter of %s", argus[0]);
+			return ERROR_FAIL;
+		}
+		if (num_of_argu > 2) {
+			/* STATE pathstate1 ... stable_state */
+			path = malloc((num_of_argu - 1) * sizeof(enum tap_state));
+			if (!path) {
+				LOG_ERROR("not enough memory");
 				return ERROR_FAIL;
 			}
-			break;
-		case STATE:
-			/* STATE [pathstate1 [pathstate2 ...[pathstaten]]] stable_state */
-			if (num_of_argu < 2) {
-				LOG_ERROR("invalid parameter of %s", argus[0]);
-				return ERROR_FAIL;
-			}
-			if (num_of_argu > 2) {
-				/* STATE pathstate1 ... stable_state */
-				path = malloc((num_of_argu - 1) * sizeof(enum tap_state));
-				if (!path) {
-					LOG_ERROR("not enough memory");
+			num_of_argu--;	/* num of path */
+			i_tmp = 1;		/* path is from parameter 1 */
+			for (i = 0; i < num_of_argu; i++, i_tmp++) {
+				path[i] = tap_state_by_name(argus[i_tmp]);
+				if (path[i] == TAP_INVALID) {
+					LOG_ERROR("%s: %s is not a valid state", argus[0], argus[i_tmp]);
+					free(path);
 					return ERROR_FAIL;
 				}
-				num_of_argu--;	/* num of path */
-				i_tmp = 1;		/* path is from parameter 1 */
-				for (i = 0; i < num_of_argu; i++, i_tmp++) {
-					path[i] = tap_state_by_name(argus[i_tmp]);
-					if (path[i] == TAP_INVALID) {
-						LOG_ERROR("%s: %s is not a valid state", argus[0], argus[i_tmp]);
-						free(path);
-						return ERROR_FAIL;
-					}
-					/* OpenOCD refuses paths containing TAP_RESET */
-					if (path[i] == TAP_RESET) {
-						/* FIXME last state MUST be stable! */
-						if (i > 0) {
-							if (!svf_nil)
-								jtag_add_pathmove(i, path);
-						}
+				/* OpenOCD refuses paths containing TAP_RESET */
+				if (path[i] == TAP_RESET) {
+					/* FIXME last state MUST be stable! */
+					if (i > 0) {
 						if (!svf_nil)
-							jtag_add_tlr();
-						num_of_argu -= i + 1;
-						i = -1;
+							jtag_add_pathmove(i, path);
 					}
+					if (!svf_nil)
+						jtag_add_tlr();
+					num_of_argu -= i + 1;
+					i = -1;
 				}
-				if (num_of_argu > 0) {
-					/* execute last path if necessary */
-					if (svf_tap_state_is_stable(path[num_of_argu - 1])) {
-						/* last state MUST be stable state */
-						if (!svf_nil)
-							jtag_add_pathmove(num_of_argu, path);
-						LOG_DEBUG("\tmove to %s by path_move",
-								tap_state_name(path[num_of_argu - 1]));
-					} else {
-						LOG_ERROR("%s: %s is not a stable state",
-								argus[0],
-								tap_state_name(path[num_of_argu - 1]));
-						free(path);
-						return ERROR_FAIL;
-					}
-				}
-
-				free(path);
-				path = NULL;
-			} else {
-				/* STATE stable_state */
-				state = tap_state_by_name(argus[1]);
-				if (svf_tap_state_is_stable(state)) {
-					LOG_DEBUG("\tmove to %s by svf_add_statemove",
-							tap_state_name(state));
-					/* FIXME handle statemove failures */
-					svf_add_statemove(state);
+			}
+			if (num_of_argu > 0) {
+				/* execute last path if necessary */
+				if (svf_tap_state_is_stable(path[num_of_argu - 1])) {
+					/* last state MUST be stable state */
+					if (!svf_nil)
+						jtag_add_pathmove(num_of_argu, path);
+					LOG_DEBUG("\tmove to %s by path_move",
+							tap_state_name(path[num_of_argu - 1]));
 				} else {
 					LOG_ERROR("%s: %s is not a stable state",
-							argus[0], tap_state_name(state));
+							argus[0],
+							tap_state_name(path[num_of_argu - 1]));
+					free(path);
 					return ERROR_FAIL;
 				}
 			}
-			break;
-		case TRST:
-			/* TRST trst_mode */
-			if (num_of_argu != 2) {
-				LOG_ERROR("invalid parameter of %s", argus[0]);
-				return ERROR_FAIL;
-			}
-			if (svf_para.trst_mode != TRST_ABSENT) {
-				if (svf_execute_tap() != ERROR_OK)
-					return ERROR_FAIL;
-				i_tmp = svf_find_string_in_array(argus[1],
-						(char **)svf_trst_mode_name,
-						ARRAY_SIZE(svf_trst_mode_name));
-				switch (i_tmp) {
-				case TRST_ON:
-					if (!svf_nil)
-						jtag_add_reset(1, 0);
-					break;
-				case TRST_Z:
-				case TRST_OFF:
-					if (!svf_nil)
-						jtag_add_reset(0, 0);
-					break;
-				case TRST_ABSENT:
-					break;
-				default:
-					LOG_ERROR("unknown TRST mode: %s", argus[1]);
-					return ERROR_FAIL;
-				}
-				svf_para.trst_mode = i_tmp;
-				LOG_DEBUG("\ttrst_mode = %s", svf_trst_mode_name[svf_para.trst_mode]);
+
+			free(path);
+			path = NULL;
+		} else {
+			/* STATE stable_state */
+			state = tap_state_by_name(argus[1]);
+			if (svf_tap_state_is_stable(state)) {
+				LOG_DEBUG("\tmove to %s by svf_add_statemove",
+						tap_state_name(state));
+				/* FIXME handle statemove failures */
+				svf_add_statemove(state);
 			} else {
-				LOG_ERROR("can not accept TRST command if trst_mode is ABSENT");
+				LOG_ERROR("%s: %s is not a stable state",
+						argus[0], tap_state_name(state));
 				return ERROR_FAIL;
 			}
-			break;
-		default:
-			LOG_ERROR("invalid svf command: %s", argus[0]);
+		}
+		break;
+	case TRST:
+		/* TRST trst_mode */
+		if (num_of_argu != 2) {
+			LOG_ERROR("invalid parameter of %s", argus[0]);
 			return ERROR_FAIL;
+		}
+		if (svf_para.trst_mode != TRST_ABSENT) {
+			if (svf_execute_tap() != ERROR_OK)
+				return ERROR_FAIL;
+			i_tmp = svf_find_string_in_array(argus[1],
+					(char **)svf_trst_mode_name,
+					ARRAY_SIZE(svf_trst_mode_name));
+			switch (i_tmp) {
+			case TRST_ON:
+				if (!svf_nil)
+					jtag_add_reset(1, 0);
+				break;
+			case TRST_Z:
+			case TRST_OFF:
+				if (!svf_nil)
+					jtag_add_reset(0, 0);
+				break;
+			case TRST_ABSENT:
+				break;
+			default:
+				LOG_ERROR("unknown TRST mode: %s", argus[1]);
+				return ERROR_FAIL;
+			}
+			svf_para.trst_mode = i_tmp;
+			LOG_DEBUG("\ttrst_mode = %s", svf_trst_mode_name[svf_para.trst_mode]);
+		} else {
+			LOG_ERROR("can not accept TRST command if trst_mode is ABSENT");
+			return ERROR_FAIL;
+		}
+		break;
+	default:
+		LOG_ERROR("invalid svf command: %s", argus[0]);
+		return ERROR_FAIL;
 	}
 
 	if (!svf_quiet) {
@@ -1604,7 +1620,7 @@ xxr_common:
 			LOG_USER("(Above Padding command skipped, as per -tap argument)");
 	}
 
-	if (debug_level >= LOG_LVL_DEBUG) {
+	if (LOG_LEVEL_IS(LOG_LVL_DEBUG)) {
 		/* for convenient debugging, execute tap if possible */
 		if ((svf_buffer_index > 0) &&
 				(((command != STATE) && (command != RUNTEST)) ||

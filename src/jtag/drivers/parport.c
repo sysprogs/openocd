@@ -20,7 +20,7 @@
 #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
 #include <machine/sysarch.h>
 #include <machine/cpufunc.h>
-#define ioperm(startport, length, enable)\
+#define ioperm(startport, length, enable) \
 	i386_set_ioperm((startport), (length), (enable))
 #endif /* __FreeBSD__ */
 
@@ -45,67 +45,17 @@
 #include <windows.h>
 #endif
 
-// Parallel port cable description.
-struct cable {
-	const char *name;
-	// Status port bit containing current TDO value.
-	uint8_t tdo_mask;
-	// Data port bit for TRST.
-	uint8_t trst_mask;
-	// Data port bit for TMD.
-	uint8_t tms_mask;
-	// Data port bit for TCK.
-	uint8_t tck_mask;
-	// Data port bit for TDI.
-	uint8_t tdi_mask;
-	// Data port bit for SRST.
-	uint8_t srst_mask;
-	// Data port bits that should be inverted.
-	uint8_t output_invert;
-	// Status port that should be inverted.
-	uint8_t input_invert;
-	// Initialize data port with this value.
-	uint8_t port_init;
-	// De-initialize data port with this value.
-	uint8_t port_exit;
-	// Data port bit for LED.
-	uint8_t led_mask;
-};
+static const struct adapter_gpio_config *adapter_gpio_config;
 
-static const struct cable cables[] = {
-	/* name				tdo   trst  tms   tck   tdi   srst  o_inv i_inv init  exit  led */
-	{ "wiggler",			0x80, 0x10, 0x02, 0x04, 0x08, 0x01, 0x01, 0x80, 0x80, 0x80, 0x00 },
-	{ "wiggler2",			0x80, 0x10, 0x02, 0x04, 0x08, 0x01, 0x01, 0x80, 0x80, 0x00, 0x20 },
-	{ "wiggler_ntrst_inverted",	0x80, 0x10, 0x02, 0x04, 0x08, 0x01, 0x11, 0x80, 0x80, 0x80, 0x00 },
-	{ "old_amt_wiggler",		0x80, 0x01, 0x02, 0x04, 0x08, 0x10, 0x11, 0x80, 0x80, 0x80, 0x00 },
-	{ "arm-jtag",			0x80, 0x01, 0x02, 0x04, 0x08, 0x10, 0x01, 0x80, 0x80, 0x80, 0x00 },
-	{ "chameleon",			0x80, 0x00, 0x04, 0x01, 0x02, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00 },
-	{ "dlc5",				0x10, 0x00, 0x04, 0x02, 0x01, 0x00, 0x00, 0x00, 0x10, 0x10, 0x00 },
-	{ "triton",				0x80, 0x08, 0x04, 0x01, 0x02, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00 },
-	{ "lattice",			0x40, 0x10, 0x04, 0x02, 0x01, 0x08, 0x00, 0x00, 0x18, 0x18, 0x00 },
-	{ "flashlink",			0x20, 0x10, 0x02, 0x01, 0x04, 0x20, 0x30, 0x20, 0x00, 0x00, 0x00 },
-/* Altium Universal JTAG cable. Set the cable to Xilinx Mode and wire to target as follows:
-	HARD TCK - Target TCK
-	HARD TMS - Target TMS
-	HARD TDI - Target TDI
-	HARD TDO - Target TDO
-	SOFT TCK - Target TRST
-	SOFT TDI - Target SRST
-*/
-	{ "altium",			0x10, 0x20, 0x04, 0x02, 0x01, 0x80, 0x00, 0x00, 0x10, 0x00, 0x08 },
-	{ "aspo",                       0x10, 0x01, 0x04, 0x08, 0x02, 0x10, 0x17, 0x00, 0x17, 0x17, 0x00 },
-	{ NULL,				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
-};
-
-// Configuration variables.
-static char *parport_cable;
+#if PARPORT_USE_PPDEV == 0
 static uint16_t parport_port;
-static bool parport_exit;
+#endif
+static bool parport_write_exit_state;
+static char *parport_device_file;
 static uint32_t parport_toggling_time_ns = 1000;
 static int wait_states;
 
 // Interface variables.
-static const struct cable *cable;
 static uint8_t dataport_value;
 
 #if PARPORT_USE_PPDEV == 1
@@ -114,6 +64,20 @@ static int device_handle;
 static unsigned long dataport;
 static unsigned long statusport;
 #endif
+
+// Bitmask map for the input pins.
+static struct {
+	uint8_t mask;
+} input_pin_bitmask_map[] = {
+	[10] = {0x40},
+	[11] = {0x80},
+	[12] = {0x20},
+	[13] = {0x10},
+	[15] = {0x08},
+};
+
+// Generate an output pin bitmask for an adapter signal.
+#define OUTPUT_BITMASK(gpio_index) BIT((adapter_gpio_config[(gpio_index)].gpio_num - 2))
 
 static enum bb_value parport_read(void)
 {
@@ -125,16 +89,15 @@ static enum bb_value parport_read(void)
 	data = inb(statusport);
 #endif
 
-	if ((data ^ cable->input_invert) & cable->tdo_mask)
-		return BB_HIGH;
-	else
-		return BB_LOW;
+	const struct adapter_gpio_config *gpio_config = &adapter_gpio_config[ADAPTER_GPIO_IDX_TDO];
+	const bool tdo_state = data & input_pin_bitmask_map[gpio_config->gpio_num].mask;
+
+	return (tdo_state ^ gpio_config->active_low) ? BB_HIGH : BB_LOW;
 }
 
-static inline void parport_write_data(void)
+static void parport_write_data(void)
 {
-	uint8_t output;
-	output = dataport_value ^ cable->output_invert;
+	const uint8_t output = dataport_value;
 
 #if PARPORT_USE_PPDEV == 1
 	ioctl(device_handle, PPWDATA, &output);
@@ -147,26 +110,27 @@ static inline void parport_write_data(void)
 #endif
 }
 
+static bool is_gpio_configured(enum adapter_gpio_config_index gpio_index)
+{
+	return adapter_gpio_config[gpio_index].gpio_num != ADAPTER_GPIO_NOT_SET;
+}
+
+static void set_pin_state(enum adapter_gpio_config_index gpio_index,
+	bool state)
+{
+	if (state ^ adapter_gpio_config[gpio_index].active_low)
+		dataport_value |= OUTPUT_BITMASK(gpio_index);
+	else
+		dataport_value &= ~OUTPUT_BITMASK(gpio_index);
+}
+
 static int parport_write(int tck, int tms, int tdi)
 {
-	int i = wait_states + 1;
+	set_pin_state(ADAPTER_GPIO_IDX_TCK, tck == 1);
+	set_pin_state(ADAPTER_GPIO_IDX_TMS, tms == 1);
+	set_pin_state(ADAPTER_GPIO_IDX_TDI, tdi == 1);
 
-	if (tck)
-		dataport_value |= cable->tck_mask;
-	else
-		dataport_value &= ~cable->tck_mask;
-
-	if (tms)
-		dataport_value |= cable->tms_mask;
-	else
-		dataport_value &= ~cable->tms_mask;
-
-	if (tdi)
-		dataport_value |= cable->tdi_mask;
-	else
-		dataport_value &= ~cable->tdi_mask;
-
-	while (i-- > 0)
+	for (int i = 0; i < wait_states + 1; i++)
 		parport_write_data();
 
 	return ERROR_OK;
@@ -177,15 +141,11 @@ static int parport_reset(int trst, int srst)
 {
 	LOG_DEBUG("trst: %i, srst: %i", trst, srst);
 
-	if (trst == 0)
-		dataport_value |= cable->trst_mask;
-	else if (trst == 1)
-		dataport_value &= ~cable->trst_mask;
+	if (is_gpio_configured(ADAPTER_GPIO_IDX_TRST))
+		set_pin_state(ADAPTER_GPIO_IDX_TRST, trst == 0);
 
-	if (srst == 0)
-		dataport_value |= cable->srst_mask;
-	else if (srst == 1)
-		dataport_value &= ~cable->srst_mask;
+	if (is_gpio_configured(ADAPTER_GPIO_IDX_SRST))
+		set_pin_state(ADAPTER_GPIO_IDX_SRST, srst == 0);
 
 	parport_write_data();
 
@@ -194,11 +154,10 @@ static int parport_reset(int trst, int srst)
 
 static int parport_led(bool on)
 {
-	if (on)
-		dataport_value |= cable->led_mask;
-	else
-		dataport_value &= ~cable->led_mask;
+	if (!is_gpio_configured(ADAPTER_GPIO_IDX_LED))
+		return ERROR_OK;
 
+	set_pin_state(ADAPTER_GPIO_IDX_LED, on);
 	parport_write_data();
 
 	return ERROR_OK;
@@ -213,11 +172,12 @@ static int parport_speed(int speed)
 static int parport_khz(int khz, int *jtag_speed)
 {
 	if (!khz) {
-		LOG_DEBUG("RCLK not supported");
+		LOG_ERROR("RCLK is not supported by the adapter");
 		return ERROR_FAIL;
 	}
 
 	*jtag_speed = 499999 / (khz * parport_toggling_time_ns);
+
 	return ERROR_OK;
 }
 
@@ -226,32 +186,35 @@ static int parport_speed_div(int speed, int *khz)
 	uint32_t denominator = (speed + 1) * parport_toggling_time_ns;
 
 	*khz = (499999 + denominator) / denominator;
+
 	return ERROR_OK;
 }
 
 #if PARPORT_USE_GIVEIO == 1
-static int parport_get_giveio_access(void)
+static bool parport_get_giveio_access(void)
 {
-	HANDLE h;
 	OSVERSIONINFO version;
 
 	version.dwOSVersionInfoSize = sizeof(version);
 	if (!GetVersionEx(&version)) {
 		errno = EINVAL;
-		return -1;
+		return false;
 	}
-	if (version.dwPlatformId != VER_PLATFORM_WIN32_NT)
-		return 0;
 
-	h = CreateFile("\\\\.\\giveio", GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (version.dwPlatformId != VER_PLATFORM_WIN32_NT)
+		return true;
+
+	HANDLE h = CreateFile("\\\\.\\giveio", GENERIC_READ, 0, NULL, OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL, NULL);
+
 	if (h == INVALID_HANDLE_VALUE) {
 		errno = ENODEV;
-		return -1;
+		return false;
 	}
 
 	CloseHandle(h);
 
-	return 0;
+	return true;
 }
 #endif
 
@@ -261,105 +224,150 @@ static const struct bitbang_interface parport_bitbang = {
 	.blink = &parport_led,
 };
 
+static const struct {
+	enum adapter_gpio_config_index gpio_index;
+	bool required;
+} all_signals[] = {
+	{ ADAPTER_GPIO_IDX_TDO, true },
+	{ ADAPTER_GPIO_IDX_TDI, true },
+	{ ADAPTER_GPIO_IDX_TMS, true },
+	{ ADAPTER_GPIO_IDX_TCK, true },
+	{ ADAPTER_GPIO_IDX_TRST, false },
+	{ ADAPTER_GPIO_IDX_SRST, false },
+	{ ADAPTER_GPIO_IDX_LED, false },
+	{ ADAPTER_GPIO_IDX_USER0, false },
+};
+
 static int parport_init(void)
 {
-	const struct cable *cur_cable;
-#if PARPORT_USE_PPDEV == 1
-	char buffer[256];
-#endif
+	adapter_gpio_config = adapter_gpio_get_config();
 
-	cur_cable = cables;
+	// Check if all signals are configured properly.
+	for (size_t i = 0; i < ARRAY_SIZE(all_signals); i++) {
+		const enum adapter_gpio_config_index gpio_index = all_signals[i].gpio_index;
+		const struct adapter_gpio_config gpio = adapter_gpio_config[gpio_index];
 
-	if (!parport_cable) {
-		parport_cable = strdup("wiggler");
-		LOG_WARNING("No parport cable specified, using default 'wiggler'");
-	}
+		if (gpio.gpio_num == ADAPTER_GPIO_NOT_SET) {
+			if (all_signals[i].required) {
+				LOG_ERROR("The signal '%s' is required and must be configured",
+					adapter_gpio_get_name(gpio_index));
+				return ERROR_FAIL;
+			}
 
-	while (cur_cable->name) {
-		if (!strcmp(cur_cable->name, parport_cable)) {
-			cable = cur_cable;
-			break;
+			continue;
 		}
-		cur_cable++;
+
+		if (gpio_index == ADAPTER_GPIO_IDX_TDO) {
+			if (gpio.gpio_num < 10 || gpio.gpio_num > 15 || gpio.gpio_num == 14) {
+				LOG_ERROR("The '%s' signal pin must be 10, 11, 12, 13, or 15",
+					adapter_gpio_get_name(gpio_index));
+				goto init_fail;
+			}
+		} else {
+			if (gpio.gpio_num < 2 || gpio.gpio_num > 9) {
+				LOG_ERROR("The '%s' signal pin must be 2, 3, 4, 5, 6, 7, 8, or 9",
+					adapter_gpio_get_name(gpio_index));
+				goto init_fail;
+			}
+		}
 	}
 
-	if (!cable) {
-		LOG_ERROR("No matching cable found for %s", parport_cable);
-		return ERROR_JTAG_INIT_FAILED;
-	}
+	// Initialize signal pin states.
+	for (size_t i = 0; i < ARRAY_SIZE(all_signals); i++) {
+		const enum adapter_gpio_config_index gpio_index = all_signals[i].gpio_index;
+		const struct adapter_gpio_config gpio = adapter_gpio_config[gpio_index];
 
-	dataport_value = cable->port_init;
+		// The TDO (input) and LED (controlled by the adapter) pins cannot be
+		// initialized.
+		if (gpio_index == ADAPTER_GPIO_IDX_TDO || gpio_index == ADAPTER_GPIO_IDX_LED)
+			continue;
+
+		// Do not initialize unconfigured GPIO pins.
+		if (gpio.gpio_num == ADAPTER_GPIO_NOT_SET)
+			continue;
+
+		if (gpio.init_state == ADAPTER_GPIO_INIT_STATE_ACTIVE)
+			set_pin_state(gpio_index, true);
+		else if (gpio.init_state == ADAPTER_GPIO_INIT_STATE_INACTIVE)
+			set_pin_state(gpio_index, false);
+	}
 
 #if PARPORT_USE_PPDEV == 1
 	if (device_handle > 0) {
-		LOG_ERROR("device is already opened");
-		return ERROR_JTAG_INIT_FAILED;
+		LOG_ERROR("Parallel port is already open");
+		goto init_fail;
 	}
 
+	if (!parport_device_file) {
 #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
-	LOG_DEBUG("opening /dev/ppi%d...", parport_port);
+		parport_device_file = strdup("/dev/ppi0");
+#else
+		parport_device_file = strdup("/dev/parport0");
+#endif
+		LOG_WARNING("No parallel port specified, using %s", parport_device_file);
+		LOG_WARNING("DEPRECATED! The lack of a parallel port specification is deprecated and will no longer work in the future");
+	}
 
-	snprintf(buffer, 256, "/dev/ppi%d", parport_port);
-	device_handle = open(buffer, O_WRONLY);
-#else /* not __FreeBSD__, __FreeBSD_kernel__ */
-	LOG_DEBUG("opening /dev/parport%d...", parport_port);
+	LOG_DEBUG("Using parallel port %s", parport_device_file);
 
-	snprintf(buffer, 256, "/dev/parport%d", parport_port);
-	device_handle = open(buffer, O_WRONLY);
-#endif /* __FreeBSD__, __FreeBSD_kernel__ */
+	device_handle = open(parport_device_file, O_WRONLY);
 
 	if (device_handle < 0) {
 		int err = errno;
-		LOG_ERROR("cannot open device. check it exists and that user read and write rights are set. errno=%d", err);
-		return ERROR_JTAG_INIT_FAILED;
+		LOG_ERROR("Failed to open parallel port %s (errno = %d)",
+			parport_device_file, err);
+		LOG_ERROR("Check whether the device exists and if you have the required access rights");
+		goto init_fail;
 	}
-
-	LOG_DEBUG("...open");
 
 #if !defined(__FreeBSD__) && !defined(__FreeBSD_kernel__)
-	int i = ioctl(device_handle, PPCLAIM);
+	int retval = ioctl(device_handle, PPCLAIM);
 
-	if (i < 0) {
-		LOG_ERROR("cannot claim device");
-		return ERROR_JTAG_INIT_FAILED;
+	if (retval < 0) {
+		LOG_ERROR("Failed to claim parallel port %s", parport_device_file);
+		goto init_fail;
 	}
 
-	i = PARPORT_MODE_COMPAT;
-	i = ioctl(device_handle, PPSETMODE, &i);
-	if (i < 0) {
-		LOG_ERROR(" cannot set compatible mode to device");
-		return ERROR_JTAG_INIT_FAILED;
+	int value = PARPORT_MODE_COMPAT;
+	retval = ioctl(device_handle, PPSETMODE, &value);
+
+	if (retval < 0) {
+		LOG_ERROR("Cannot set compatible mode to device");
+		goto init_fail;
 	}
 
-	i = IEEE1284_MODE_COMPAT;
-	i = ioctl(device_handle, PPNEGOT, &i);
-	if (i < 0) {
-		LOG_ERROR("cannot set compatible 1284 mode to device");
-		return ERROR_JTAG_INIT_FAILED;
+	value = IEEE1284_MODE_COMPAT;
+	retval = ioctl(device_handle, PPNEGOT, &value);
+
+	if (retval < 0) {
+		LOG_ERROR("Cannot set compatible 1284 mode to device");
+		goto init_fail;
 	}
 #endif /* not __FreeBSD__, __FreeBSD_kernel__ */
 
 #else /* not PARPORT_USE_PPDEV */
+	LOG_WARNING("DEPRECATED: Parallel port access with direct I/O is deprecated and support will be removed in the next release");
+
 	if (!parport_port) {
 		parport_port = 0x378;
-		LOG_WARNING("No parport port specified, using default '0x378' (LPT1)");
+		LOG_WARNING("No parallel port specified, using default 0x378 (LPT1)");
 	}
+
+	LOG_DEBUG("Using parallel port 0x%x", parport_port);
 
 	dataport = parport_port;
 	statusport = parport_port + 1;
 
-	LOG_DEBUG("requesting privileges for parallel port 0x%lx...", dataport);
 #if PARPORT_USE_GIVEIO == 1
-	if (parport_get_giveio_access() != 0) {
+	if (!parport_get_giveio_access()) {
 #else /* PARPORT_USE_GIVEIO */
 	if (ioperm(dataport, 3, 1) != 0) {
 #endif /* PARPORT_USE_GIVEIO */
-		LOG_ERROR("missing privileges for direct i/o");
-		return ERROR_JTAG_INIT_FAILED;
+		LOG_ERROR("Missing privileges for direct I/O");
+		goto init_fail;
 	}
-	LOG_DEBUG("...privileges granted");
 
-	// Make sure parallel port is in right mode (clear tristate and interrupt.
+	// Make sure parallel port is in right mode (clear tristate and interrupt).
 	#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
 		outb(parport_port + 2, 0x0);
 	#else
@@ -369,69 +377,113 @@ static int parport_init(void)
 #endif /* PARPORT_USE_PPDEV */
 
 	if (parport_reset(0, 0) != ERROR_OK)
-		return ERROR_FAIL;
+		goto init_fail;
+
 	if (parport_write(0, 0, 0) != ERROR_OK)
-		return ERROR_FAIL;
+		goto init_fail;
+
 	if (parport_led(true) != ERROR_OK)
-		return ERROR_FAIL;
+		goto init_fail;
 
 	bitbang_interface = &parport_bitbang;
 
 	return ERROR_OK;
+
+init_fail:
+	free(parport_device_file);
+	return ERROR_JTAG_INIT_FAILED;
 }
 
 static int parport_quit(void)
 {
-	if (parport_led(false) != ERROR_OK)
-		return ERROR_FAIL;
+	free(parport_device_file);
 
-	if (parport_exit) {
-		dataport_value = cable->port_exit;
-		parport_write_data();
+	// Deinitialize signal pin states.
+	for (size_t i = 0; i < ARRAY_SIZE(all_signals); i++) {
+		const enum adapter_gpio_config_index gpio_index = all_signals[i].gpio_index;
+		const struct adapter_gpio_config gpio = adapter_gpio_config[gpio_index];
+
+		// The TDO (input) and LED (controlled by the adapter) pins cannot be
+		// deinitialized.
+		if (gpio_index == ADAPTER_GPIO_IDX_TDO || gpio_index == ADAPTER_GPIO_IDX_LED)
+			continue;
+
+		// Do not deinitialize unconfigured GPIO pins.
+		if (gpio.gpio_num == ADAPTER_GPIO_NOT_SET)
+			continue;
+
+		if (gpio.exit_state == ADAPTER_GPIO_EXIT_STATE_ACTIVE)
+			set_pin_state(gpio_index, true);
+		else if (gpio.exit_state == ADAPTER_GPIO_EXIT_STATE_INACTIVE)
+			set_pin_state(gpio_index, false);
 	}
 
-	free(parport_cable);
-	parport_cable = NULL;
+	if (parport_write_exit_state)
+		parport_write_data();
+
+	if (parport_led(false) != ERROR_OK)
+		return ERROR_FAIL;
 
 	return ERROR_OK;
 }
 
 COMMAND_HANDLER(parport_handle_port_command)
 {
-	if (CMD_ARGC == 1) {
-		// Only if the port wasn't overwritten by cmdline.
-		if (!parport_port) {
-			COMMAND_PARSE_NUMBER(u16, CMD_ARGV[0], parport_port);
-		} else {
-			LOG_ERROR("The parport port was already configured!");
-			return ERROR_FAIL;
-		}
+	if (CMD_ARGC != 1)
+		return ERROR_COMMAND_SYNTAX_ERROR;
+
+#if PARPORT_USE_PPDEV == 1
+	if (parport_device_file) {
+		LOG_ERROR("The parallel port device file is already configured");
+		return ERROR_FAIL;
 	}
 
-	command_print(CMD, "parport port = 0x%" PRIx16 "", parport_port);
+	char *tmp;
+
+	// We do not use the parse_xxx() or COMMAND_PARSE_xxx() functions here since
+	// they generate an error message if parsing fails.
+	char *endptr = NULL;
+	unsigned long port_number = strtoul(CMD_ARGV[0], &endptr, 0);
+
+	if (*endptr == '\0' && endptr != CMD_ARGV[0]) {
+		LOG_WARNING("DEPRECATED! Using a port number is deprecated, use the device file instead");
+
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+		tmp = alloc_printf("/dev/ppi%lu", port_number);
+#else
+		tmp = alloc_printf("/dev/parport%lu", port_number);
+#endif
+	} else {
+		tmp = strdup(CMD_ARGV[0]);
+	}
+
+	if (!tmp) {
+		LOG_ERROR("Failed to allocate memory");
+		return ERROR_FAIL;
+	}
+
+	free(parport_device_file);
+	parport_device_file = tmp;
+#else
+	if (parport_port > 0) {
+		command_print(CMD, "The parallel port is already configured");
+		return ERROR_FAIL;
+	}
+
+	COMMAND_PARSE_NUMBER(u16, CMD_ARGV[0], parport_port);
+#endif
 
 	return ERROR_OK;
 }
 
+// This command is only for backward compatibility and will be removed in the
+// future.
 COMMAND_HANDLER(parport_handle_cable_command)
 {
-	if (!CMD_ARGC)
-		return ERROR_OK;
+	if (CMD_ARGC != 1)
+		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	// Only if the cable name wasn't overwritten by cmdline.
-	if (!parport_cable) {
-		// TODO: REVISIT first verify that it's listed in cables[].
-		parport_cable = malloc(strlen(CMD_ARGV[0]) + sizeof(char));
-		if (!parport_cable) {
-			LOG_ERROR("Out of memory");
-			return ERROR_FAIL;
-		}
-		strcpy(parport_cable, CMD_ARGV[0]);
-	}
-
-	//  TODO: REVISIT it's probably worth returning the current value.
-
-	return ERROR_OK;
+	return command_run_linef(CMD_CTX, "parport_select_cable %s", CMD_ARGV[0]);
 }
 
 COMMAND_HANDLER(parport_handle_write_on_exit_command)
@@ -439,40 +491,39 @@ COMMAND_HANDLER(parport_handle_write_on_exit_command)
 	if (CMD_ARGC != 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	COMMAND_PARSE_ON_OFF(CMD_ARGV[0], parport_exit);
+	LOG_WARNING("DEPRECATED: 'parport write_on_exit' will be removed in the future, use the 'adapter gpio' command to configure the exit state for pins");
+
+	COMMAND_PARSE_ON_OFF(CMD_ARGV[0], parport_write_exit_state);
 
 	return ERROR_OK;
 }
 
 COMMAND_HANDLER(parport_handle_toggling_time_command)
 {
-	if (CMD_ARGC == 1) {
-		uint32_t ns;
-		int retval = parse_u32(CMD_ARGV[0], &ns);
+	if (CMD_ARGC != 1)
+		return ERROR_COMMAND_SYNTAX_ERROR;
 
-		if (retval != ERROR_OK)
-			return retval;
+	uint32_t toggling_time;
 
-		if (!ns) {
-			LOG_ERROR("0 ns is not a valid parport toggling time");
-			return ERROR_FAIL;
-		}
+	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], toggling_time);
 
-		parport_toggling_time_ns = ns;
-		retval = adapter_get_speed(&wait_states);
-		if (retval != ERROR_OK) {
-			/*
-			 * If adapter_get_speed fails then the clock_mode has
-			 * not been configured, this happens if toggling_time is
-			 * called before the adapter speed is set.
-			 */
-			LOG_INFO("no parport speed set - defaulting to zero wait states");
-			wait_states = 0;
-		}
+	if (!toggling_time) {
+		command_print(CMD, "toggling time must not be 0 ns");
+		return ERROR_COMMAND_ARGUMENT_INVALID;
 	}
 
-	command_print(CMD, "parport toggling time = %" PRIu32 " ns",
-			parport_toggling_time_ns);
+	parport_toggling_time_ns = toggling_time;
+	int retval = adapter_get_speed(&wait_states);
+
+	if (retval != ERROR_OK) {
+		/*
+		 * If adapter_get_speed fails then the clock_mode has not been
+		 * configured, this happens if toggling_time is called before the
+		 * adapter speed is set.
+		 */
+		LOG_INFO("No parallel port speed set, using zero wait states");
+		wait_states = 0;
+	}
 
 	return ERROR_OK;
 }
@@ -482,35 +533,30 @@ static const struct command_registration parport_subcommand_handlers[] = {
 		.name = "port",
 		.handler = parport_handle_port_command,
 		.mode = COMMAND_CONFIG,
-		.help = "Display the address of the I/O port (e.g. 0x378) "
-			"or the number of the '/dev/parport' device used.  "
-			"If a parameter is provided, first change that port.",
-		.usage = "[port_number]",
+		.help = "Specify the device file of the parallel port",
+		.usage = "file",
 	},
 	{
 		.name = "cable",
 		.handler = parport_handle_cable_command,
 		.mode = COMMAND_CONFIG,
 		.help = "Set the layout of the parallel port cable "
-			"used to connect to the target.",
-		// TODO: REVISIT there's no way to list layouts we know.
-		.usage = "[layout]",
+			"used to connect to the target",
+		.usage = "cable",
 	},
 	{
 		.name = "write_on_exit",
 		.handler = parport_handle_write_on_exit_command,
 		.mode = COMMAND_CONFIG,
-		.help = "Configure the parallel driver to write "
-			"a known value to the parallel interface on exit.",
+		.help = "Configure the driver to write a value to the parallel port on shutdown",
 		.usage = "('on'|'off')",
 	},
 	{
 		.name = "toggling_time",
 		.handler = parport_handle_toggling_time_command,
 		.mode = COMMAND_CONFIG,
-		.help = "Displays or assigns how many nanoseconds it "
-			"takes for the hardware to toggle TCK.",
-		.usage = "[nanoseconds]",
+		.help = "Configure how many nanoseconds it takes for the hardware to toggle TCK",
+		.usage = "time",
 	},
 	COMMAND_REGISTRATION_DONE
 };
@@ -533,7 +579,8 @@ static struct jtag_interface parport_interface = {
 
 struct adapter_driver parport_adapter_driver = {
 	.name = "parport",
-	.transports = jtag_only,
+	.transport_ids = TRANSPORT_JTAG,
+	.transport_preferred_id = TRANSPORT_JTAG,
 	.commands = parport_command_handlers,
 
 	.init = parport_init,

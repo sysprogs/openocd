@@ -278,52 +278,52 @@ int parse_cmdline_args(struct command_context *cmd_ctx, int argc, char *argv[])
 			break;
 
 		switch (c) {
-			case 0:
-				break;
-			case 'h':		/* --help | -h */
-				help_flag = 1;
-				break;
-			case 'v':		/* --version | -v */
-				version_flag = 1;
-				break;
-			case 'f':		/* --file | -f */
+		case 0:
+			break;
+		case 'h':		/* --help | -h */
+			help_flag = 1;
+			break;
+		case 'v':		/* --version | -v */
+			version_flag = 1;
+			break;
+		case 'f':		/* --file | -f */
+		{
+			char *command = alloc_printf("script {%s}", optarg);
+			add_config_command(command);
+			free(command);
+			break;
+		}
+		case 's':		/* --search | -s */
+			add_script_search_dir(optarg);
+			break;
+		case 'd':		/* --debug | -d */
+		{
+			int retval = command_run_linef(cmd_ctx, "debug_level %s", optarg ? optarg : "3");
+			if (retval != ERROR_OK)
+				return retval;
+			break;
+		}
+		case 'l':		/* --log_output | -l */
+		{
+			int retval = command_run_linef(cmd_ctx, "log_output %s", optarg);
+			if (retval != ERROR_OK)
+				return retval;
+			break;
+		}
+		case 'c':		/* --command | -c */
+			add_config_command(optarg);
+			break;
+		case 'e':
+			if (optarg)
 			{
-				char *command = alloc_printf("script {%s}", optarg);
+				char *command = alloc_printf("set %s", optarg);
 				add_config_command(command);
 				free(command);
-				break;
 			}
-			case 's':		/* --search | -s */
-				add_script_search_dir(optarg);
-				break;
-			case 'd':		/* --debug | -d */
-			{
-				int retval = command_run_linef(cmd_ctx, "debug_level %s", optarg ? optarg : "3");
-				if (retval != ERROR_OK)
-					return retval;
-				break;
-			}
-			case 'l':		/* --log_output | -l */
-			{
-				int retval = command_run_linef(cmd_ctx, "log_output %s", optarg);
-				if (retval != ERROR_OK)
-					return retval;
-				break;
-			}
-			case 'c':		/* --command | -c */
-				add_config_command(optarg);
-				break;
-			case 'e':
-				if (optarg)
-				{
-					char *command = alloc_printf("set %s", optarg);
-					add_config_command(command);
-					free(command);
-				}
-				break;			
-			default:  /* '?' */
-				/* getopt will emit an error message, all we have to do is bail. */
-				return ERROR_FAIL;
+			break;			
+		default:  /* '?' */
+			/* getopt will emit an error message, all we have to do is bail. */
+			return ERROR_FAIL;
 		}
 	}
 

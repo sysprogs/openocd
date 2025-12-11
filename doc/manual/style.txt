@@ -22,17 +22,16 @@ providing documentation, either as part of the C code or stand-alone.
 
 - @subpage styledoxygen
 - @subpage styletexinfo
-- @subpage stylelatex
 
 Feedback would be welcome to improve the OpenOCD guidelines.
 
  */
-/** @page styletcl TCL Style Guide
+/** @page styletcl Tcl Style Guide
 
-OpenOCD needs to expand its Jim/TCL Style Guide.
+OpenOCD needs to expand its Jim Tcl Style Guide.
 
 Many of the guidelines listed on the @ref stylec page should apply to
-OpenOCD's Jim/TCL code as well.
+OpenOCD's Jim Tcl code as well.
 
  */
 /** @page stylec C Style Guide
@@ -46,7 +45,7 @@ OpenOCD project.
 - use TAB characters for indentation; do NOT use spaces.
 - displayed TAB width is 4 characters.
 - use Unix line endings ('\\n'); do NOT use DOS endings ('\\r\\n')
-- limit adjacent empty lines to at most two (2).
+- do NOT use multiple empty lines.
 - remove any trailing empty lines at the end of source files
 - do not "comment out" code from the tree nor put it within a block
   @code
@@ -450,13 +449,6 @@ to figure out how to use it is a bad sign, though it's OK to need to
 look at the User's guide to figure out what a config script is doing.
 
  */
-/** @page stylelatex LaTeX Style Guide
-
-This page needs to provide style guidelines for using LaTeX, the
-typesetting language used by The References for OpenOCD Hardware.
-Likewise, the @ref primerlatex for using this guide needs to be completed.
-
- */
 /** @page styleperl Perl Style Guide
 
 This page provides some style guidelines for using Perl, a scripting
@@ -510,7 +502,6 @@ documentation languages:
 - @ref stylec
 - @ref styledoxygen
 - @ref styletexinfo
-- @ref stylelatex
 - @ref styleperl
 - @ref styleautotools
 

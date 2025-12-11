@@ -80,15 +80,15 @@ static void fa526_read_core_regs_target_buffer(struct target *target,
 		if (mask & (1 << i))
 			/* nothing fetched, STM in MEMORY (i'th cycle) */
 			switch (size) {
-				case 4:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u32++, 4, be);
-					break;
-				case 2:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u16++, 2, be);
-					break;
-				case 1:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u8++, 1, be);
-					break;
+			case 4:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u32++, 4, be);
+				break;
+			case 2:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u16++, 2, be);
+				break;
+			case 1:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u8++, 1, be);
+				break;
 			}
 	}
 }
@@ -315,7 +315,7 @@ static int fa526_init_arch_info(struct target *target,
 	arm920t->armv4_5_mmu.disable_mmu_caches = arm920t_disable_mmu_caches;
 	arm920t->armv4_5_mmu.enable_mmu_caches = arm920t_enable_mmu_caches;
 	arm920t->armv4_5_mmu.has_tiny_pages = 1;
-	arm920t->armv4_5_mmu.mmu_enabled = 0;
+	arm920t->armv4_5_mmu.mmu_enabled = false;
 
 	/* disabling linefills leads to lockups, so keep them enabled for now
 	 * this doesn't affect correctness, but might affect timing issues, if
@@ -329,7 +329,7 @@ static int fa526_init_arch_info(struct target *target,
 	return ERROR_OK;
 }
 
-static int fa526_target_create(struct target *target, Jim_Interp *interp)
+static int fa526_target_create(struct target *target)
 {
 	struct arm920t_common *arm920t = calloc(1, sizeof(struct arm920t_common));
 

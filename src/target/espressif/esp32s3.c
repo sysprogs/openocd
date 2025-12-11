@@ -193,8 +193,8 @@ static int esp32s3_soc_reset(struct target *target)
 		xtensa_poll(target);
 		if (timeval_ms() >= timeout) {
 			LOG_TARGET_ERROR(target,
-				"Timed out waiting for CPU to be reset, target state=%d",
-				target->state);
+				"Timed out waiting for CPU to be reset, target state %s",
+				target_state_name(target));
 			get_timeout = true;
 			break;
 		}
@@ -320,7 +320,7 @@ static const struct esp_semihost_ops esp32s3_semihost_ops = {
 	.prepare = esp32s3_disable_wdts
 };
 
-static int esp32s3_target_create(struct target *target, Jim_Interp *interp)
+static int esp32s3_target_create(struct target *target)
 {
 	struct xtensa_debug_module_config esp32s3_dm_cfg = {
 		.dbg_ops = &esp32s3_dbg_ops,

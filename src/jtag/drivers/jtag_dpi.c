@@ -189,7 +189,7 @@ static int jtag_dpi_runtest(unsigned int num_cycles)
 		return ERROR_FAIL;
 	}
 	snprintf(buf, sizeof(buf), "ib %d\n", num_bits);
-	while (num_cycles > 0) {
+	for (unsigned int cycle = 0; cycle < num_cycles; cycle += num_bits + 6) {
 		ret = write_sock(buf, strlen(buf));
 		if (ret != ERROR_OK) {
 			LOG_ERROR("write_sock() fail, file %s, line %d",
@@ -208,8 +208,6 @@ static int jtag_dpi_runtest(unsigned int num_cycles)
 				__FILE__, __LINE__);
 			goto out;
 		}
-
-		num_cycles -= num_bits + 6;
 	}
 
 out:
@@ -398,7 +396,8 @@ static struct jtag_interface jtag_dpi_interface = {
 
 struct adapter_driver jtag_dpi_adapter_driver = {
 	.name = "jtag_dpi",
-	.transports = jtag_only,
+	.transport_ids = TRANSPORT_JTAG,
+	.transport_preferred_id = TRANSPORT_JTAG,
 	.commands = jtag_dpi_command_handlers,
 	.init = jtag_dpi_init,
 	.quit = jtag_dpi_quit,

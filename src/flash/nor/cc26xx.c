@@ -51,22 +51,22 @@ static uint32_t cc26xx_device_type(uint32_t icepick_id, uint32_t user_id)
 	uint32_t device_type = 0;
 
 	switch (icepick_id & ICEPICK_ID_MASK) {
-		case CC26X0_ICEPICK_ID:
-			device_type = CC26X0_TYPE;
-			break;
-		case CC26X1_ICEPICK_ID:
-			device_type = CC26X1_TYPE;
-			break;
-		case CC13X0_ICEPICK_ID:
-			device_type = CC13X0_TYPE;
-			break;
-		case CC13X2_CC26X2_ICEPICK_ID:
-		default:
-			if ((user_id & USER_ID_CC13_MASK) != 0)
-				device_type = CC13X2_TYPE;
-			else
-				device_type = CC26X2_TYPE;
-			break;
+	case CC26X0_ICEPICK_ID:
+		device_type = CC26X0_TYPE;
+		break;
+	case CC26X1_ICEPICK_ID:
+		device_type = CC26X1_TYPE;
+		break;
+	case CC13X0_ICEPICK_ID:
+		device_type = CC13X0_TYPE;
+		break;
+	case CC13X2_CC26X2_ICEPICK_ID:
+	default:
+		if ((user_id & USER_ID_CC13_MASK) != 0)
+			device_type = CC13X2_TYPE;
+		else
+			device_type = CC26X2_TYPE;
+		break;
 	}
 
 	return device_type;
@@ -77,17 +77,17 @@ static uint32_t cc26xx_sector_length(uint32_t icepick_id)
 	uint32_t sector_length;
 
 	switch (icepick_id & ICEPICK_ID_MASK) {
-		case CC26X0_ICEPICK_ID:
-		case CC26X1_ICEPICK_ID:
-		case CC13X0_ICEPICK_ID:
-			/* Chameleon family device */
-			sector_length = CC26X0_SECTOR_LENGTH;
-			break;
-		case CC13X2_CC26X2_ICEPICK_ID:
-		default:
-			/* Agama family device */
-			sector_length = CC26X2_SECTOR_LENGTH;
-			break;
+	case CC26X0_ICEPICK_ID:
+	case CC26X1_ICEPICK_ID:
+	case CC13X0_ICEPICK_ID:
+		/* Chameleon family device */
+		sector_length = CC26X0_SECTOR_LENGTH;
+		break;
+	case CC13X2_CC26X2_ICEPICK_ID:
+	default:
+		/* Agama family device */
+		sector_length = CC26X2_SECTOR_LENGTH;
+		break;
 	}
 
 	return sector_length;
@@ -112,10 +112,10 @@ static int cc26xx_wait_algo_done(struct flash_bank *bank, uint32_t params_addr)
 			return retval;
 
 		elapsed_ms = timeval_ms() - start_ms;
-		if (elapsed_ms > 500)
-			keep_alive();
 		if (elapsed_ms > FLASH_TIMEOUT)
 			break;
+
+		keep_alive();
 	};
 
 	if (status != CC26XX_BUFFER_EMPTY) {
@@ -321,8 +321,6 @@ static int cc26xx_write(struct flash_bank *bank, const uint8_t *buffer,
 	struct cc26xx_bank *cc26xx_bank = bank->driver_priv;
 	struct cc26xx_algo_params algo_params[2];
 	uint32_t size = 0;
-	long long start_ms;
-	long long elapsed_ms;
 	uint32_t address;
 
 	uint32_t index;
@@ -343,7 +341,6 @@ static int cc26xx_write(struct flash_bank *bank, const uint8_t *buffer,
 
 	/* Write requested data, ping-ponging between two buffers */
 	index = 0;
-	start_ms = timeval_ms();
 	address = bank->base + offset;
 	while (count > 0) {
 
@@ -381,9 +378,7 @@ static int cc26xx_write(struct flash_bank *bank, const uint8_t *buffer,
 		buffer += size;
 		address += size;
 
-		elapsed_ms = timeval_ms() - start_ms;
-		if (elapsed_ms > 500)
-			keep_alive();
+		keep_alive();
 	}
 
 	/* If no error yet, wait for last buffer to finish */
@@ -427,31 +422,31 @@ static int cc26xx_probe(struct flash_bank *bank)
 
 	/* Set up appropriate flash helper algorithm */
 	switch (cc26xx_bank->icepick_id & ICEPICK_ID_MASK) {
-		case CC26X0_ICEPICK_ID:
-		case CC26X1_ICEPICK_ID:
-		case CC13X0_ICEPICK_ID:
-			/* Chameleon family device */
-			cc26xx_bank->algo_code = cc26x0_algo;
-			cc26xx_bank->algo_size = sizeof(cc26x0_algo);
-			cc26xx_bank->algo_working_size = CC26X0_WORKING_SIZE;
-			cc26xx_bank->buffer_addr[0] = CC26X0_ALGO_BUFFER_0;
-			cc26xx_bank->buffer_addr[1] = CC26X0_ALGO_BUFFER_1;
-			cc26xx_bank->params_addr[0] = CC26X0_ALGO_PARAMS_0;
-			cc26xx_bank->params_addr[1] = CC26X0_ALGO_PARAMS_1;
-			max_sectors = CC26X0_MAX_SECTORS;
-			break;
-		case CC13X2_CC26X2_ICEPICK_ID:
-		default:
-			/* Agama family device */
-			cc26xx_bank->algo_code = cc26x2_algo;
-			cc26xx_bank->algo_size = sizeof(cc26x2_algo);
-			cc26xx_bank->algo_working_size = CC26X2_WORKING_SIZE;
-			cc26xx_bank->buffer_addr[0] = CC26X2_ALGO_BUFFER_0;
-			cc26xx_bank->buffer_addr[1] = CC26X2_ALGO_BUFFER_1;
-			cc26xx_bank->params_addr[0] = CC26X2_ALGO_PARAMS_0;
-			cc26xx_bank->params_addr[1] = CC26X2_ALGO_PARAMS_1;
-			max_sectors = CC26X2_MAX_SECTORS;
-			break;
+	case CC26X0_ICEPICK_ID:
+	case CC26X1_ICEPICK_ID:
+	case CC13X0_ICEPICK_ID:
+		/* Chameleon family device */
+		cc26xx_bank->algo_code = cc26x0_algo;
+		cc26xx_bank->algo_size = sizeof(cc26x0_algo);
+		cc26xx_bank->algo_working_size = CC26X0_WORKING_SIZE;
+		cc26xx_bank->buffer_addr[0] = CC26X0_ALGO_BUFFER_0;
+		cc26xx_bank->buffer_addr[1] = CC26X0_ALGO_BUFFER_1;
+		cc26xx_bank->params_addr[0] = CC26X0_ALGO_PARAMS_0;
+		cc26xx_bank->params_addr[1] = CC26X0_ALGO_PARAMS_1;
+		max_sectors = CC26X0_MAX_SECTORS;
+		break;
+	case CC13X2_CC26X2_ICEPICK_ID:
+	default:
+		/* Agama family device */
+		cc26xx_bank->algo_code = cc26x2_algo;
+		cc26xx_bank->algo_size = sizeof(cc26x2_algo);
+		cc26xx_bank->algo_working_size = CC26X2_WORKING_SIZE;
+		cc26xx_bank->buffer_addr[0] = CC26X2_ALGO_BUFFER_0;
+		cc26xx_bank->buffer_addr[1] = CC26X2_ALGO_BUFFER_1;
+		cc26xx_bank->params_addr[0] = CC26X2_ALGO_PARAMS_0;
+		cc26xx_bank->params_addr[1] = CC26X2_ALGO_PARAMS_1;
+		max_sectors = CC26X2_MAX_SECTORS;
+		break;
 	}
 
 	retval = target_read_u32(target, CC26XX_FLASH_SIZE_INFO, &value);
@@ -505,25 +500,25 @@ static int cc26xx_info(struct flash_bank *bank, struct command_invocation *cmd)
 	const char *device;
 
 	switch (cc26xx_bank->device_type) {
-		case CC26X0_TYPE:
-			device = "CC26x0";
-			break;
-		case CC26X1_TYPE:
-			device = "CC26x1";
-			break;
-		case CC13X0_TYPE:
-			device = "CC13x0";
-			break;
-		case CC13X2_TYPE:
-			device = "CC13x2";
-			break;
-		case CC26X2_TYPE:
-			device = "CC26x2";
-			break;
-		case CC26XX_NO_TYPE:
-		default:
-			device = "Unrecognized";
-			break;
+	case CC26X0_TYPE:
+		device = "CC26x0";
+		break;
+	case CC26X1_TYPE:
+		device = "CC26x1";
+		break;
+	case CC13X0_TYPE:
+		device = "CC13x0";
+		break;
+	case CC13X2_TYPE:
+		device = "CC13x2";
+		break;
+	case CC26X2_TYPE:
+		device = "CC26x2";
+		break;
+	case CC26XX_NO_TYPE:
+	default:
+		device = "Unrecognized";
+		break;
 	}
 
 	command_print_sameline(cmd,

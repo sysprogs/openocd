@@ -12,6 +12,7 @@
 
 #include "arm920t.h"
 #include <helper/time_support.h>
+#include <helper/string_choices.h>
 #include "target_type.h"
 #include "register.h"
 #include "arm_opcodes.h"
@@ -425,12 +426,11 @@ int arm920t_post_debug_entry(struct target *target)
 			&arm920t->armv4_5_mmu.armv4_5_cache);
 	}
 
-	arm920t->armv4_5_mmu.mmu_enabled =
-		(arm920t->cp15_control_reg & 0x1U) ? 1 : 0;
+	arm920t->armv4_5_mmu.mmu_enabled = arm920t->cp15_control_reg & 0x1U;
 	arm920t->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled =
-		(arm920t->cp15_control_reg & 0x4U) ? 1 : 0;
+		arm920t->cp15_control_reg & 0x4U;
 	arm920t->armv4_5_mmu.armv4_5_cache.i_cache_enabled =
-		(arm920t->cp15_control_reg & 0x1000U) ? 1 : 0;
+		arm920t->cp15_control_reg & 0x1000U;
 
 	/* save i/d fault status and address register
 	 * FIXME use opcode macros */
@@ -510,10 +510,6 @@ static int arm920t_verify_pointer(struct command_invocation *cmd,
 /** Logs summary of ARM920 state for a halted target. */
 int arm920t_arch_state(struct target *target)
 {
-	static const char *state[] = {
-		"disabled", "enabled"
-	};
-
 	struct arm920t_common *arm920t = target_to_arm920(target);
 
 	if (arm920t->common_magic != ARM920T_COMMON_MAGIC) {
@@ -523,14 +519,14 @@ int arm920t_arch_state(struct target *target)
 
 	arm_arch_state(target);
 	LOG_USER("MMU: %s, D-Cache: %s, I-Cache: %s",
-		state[arm920t->armv4_5_mmu.mmu_enabled],
-		state[arm920t->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled],
-		state[arm920t->armv4_5_mmu.armv4_5_cache.i_cache_enabled]);
+		str_enabled_disabled(arm920t->armv4_5_mmu.mmu_enabled),
+		str_enabled_disabled(arm920t->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled),
+		str_enabled_disabled(arm920t->armv4_5_mmu.armv4_5_cache.i_cache_enabled));
 
 	return ERROR_OK;
 }
 
-static int arm920_mmu(struct target *target, int *enabled)
+static int arm920_mmu(struct target *target, bool *enabled)
 {
 	if (target->state != TARGET_HALTED) {
 		LOG_TARGET_ERROR(target, "not halted");
@@ -750,7 +746,7 @@ int arm920t_soft_reset_halt(struct target *target)
 				return retval;
 		} else
 			break;
-		if (debug_level >= 3) {
+		if (LOG_LEVEL_IS(LOG_LVL_DEBUG)) {
 			/* do not eat all CPU, time out after 1 se*/
 			alive_sleep(100);
 		} else
@@ -778,9 +774,9 @@ int arm920t_soft_reset_halt(struct target *target)
 	arm->pc->valid = true;
 
 	arm920t_disable_mmu_caches(target, 1, 1, 1);
-	arm920t->armv4_5_mmu.mmu_enabled = 0;
-	arm920t->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled = 0;
-	arm920t->armv4_5_mmu.armv4_5_cache.i_cache_enabled = 0;
+	arm920t->armv4_5_mmu.mmu_enabled = false;
+	arm920t->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled = false;
+	arm920t->armv4_5_mmu.armv4_5_cache.i_cache_enabled = false;
 
 	return target_call_event_callbacks(target, TARGET_EVENT_HALTED);
 }
@@ -819,7 +815,7 @@ static int arm920t_init_arch_info(struct target *target,
 	arm920t->armv4_5_mmu.disable_mmu_caches = arm920t_disable_mmu_caches;
 	arm920t->armv4_5_mmu.enable_mmu_caches = arm920t_enable_mmu_caches;
 	arm920t->armv4_5_mmu.has_tiny_pages = 1;
-	arm920t->armv4_5_mmu.mmu_enabled = 0;
+	arm920t->armv4_5_mmu.mmu_enabled = false;
 
 	/* disabling linefills leads to lockups, so keep them enabled for now
 	 * this doesn't affect correctness, but might affect timing issues, if
@@ -833,7 +829,7 @@ static int arm920t_init_arch_info(struct target *target,
 	return ERROR_OK;
 }
 
-static int arm920t_target_create(struct target *target, Jim_Interp *interp)
+static int arm920t_target_create(struct target *target)
 {
 	struct arm920t_common *arm920t;
 

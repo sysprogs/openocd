@@ -104,7 +104,7 @@ struct usb_endpoint_descriptor {
 struct usb_language_descriptor {
 	uint8_t blength;		/**< Size of this descriptor in bytes. */
 	uint8_t bdescriptortype;	/**< STRING descriptor type. */
-	uint16_t wlangid[];		/**< LANGID codes. */
+	uint16_t wlangid;		/**< LANGID codes. */
 };
 
 /** USB String Descriptor. See USB 2.0 Spec */
@@ -124,12 +124,6 @@ struct setup_data {
 	uint16_t windex;		/**< Field that varies according to request. */
 	uint16_t wlength;		/**< Number of bytes to transfer in data stage. */
 };
-
-/* External declarations for variables that need to be accessed outside of
- * the USB module */
-extern volatile bool ep1_out;
-extern volatile bool ep1_in;
-extern volatile bool ep6_out;
 
 extern volatile __xdata __at 0xE6B8 struct setup_data setup_data;
 
@@ -278,8 +272,8 @@ bool usb_handle_set_feature(void);
 bool usb_handle_get_descriptor(void);
 void usb_handle_set_interface(void);
 void usb_handle_setup_data(void);
-void usb_handle_i2c_in(void);
-void usb_handle_i2c_out(void);
+bool usb_handle_vcommands(void);
+void set_gpif_cnt(uint32_t count);
 
 void i2c_recieve(void);
 void ep_init(void);

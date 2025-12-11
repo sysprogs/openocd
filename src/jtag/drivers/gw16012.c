@@ -284,46 +284,46 @@ static int gw16012_execute_queue(struct jtag_command *cmd_queue)
 
 	while (cmd) {
 		switch (cmd->type) {
-			case JTAG_RESET:
-				LOG_DEBUG_IO("reset trst: %i srst %i", cmd->cmd.reset->trst, cmd->cmd.reset->srst);
-				if (cmd->cmd.reset->trst == 1)
-					tap_set_state(TAP_RESET);
-				gw16012_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
-				break;
-			case JTAG_RUNTEST:
-				LOG_DEBUG_IO("runtest %u cycles, end in %i", cmd->cmd.runtest->num_cycles,
-						cmd->cmd.runtest->end_state);
-				gw16012_end_state(cmd->cmd.runtest->end_state);
-				gw16012_runtest(cmd->cmd.runtest->num_cycles);
-				break;
-			case JTAG_TLR_RESET:
-				LOG_DEBUG_IO("statemove end in %i", cmd->cmd.statemove->end_state);
-				gw16012_end_state(cmd->cmd.statemove->end_state);
-				gw16012_state_move();
-				break;
-			case JTAG_PATHMOVE:
-				LOG_DEBUG_IO("pathmove: %i states, end in %i", cmd->cmd.pathmove->num_states,
-						cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]);
-				gw16012_path_move(cmd->cmd.pathmove);
-				break;
-			case JTAG_SCAN:
-				gw16012_end_state(cmd->cmd.scan->end_state);
-				scan_size = jtag_build_buffer(cmd->cmd.scan, &buffer);
-				type = jtag_scan_type(cmd->cmd.scan);
-				LOG_DEBUG_IO("%s scan (%i) %i bit end in %i", (cmd->cmd.scan->ir_scan) ? "ir" : "dr",
-					type, scan_size, cmd->cmd.scan->end_state);
-				gw16012_scan(cmd->cmd.scan->ir_scan, type, buffer, scan_size);
-				if (jtag_read_buffer(buffer, cmd->cmd.scan) != ERROR_OK)
-					retval = ERROR_JTAG_QUEUE_FAILED;
-				free(buffer);
-				break;
-			case JTAG_SLEEP:
-				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
-				jtag_sleep(cmd->cmd.sleep->us);
-				break;
-			default:
-				LOG_ERROR("BUG: unknown JTAG command type encountered");
-				exit(-1);
+		case JTAG_RESET:
+			LOG_DEBUG_IO("reset trst: %i srst %i", cmd->cmd.reset->trst, cmd->cmd.reset->srst);
+			if (cmd->cmd.reset->trst == 1)
+				tap_set_state(TAP_RESET);
+			gw16012_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
+			break;
+		case JTAG_RUNTEST:
+			LOG_DEBUG_IO("runtest %u cycles, end in %i", cmd->cmd.runtest->num_cycles,
+					cmd->cmd.runtest->end_state);
+			gw16012_end_state(cmd->cmd.runtest->end_state);
+			gw16012_runtest(cmd->cmd.runtest->num_cycles);
+			break;
+		case JTAG_TLR_RESET:
+			LOG_DEBUG_IO("statemove end in %i", cmd->cmd.statemove->end_state);
+			gw16012_end_state(cmd->cmd.statemove->end_state);
+			gw16012_state_move();
+			break;
+		case JTAG_PATHMOVE:
+			LOG_DEBUG_IO("pathmove: %i states, end in %i", cmd->cmd.pathmove->num_states,
+					cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]);
+			gw16012_path_move(cmd->cmd.pathmove);
+			break;
+		case JTAG_SCAN:
+			gw16012_end_state(cmd->cmd.scan->end_state);
+			scan_size = jtag_build_buffer(cmd->cmd.scan, &buffer);
+			type = jtag_scan_type(cmd->cmd.scan);
+			LOG_DEBUG_IO("%s scan (%i) %i bit end in %i", (cmd->cmd.scan->ir_scan) ? "ir" : "dr",
+				type, scan_size, cmd->cmd.scan->end_state);
+			gw16012_scan(cmd->cmd.scan->ir_scan, type, buffer, scan_size);
+			if (jtag_read_buffer(buffer, cmd->cmd.scan) != ERROR_OK)
+				retval = ERROR_JTAG_QUEUE_FAILED;
+			free(buffer);
+			break;
+		case JTAG_SLEEP:
+			LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
+			jtag_sleep(cmd->cmd.sleep->us);
+			break;
+		default:
+			LOG_ERROR("BUG: unknown JTAG command type encountered");
+			exit(-1);
 		}
 		cmd = cmd->next;
 	}
@@ -461,6 +461,8 @@ static int gw16012_init(void)
 {
 	uint8_t status_port;
 
+	LOG_WARNING("This adapter is deprecated and support will be removed in the next release!");
+
 	if (gw16012_init_device() != ERROR_OK)
 		return ERROR_JTAG_INIT_FAILED;
 
@@ -514,7 +516,8 @@ static struct jtag_interface gw16012_interface = {
 
 struct adapter_driver gw16012_adapter_driver = {
 	.name = "gw16012",
-	.transports = jtag_only,
+	.transport_ids = TRANSPORT_JTAG,
+	.transport_preferred_id = TRANSPORT_JTAG,
 	.commands = gw16012_command_handlers,
 
 	.init = gw16012_init,

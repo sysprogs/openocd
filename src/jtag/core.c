@@ -967,60 +967,60 @@ int default_interface_jtag_execute_queue(void)
 	struct jtag_command *cmd = jtag_command_queue_get();
 	int result = adapter_driver->jtag_ops->execute_queue(cmd);
 
-	while (debug_level >= LOG_LVL_DEBUG_IO && cmd) {
+	while (LOG_LEVEL_IS(LOG_LVL_DEBUG_IO) && cmd) {
 		switch (cmd->type) {
-			case JTAG_SCAN:
-				LOG_DEBUG_IO("JTAG %s SCAN to %s",
-						cmd->cmd.scan->ir_scan ? "IR" : "DR",
-						tap_state_name(cmd->cmd.scan->end_state));
-				for (unsigned int i = 0; i < cmd->cmd.scan->num_fields; i++) {
-					struct scan_field *field = cmd->cmd.scan->fields + i;
-					if (field->out_value) {
-						char *str = buf_to_hex_str(field->out_value, field->num_bits);
-						LOG_DEBUG_IO("  %ub out: %s", field->num_bits, str);
-						free(str);
-					}
-					if (field->in_value) {
-						char *str = buf_to_hex_str(field->in_value, field->num_bits);
-						LOG_DEBUG_IO("  %ub  in: %s", field->num_bits, str);
-						free(str);
-					}
+		case JTAG_SCAN:
+			LOG_DEBUG_IO("JTAG %s SCAN to %s",
+					cmd->cmd.scan->ir_scan ? "IR" : "DR",
+					tap_state_name(cmd->cmd.scan->end_state));
+			for (unsigned int i = 0; i < cmd->cmd.scan->num_fields; i++) {
+				struct scan_field *field = cmd->cmd.scan->fields + i;
+				if (field->out_value) {
+					char *str = buf_to_hex_str(field->out_value, field->num_bits);
+					LOG_DEBUG_IO("  %ub out: %s", field->num_bits, str);
+					free(str);
 				}
-				break;
-			case JTAG_TLR_RESET:
-				LOG_DEBUG_IO("JTAG TLR RESET to %s",
-						tap_state_name(cmd->cmd.statemove->end_state));
-				break;
-			case JTAG_RUNTEST:
-				LOG_DEBUG_IO("JTAG RUNTEST %d cycles to %s",
-						cmd->cmd.runtest->num_cycles,
-						tap_state_name(cmd->cmd.runtest->end_state));
-				break;
-			case JTAG_RESET:
-				{
-					const char *reset_str[3] = {
-						"leave", "deassert", "assert"
-					};
-					LOG_DEBUG_IO("JTAG RESET %s TRST, %s SRST",
-							reset_str[cmd->cmd.reset->trst + 1],
-							reset_str[cmd->cmd.reset->srst + 1]);
+				if (field->in_value) {
+					char *str = buf_to_hex_str(field->in_value, field->num_bits);
+					LOG_DEBUG_IO("  %ub  in: %s", field->num_bits, str);
+					free(str);
 				}
-				break;
-			case JTAG_PATHMOVE:
-				LOG_DEBUG_IO("JTAG PATHMOVE (TODO)");
-				break;
-			case JTAG_SLEEP:
-				LOG_DEBUG_IO("JTAG SLEEP (TODO)");
-				break;
-			case JTAG_STABLECLOCKS:
-				LOG_DEBUG_IO("JTAG STABLECLOCKS (TODO)");
-				break;
-			case JTAG_TMS:
-				LOG_DEBUG_IO("JTAG TMS (TODO)");
-				break;
-			default:
-				LOG_ERROR("Unknown JTAG command: %d", cmd->type);
-				break;
+			}
+			break;
+		case JTAG_TLR_RESET:
+			LOG_DEBUG_IO("JTAG TLR RESET to %s",
+					tap_state_name(cmd->cmd.statemove->end_state));
+			break;
+		case JTAG_RUNTEST:
+			LOG_DEBUG_IO("JTAG RUNTEST %d cycles to %s",
+					cmd->cmd.runtest->num_cycles,
+					tap_state_name(cmd->cmd.runtest->end_state));
+			break;
+		case JTAG_RESET:
+			{
+				const char *reset_str[3] = {
+					"leave", "deassert", "assert"
+				};
+				LOG_DEBUG_IO("JTAG RESET %s TRST, %s SRST",
+						reset_str[cmd->cmd.reset->trst + 1],
+						reset_str[cmd->cmd.reset->srst + 1]);
+			}
+			break;
+		case JTAG_PATHMOVE:
+			LOG_DEBUG_IO("JTAG PATHMOVE (TODO)");
+			break;
+		case JTAG_SLEEP:
+			LOG_DEBUG_IO("JTAG SLEEP (TODO)");
+			break;
+		case JTAG_STABLECLOCKS:
+			LOG_DEBUG_IO("JTAG STABLECLOCKS (TODO)");
+			break;
+		case JTAG_TMS:
+			LOG_DEBUG_IO("JTAG TMS (TODO)");
+			break;
+		default:
+			LOG_ERROR("Unknown JTAG command: %d", cmd->type);
+			break;
 		}
 		cmd = cmd->next;
 	}
@@ -1551,22 +1551,22 @@ int jtag_init_inner(struct command_context *cmd_ctx)
 	 */
 	retval = jtag_examine_chain();
 	switch (retval) {
-		case ERROR_OK:
-			/* complete success */
-			break;
-		default:
-			/* For backward compatibility reasons, try coping with
-			 * configuration errors involving only ID mismatches.
-			 * We might be able to talk to the devices.
-			 *
-			 * Also the device might be powered down during startup.
-			 *
-			 * After OpenOCD starts, we can try to power on the device
-			 * and run a reset.
-			 */
-			LOG_ERROR("Trying to use configured scan chain anyway...");
-			issue_setup = false;
-			break;
+	case ERROR_OK:
+		/* complete success */
+		break;
+	default:
+		/* For backward compatibility reasons, try coping with
+		 * configuration errors involving only ID mismatches.
+		 * We might be able to talk to the devices.
+		 *
+		 * Also the device might be powered down during startup.
+		 *
+		 * After OpenOCD starts, we can try to power on the device
+		 * and run a reset.
+		 */
+		LOG_ERROR("Trying to use configured scan chain anyway...");
+		issue_setup = false;
+		break;
 	}
 
 	/* Now look at IR values.  Problems here will prevent real
@@ -1823,7 +1823,7 @@ static int jtag_select(struct command_context *ctx)
 }
 
 static struct transport jtag_transport = {
-	.name = "jtag",
+	.id = TRANSPORT_JTAG,
 	.select = jtag_select,
 	.init = jtag_init,
 };
@@ -1868,7 +1868,7 @@ int adapter_resets(int trst, int srst)
 			   transport_is_swim()) {
 		if (trst == TRST_ASSERT) {
 			LOG_ERROR("transport %s has no trst signal",
-				get_current_transport()->name);
+				get_current_transport_name());
 			return ERROR_FAIL;
 		}
 
@@ -1884,7 +1884,7 @@ int adapter_resets(int trst, int srst)
 		return ERROR_OK;
 
 	LOG_ERROR("reset is not supported on transport %s",
-		get_current_transport()->name);
+		get_current_transport_name());
 
 	return ERROR_FAIL;
 }
@@ -1903,7 +1903,7 @@ int adapter_assert_reset(void)
 		return adapter_system_reset(1);
 	else if (get_current_transport())
 		LOG_ERROR("reset is not supported on %s",
-			get_current_transport()->name);
+			get_current_transport_name());
 	else
 		LOG_ERROR("transport is not selected");
 	return ERROR_FAIL;
@@ -1920,7 +1920,7 @@ int adapter_deassert_reset(void)
 		return adapter_system_reset(0);
 	else if (get_current_transport())
 		LOG_ERROR("reset is not supported on %s",
-			get_current_transport()->name);
+			get_current_transport_name());
 	else
 		LOG_ERROR("transport is not selected");
 	return ERROR_FAIL;

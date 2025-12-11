@@ -12,14 +12,26 @@
 #include "delay.h"
 #include "reg_ezusb.h"
 
+bool get_status(void)
+{
+	PIN_SDA_DIR = 1;
+	OEA = 0xF7;
+	delay_us(1);
+	bool sda_state = PIN_SDA;
+	PIN_T0 = sda_state;
+	delay_us(1);
+	OEA = 0xFF;
+	delay_us(1);
+	return sda_state;
+}
+
 void start_cd(void)
 {
-	PIN_SCL_DIR = 0;
-	PIN_SDA_DIR = 0;
+	PIN_SDA_DIR = 0;    // SP6 SDA: OUT
 	delay_us(10);
-	PIN_SDA = 0; //SDA = 1;
+	PIN_SDA = 0;
 	delay_us(1);
-	PIN_SCL = 0; //SCL = 1;
+	PIN_SCL = 0;
 	delay_us(1);
 }
 
@@ -43,9 +55,7 @@ void stop_cd(void)
 	delay_us(1);
 	PIN_SDA = 1;
 	delay_us(1);
-	PIN_SDA_DIR = 1;
-	delay_us(1);
-	PIN_SCL_DIR = 1;
+	PIN_SDA_DIR = 1;    // SP6 SDA: IN
 	delay_us(1);
 }
 
@@ -79,16 +89,16 @@ void send_nack(void)
 
 bool get_ack(void)
 {
-	PIN_SDA_DIR = 1;
+	PIN_SDA_DIR = 1;    // SP6 SDA: IN
 	delay_us(1);
-	OED = 0xFE;
+	OEA = 0xF7;         // FX2 SDA: IN
 	PIN_SCL = 1;
 	delay_us(1);
 	bool ack = PIN_SDA;
 	PIN_SCL = 0;
 	delay_us(1);
-	OED = 0xFF;
-	PIN_SDA_DIR = 0;
+	OEA = 0xFF;         // FX2 SDA: OUT
+	PIN_SDA_DIR = 0;    // SP6 SDA: OUT
 	delay_us(1);
 	return ack;
 }
@@ -123,8 +133,8 @@ void send_byte(uint8_t input)
 
 uint8_t receive_byte(void)
 {
-	PIN_SDA_DIR = 1;    //FX2 <-- FPGA
-	OED = 0xFE;
+	PIN_SDA_DIR = 1;    // SP6 SDA: IN
+	OEA = 0xF7;         // FX2 SDA: IN
 	uint8_t input = 0x00;
 	for (uint8_t i = 0; i < 8; i++) {
 		PIN_SCL = 1;
@@ -138,7 +148,7 @@ uint8_t receive_byte(void)
 		PIN_SCL = 0;
 		delay_us(1);
 	}
-	OED = 0xFF;
-	PIN_SDA_DIR = 0;
+	OEA = 0xFF;         // FX2 SDA: OUT
+	PIN_SDA_DIR = 0;    // SP6 SDA: OUT
 	return input;
 }

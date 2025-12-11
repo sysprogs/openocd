@@ -58,21 +58,21 @@ struct armv7a_arch_cache {
 
 /* common cache information */
 struct armv7a_cache_common {
-	int info;				/* -1 invalid, else valid */
+	bool info_valid;
 	int loc;				/* level of coherency */
 	uint32_t dminline;			/* minimum d-cache linelen */
 	uint32_t iminline;			/* minimum i-cache linelen */
 	struct armv7a_arch_cache arch[6];	/* cache info, L1 - L7 */
-	int i_cache_enabled;
-	int d_u_cache_enabled;
+	bool i_cache_enabled;
+	bool d_u_cache_enabled;
 	/* outer unified cache if some */
-	void *outer_cache;
+	struct armv7a_l2x_cache *outer_cache;
 	int (*flush_all_data_cache)(struct target *target);
 };
 
 struct armv7a_mmu_common {
 	/* following field mmu working way */
-	int32_t cached;     /* 0: not initialized, 1: initialized */
+	bool cached;
 	uint32_t ttbcr;     /* cache for ttbcr register */
 	uint32_t ttbr[2];
 	uint32_t ttbr_mask[2];
@@ -81,7 +81,7 @@ struct armv7a_mmu_common {
 	int (*read_physical_memory)(struct target *target, target_addr_t address, uint32_t size,
 			uint32_t count, uint8_t *buffer);
 	struct armv7a_cache_common armv7a_cache;
-	uint32_t mmu_enabled;
+	bool mmu_enabled;
 };
 
 struct armv7a_common {

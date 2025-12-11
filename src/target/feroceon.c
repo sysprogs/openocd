@@ -191,15 +191,15 @@ static void feroceon_read_core_regs_target_buffer(struct target *target,
 	for (i = 0; i <= 15; i++) {
 		if (mask & (1 << i)) {
 			switch (size) {
-				case 4:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u32++, 4, be);
-					break;
-				case 2:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u16++, 2, be);
-					break;
-				case 1:
-					arm9tdmi_clock_data_in_endianness(jtag_info, buf_u8++, 1, be);
-					break;
+			case 4:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u32++, 4, be);
+				break;
+			case 2:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u16++, 2, be);
+				break;
+			case 1:
+				arm9tdmi_clock_data_in_endianness(jtag_info, buf_u8++, 1, be);
+				break;
 			}
 		}
 	}
@@ -555,7 +555,7 @@ static int feroceon_bulk_write_memory(struct target *target,
 		if (endaddress != address + count*4) {
 			LOG_ERROR("DCC write failed,"
 				" expected end address 0x%08" TARGET_PRIxADDR
-				" got 0x%0" PRIx32 "",
+				" got 0x%0" PRIx32,
 				address + count*4, endaddress);
 			retval = ERROR_FAIL;
 		}
@@ -622,7 +622,7 @@ static void feroceon_common_setup(struct target *target)
 	arm7_9->wp1_used_default = -1;
 }
 
-static int feroceon_target_create(struct target *target, Jim_Interp *interp)
+static int feroceon_target_create(struct target *target)
 {
 	struct arm926ejs_common *arm926ejs = calloc(1, sizeof(struct arm926ejs_common));
 
@@ -640,7 +640,7 @@ static int feroceon_target_create(struct target *target, Jim_Interp *interp)
 	return ERROR_OK;
 }
 
-static int dragonite_target_create(struct target *target, Jim_Interp *interp)
+static int dragonite_target_create(struct target *target)
 {
 	struct arm966e_common *arm966e = calloc(1, sizeof(struct arm966e_common));
 

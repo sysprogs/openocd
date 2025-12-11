@@ -75,20 +75,20 @@ static int log_target_callback_event_handler(struct target *target,
 	void *priv)
 {
 	switch (event) {
-		case TARGET_EVENT_GDB_START:
-			target->verbose_halt_msg = false;
-			break;
-		case TARGET_EVENT_GDB_END:
-			target->verbose_halt_msg = true;
-			break;
-		case TARGET_EVENT_HALTED:
-			if (target->verbose_halt_msg) {
-				/* do not display information when debugger caused the halt */
-				target_arch_state(target);
-			}
-			break;
-		default:
-			break;
+	case TARGET_EVENT_GDB_START:
+		target->verbose_halt_msg = false;
+		break;
+	case TARGET_EVENT_GDB_END:
+		target->verbose_halt_msg = true;
+		break;
+	case TARGET_EVENT_HALTED:
+		if (target->verbose_halt_msg) {
+			/* do not display information when debugger caused the halt */
+			target_arch_state(target);
+		}
+		break;
+	default:
+		break;
 	}
 
 	return ERROR_OK;
@@ -170,7 +170,8 @@ COMMAND_HANDLER(handle_init_command)
 	jtag_poll_unmask(save_poll_mask);
 
 	/* initialize telnet subsystem */
-	gdb_target_add_all(all_targets);
+	if (gdb_target_add_all(all_targets) != ERROR_OK)
+		return ERROR_FAIL;
 
 	target_register_event_callback(log_target_callback_event_handler, CMD_CTX);
 

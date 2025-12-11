@@ -237,9 +237,11 @@ struct flash_driver {
  */
 const struct flash_driver *flash_driver_find_by_name(const char *name);
 
+// Keep in alphabetic order this list of drivers
 extern const struct flash_driver aduc702x_flash;
 extern const struct flash_driver aducm360_flash;
 extern const struct flash_driver ambiqmicro_flash;
+extern const struct flash_driver artery_flash;
 extern const struct flash_driver at91sam3_flash;
 extern const struct flash_driver at91sam4_flash;
 extern const struct flash_driver at91sam4l_flash;
@@ -291,7 +293,7 @@ extern const struct flash_driver psoc6_flash;
 extern const struct flash_driver qn908x_flash;
 extern const struct flash_driver rs14100_flash;
 extern const struct flash_driver renesas_rpchf_flash;
-extern const struct flash_driver rp2040_flash;
+extern const struct flash_driver rp2xxx_flash;
 extern const struct flash_driver rsl10_flash;
 extern const struct flash_driver sh_qspi_flash;
 extern const struct flash_driver sim3x_flash;

@@ -113,7 +113,7 @@ static void log_puts(enum log_levels level,
 	if (f)
 		file = f + 1;
 
-	if (debug_level >= LOG_LVL_DEBUG) {
+	if (LOG_LEVEL_IS(LOG_LVL_DEBUG)) {
 		/* print with count and time information */
 		int64_t t = timeval_ms() - start;
 #ifdef _DEBUG_FREE_SPACE_
@@ -207,18 +207,19 @@ void log_printf_lf(enum log_levels level,
 
 COMMAND_HANDLER(handle_debug_level_command)
 {
-	if (CMD_ARGC == 1) {
+	if (!CMD_ARGC) {
+		command_print(CMD, "%i", debug_level);
+	} else if (CMD_ARGC == 1) {
 		int new_level;
 		COMMAND_PARSE_NUMBER(int, CMD_ARGV[0], new_level);
 		if ((new_level > LOG_LVL_DEBUG_IO) || (new_level < LOG_LVL_SILENT)) {
-			LOG_ERROR("level must be between %d and %d", LOG_LVL_SILENT, LOG_LVL_DEBUG_IO);
-			return ERROR_COMMAND_SYNTAX_ERROR;
+			command_print(CMD, "level must be between %d and %d", LOG_LVL_SILENT, LOG_LVL_DEBUG_IO);
+			return ERROR_COMMAND_ARGUMENT_INVALID;
 		}
 		debug_level = new_level;
-	} else if (CMD_ARGC > 1)
+	} else {
 		return ERROR_COMMAND_SYNTAX_ERROR;
-
-	command_print(CMD, "debug_level: %i", debug_level);
+	}
 
 	return ERROR_OK;
 }
@@ -261,11 +262,11 @@ static const struct command_registration log_command_handlers[] = {
 		.name = "debug_level",
 		.handler = handle_debug_level_command,
 		.mode = COMMAND_ANY,
-		.help = "Sets the verbosity level of debugging output. "
+		.help = "Sets or display the verbosity level of debugging output. "
 			"0 shows errors only; 1 adds warnings; "
 			"2 (default) adds other info; 3 adds debugging; "
 			"4 adds extra verbose debugging.",
-		.usage = "number",
+		.usage = "[number]",
 	},
 	COMMAND_REGISTRATION_DONE
 };
@@ -352,6 +353,8 @@ char *alloc_vprintf(const char *fmt, va_list ap)
 	va_list ap_copy;
 	int len;
 	char *string;
+
+	assert(fmt);
 
 	/* determine the length of the buffer needed */
 	va_copy(ap_copy, ap);

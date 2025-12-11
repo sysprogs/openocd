@@ -193,44 +193,41 @@ static void at91sam7_read_clock_info(struct flash_bank *bank)
 	at91sam7_info->mck_valid = 0;
 	at91sam7_info->mck_freq = 0;
 	switch (mckr & PMC_MCKR_CSS) {
-		case 0:			/* Slow Clock */
+	case 0:			/* Slow Clock */
+		at91sam7_info->mck_valid = 1;
+		tmp = RC_FREQ;
+		break;
+
+	case 1:			/* Main Clock */
+		if ((mcfr & CKGR_MCFR_MAINRDY) && at91sam7_info->ext_freq == 0) {
 			at91sam7_info->mck_valid = 1;
-			tmp = RC_FREQ;
-			break;
+			tmp = RC_FREQ / 16ul * (mcfr & 0xffff);
+		} else if (at91sam7_info->ext_freq != 0) {
+			at91sam7_info->mck_valid = 1;
+			tmp = at91sam7_info->ext_freq;
+		}
+		break;
 
-		case 1:			/* Main Clock */
-			if ((mcfr & CKGR_MCFR_MAINRDY) &&
-			(at91sam7_info->ext_freq == 0)) {
-				at91sam7_info->mck_valid = 1;
-				tmp = RC_FREQ / 16ul * (mcfr & 0xffff);
-			} else if (at91sam7_info->ext_freq != 0) {
-				at91sam7_info->mck_valid = 1;
-				tmp = at91sam7_info->ext_freq;
-			}
-			break;
+	case 2:			/* Reserved */
+		break;
 
-		case 2:			/* Reserved */
-			break;
-
-		case 3:			/* PLL Clock */
-			if ((mcfr & CKGR_MCFR_MAINRDY) &&
-			(at91sam7_info->ext_freq == 0)) {
-				target_read_u32(target, CKGR_PLLR, &pllr);
-				if (!(pllr & CKGR_PLLR_DIV))
-					break;	/* 0 Hz */
-				at91sam7_info->mck_valid = 1;
-				mainfreq = RC_FREQ / 16ul * (mcfr & 0xffff);
-				/* Integer arithmetic should have sufficient precision
-				 * as long as PLL is properly configured. */
-				tmp = mainfreq / (pllr & CKGR_PLLR_DIV)*
-						(((pllr & CKGR_PLLR_MUL) >> 16) + 1);
-			} else if ((at91sam7_info->ext_freq != 0) &&
-					((pllr&CKGR_PLLR_DIV) != 0)) {
-				at91sam7_info->mck_valid = 1;
-				tmp = at91sam7_info->ext_freq / (pllr&CKGR_PLLR_DIV)*
-						(((pllr & CKGR_PLLR_MUL) >> 16) + 1);
-			}
-			break;
+	case 3:			/* PLL Clock */
+		if ((mcfr & CKGR_MCFR_MAINRDY) && at91sam7_info->ext_freq == 0) {
+			target_read_u32(target, CKGR_PLLR, &pllr);
+			if (!(pllr & CKGR_PLLR_DIV))
+				break;	/* 0 Hz */
+			at91sam7_info->mck_valid = 1;
+			mainfreq = RC_FREQ / 16ul * (mcfr & 0xffff);
+			/* Integer arithmetic should have sufficient precision
+			 * as long as PLL is properly configured. */
+			tmp = mainfreq / (pllr & CKGR_PLLR_DIV) *
+					(((pllr & CKGR_PLLR_MUL) >> 16) + 1);
+		} else if ((at91sam7_info->ext_freq != 0) && ((pllr & CKGR_PLLR_DIV) != 0)) {
+			at91sam7_info->mck_valid = 1;
+			tmp = at91sam7_info->ext_freq / (pllr & CKGR_PLLR_DIV) *
+					(((pllr & CKGR_PLLR_MUL) >> 16) + 1);
+		}
+		break;
 	}
 
 	/* Prescaler adjust */
@@ -277,7 +274,7 @@ static void at91sam7_set_flash_mode(struct flash_bank *bank, int mode)
 		if (at91sam7_info->mck_freq > 30000000ul)
 			fws = 1;
 
-		LOG_DEBUG("fmcn[%i]: %i", bank->bank_number, (int)(fmcn));
+		LOG_DEBUG("fmcn[%u]: %" PRIu32, bank->bank_number, fmcn);
 		fmr = fmcn << 16 | fws << 8;
 		target_write_u32(target, mc_fmr[bank->bank_number], fmr);
 	}
@@ -291,14 +288,14 @@ static uint32_t at91sam7_wait_status_busy(struct flash_bank *bank, uint32_t wait
 
 	while ((!((status = at91sam7_get_flash_status(bank->target,
 			bank->bank_number)) & waitbits)) && (timeout-- > 0)) {
-		LOG_DEBUG("status[%i]: 0x%" PRIx32 "", (int)bank->bank_number, status);
+		LOG_DEBUG("status[%u]: 0x%" PRIx32, bank->bank_number, status);
 		alive_sleep(1);
 	}
 
-	LOG_DEBUG("status[%i]: 0x%" PRIx32 "", bank->bank_number, status);
+	LOG_DEBUG("status[%u]: 0x%" PRIx32, bank->bank_number, status);
 
 	if (status & 0x0C) {
-		LOG_ERROR("status register: 0x%" PRIx32 "", status);
+		LOG_ERROR("status register: 0x%" PRIx32, status);
 		if (status & 0x4)
 			LOG_ERROR("Lock Error Bit Detected, Operation Abort");
 		if (status & 0x8)
@@ -319,7 +316,7 @@ static int at91sam7_flash_command(struct flash_bank *bank, uint8_t cmd, uint16_t
 
 	fcr = (0x5A << 24) | ((pagen&0x3FF) << 8) | cmd;
 	target_write_u32(target, mc_fcr[bank->bank_number], fcr);
-	LOG_DEBUG("Flash command: 0x%" PRIx32 ", flash bank: %i, page number: %u",
+	LOG_DEBUG("Flash command: 0x%" PRIx32 ", flash bank: %u, page number: %" PRIu16,
 		fcr,
 		bank->bank_number + 1,
 		pagen);
@@ -418,130 +415,130 @@ static int at91sam7_read_part_info(struct flash_bank *bank)
 
 	/* check flash size */
 	switch ((cidr >> 8)&0x000F) {
-		case FLASH_SIZE_8KB:
-			break;
+	case FLASH_SIZE_8KB:
+		break;
 
-		case FLASH_SIZE_16KB:
-			banks_num = 1;
-			sectors_num = 8;
-			pages_per_sector = 32;
-			page_size  = 64;
-			base_address = 0x00100000;
-			if (arch == 0x70) {
-				num_nvmbits = 2;
-				target_name_t = "AT91SAM7S161/16";
-			}
-			break;
+	case FLASH_SIZE_16KB:
+		banks_num = 1;
+		sectors_num = 8;
+		pages_per_sector = 32;
+		page_size  = 64;
+		base_address = 0x00100000;
+		if (arch == 0x70) {
+			num_nvmbits = 2;
+			target_name_t = "AT91SAM7S161/16";
+		}
+		break;
 
-		case FLASH_SIZE_32KB:
-			banks_num = 1;
-			sectors_num = 8;
-			pages_per_sector = 32;
-			page_size  = 128;
-			base_address = 0x00100000;
-			if (arch == 0x70) {
-				num_nvmbits = 2;
-				target_name_t = "AT91SAM7S321/32";
-			}
-			if (arch == 0x72) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7SE32";
-			}
-			break;
+	case FLASH_SIZE_32KB:
+		banks_num = 1;
+		sectors_num = 8;
+		pages_per_sector = 32;
+		page_size  = 128;
+		base_address = 0x00100000;
+		if (arch == 0x70) {
+			num_nvmbits = 2;
+			target_name_t = "AT91SAM7S321/32";
+		}
+		if (arch == 0x72) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7SE32";
+		}
+		break;
 
-		case FLASH_SIZE_64KB:
-			banks_num = 1;
-			sectors_num = 16;
-			pages_per_sector = 32;
-			page_size  = 128;
-			base_address = 0x00100000;
-			if (arch == 0x70) {
-				num_nvmbits = 2;
-				target_name_t = "AT91SAM7S64";
-			}
-			break;
+	case FLASH_SIZE_64KB:
+		banks_num = 1;
+		sectors_num = 16;
+		pages_per_sector = 32;
+		page_size  = 128;
+		base_address = 0x00100000;
+		if (arch == 0x70) {
+			num_nvmbits = 2;
+			target_name_t = "AT91SAM7S64";
+		}
+		break;
 
-		case FLASH_SIZE_128KB:
-			banks_num = 1;
-			sectors_num = 8;
-			pages_per_sector = 64;
-			page_size  = 256;
-			base_address = 0x00100000;
-			if (arch == 0x70) {
-				num_nvmbits = 2;
-				target_name_t = "AT91SAM7S128";
-			}
-			if (arch == 0x71) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7XC128";
-			}
-			if (arch == 0x72) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7SE128";
-			}
-			if (arch == 0x75) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7X128";
-			}
-			break;
+	case FLASH_SIZE_128KB:
+		banks_num = 1;
+		sectors_num = 8;
+		pages_per_sector = 64;
+		page_size  = 256;
+		base_address = 0x00100000;
+		if (arch == 0x70) {
+			num_nvmbits = 2;
+			target_name_t = "AT91SAM7S128";
+		}
+		if (arch == 0x71) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7XC128";
+		}
+		if (arch == 0x72) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7SE128";
+		}
+		if (arch == 0x75) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7X128";
+		}
+		break;
 
-		case FLASH_SIZE_256KB:
-			banks_num = 1;
-			sectors_num = 16;
-			pages_per_sector = 64;
-			page_size  = 256;
-			base_address = 0x00100000;
-			if (arch == 0x60) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7A3";
-			}
-			if (arch == 0x70) {
-				num_nvmbits = 2;
-				target_name_t = "AT91SAM7S256";
-			}
-			if (arch == 0x71) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7XC256";
-			}
-			if (arch == 0x72) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7SE256";
-			}
-			if (arch == 0x75) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7X256";
-			}
-			break;
+	case FLASH_SIZE_256KB:
+		banks_num = 1;
+		sectors_num = 16;
+		pages_per_sector = 64;
+		page_size  = 256;
+		base_address = 0x00100000;
+		if (arch == 0x60) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7A3";
+		}
+		if (arch == 0x70) {
+			num_nvmbits = 2;
+			target_name_t = "AT91SAM7S256";
+		}
+		if (arch == 0x71) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7XC256";
+		}
+		if (arch == 0x72) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7SE256";
+		}
+		if (arch == 0x75) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7X256";
+		}
+		break;
 
-		case FLASH_SIZE_512KB:
-			banks_num = 2;
-			sectors_num = 16;
-			pages_per_sector = 64;
-			page_size  = 256;
-			base_address = 0x00100000;
-			if (arch == 0x70) {
-				num_nvmbits = 2;
-				target_name_t = "AT91SAM7S512";
-			}
-			if (arch == 0x71) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7XC512";
-			}
-			if (arch == 0x72) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7SE512";
-			}
-			if (arch == 0x75) {
-				num_nvmbits = 3;
-				target_name_t = "AT91SAM7X512";
-			}
-			break;
+	case FLASH_SIZE_512KB:
+		banks_num = 2;
+		sectors_num = 16;
+		pages_per_sector = 64;
+		page_size  = 256;
+		base_address = 0x00100000;
+		if (arch == 0x70) {
+			num_nvmbits = 2;
+			target_name_t = "AT91SAM7S512";
+		}
+		if (arch == 0x71) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7XC512";
+		}
+		if (arch == 0x72) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7SE512";
+		}
+		if (arch == 0x75) {
+			num_nvmbits = 3;
+			target_name_t = "AT91SAM7X512";
+		}
+		break;
 
-		case FLASH_SIZE_1024KB:
-			break;
+	case FLASH_SIZE_1024KB:
+		break;
 
-		case FLASH_SIZE_2048KB:
-			break;
+	case FLASH_SIZE_2048KB:
+		break;
 	}
 
 	if (strcmp(target_name_t, "Unknown") == 0) {
@@ -915,7 +912,7 @@ static int at91sam7_write(struct flash_bank *bank, const uint8_t *buffer, uint32
 	dst_min_alignment = at91sam7_info->pagesize;
 
 	if (offset % dst_min_alignment) {
-		LOG_WARNING("offset 0x%" PRIx32 " breaks required alignment 0x%" PRIx32 "",
+		LOG_WARNING("offset 0x%" PRIx32 " breaks required alignment 0x%" PRIx32,
 			offset,
 			dst_min_alignment);
 		return ERROR_FLASH_DST_BREAKS_ALIGNMENT;

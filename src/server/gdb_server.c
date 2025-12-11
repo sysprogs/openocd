@@ -50,6 +50,8 @@
  * found in most modern embedded processors.
  */
 
+#define CTRL(c) ((c) - '@')
+
 enum gdb_output_flag {
 	/* GDB doesn't accept 'O' packets */
 	GDB_OUTPUT_NO,
@@ -148,6 +150,29 @@ static bool gdb_use_target_description = true;
 
 /* current processing free-run type, used by file-I/O */
 static char gdb_running_type;
+
+/* Find an available target in the SMP group that gdb is connected to. For
+ * commands that affect an entire SMP group (like memory access and run control)
+ * this will give better results than returning the unavailable target and having
+ * the command fail.  If gdb was aware that targets can be unavailable we
+ * wouldn't need this logic.
+ */
+struct target *get_available_target_from_connection(struct connection *connection)
+{
+	struct gdb_service *gdb_service = connection->service->priv;
+	struct target *target = gdb_service->target;
+	if (target->state == TARGET_UNAVAILABLE && target->smp) {
+		struct target_list *tlist;
+		foreach_smp_target(tlist, target->smp_targets) {
+			struct target *t = tlist->target;
+			if (t->state != TARGET_UNAVAILABLE)
+				return t;
+		}
+		/* If we can't find an available target, just return the
+		 * original. */
+	}
+	return target;
+}
 
 static int gdb_last_signal(struct target *target)
 {
@@ -434,6 +459,10 @@ static int gdb_put_packet_inner(struct connection *connection,
 			gdb_putback_char(connection, reply);
 			LOG_DEBUG("Unexpected start of new packet");
 			break;
+		} else if (reply == CTRL('C')) {
+			/* do not discard Ctrl-C */
+			gdb_putback_char(connection, reply);
+			break;
 		}
 
 		LOG_WARNING("Discard unexpected char %c", reply);
@@ -445,7 +474,7 @@ static int gdb_put_packet_inner(struct connection *connection,
 
 		char local_buffer[1024];
 		local_buffer[0] = '$';
-		if ((size_t)len + 4 <= sizeof(local_buffer)) {
+		if ((size_t)len + 5 <= sizeof(local_buffer)) {
 			/* performance gain on smaller packets by only a single call to gdb_write() */
 			memcpy(local_buffer + 1, buffer, len++);
 			len += snprintf(local_buffer + len, sizeof(local_buffer) - len, "#%02x", my_checksum);
@@ -482,7 +511,7 @@ static int gdb_put_packet_inner(struct connection *connection,
 			gdb_con->output_flag = GDB_OUTPUT_NO;
 			gdb_log_incoming_packet(connection, "-");
 			LOG_WARNING("negative reply, retrying");
-		} else if (reply == 0x3) {
+		} else if (reply == CTRL('C')) {
 			gdb_con->ctrl_c = true;
 			gdb_log_incoming_packet(connection, "<Ctrl-C>");
 			retval = gdb_get_char(connection, &reply);
@@ -692,7 +721,7 @@ static int gdb_get_packet_inner(struct connection *connection,
 					gdb_log_incoming_packet(connection, "-");
 					LOG_WARNING("negative acknowledgment, but no packet pending");
 					break;
-				case 0x3:
+				case CTRL('C'):
 					gdb_log_incoming_packet(connection, "<Ctrl-C>");
 					gdb_con->ctrl_c = true;
 					*len = 0;
@@ -784,9 +813,12 @@ static void gdb_signal_reply(struct target *target, struct connection *connectio
 		sig_reply_len = snprintf(sig_reply, sizeof(sig_reply), "W00");
 	} else {
 		struct target *ct;
-		if (target->rtos) {
-			target->rtos->current_threadid = target->rtos->current_thread;
-			target->rtos->gdb_target_for_threadid(connection, target->rtos->current_threadid, &ct);
+		struct rtos *rtos;
+
+		rtos = rtos_from_target(target);
+		if (rtos) {
+			rtos->current_threadid = rtos->current_thread;
+			rtos->gdb_target_for_threadid(connection, rtos->current_threadid, &ct);
 		} else {
 			ct = target;
 		}
@@ -824,9 +856,9 @@ static void gdb_signal_reply(struct target *target, struct connection *connectio
 		}
 
 		current_thread[0] = '\0';
-		if (target->rtos)
+		if (rtos)
 			snprintf(current_thread, sizeof(current_thread), "thread:%" PRIx64 ";",
-					target->rtos->current_thread);
+					rtos->current_thread);
 
 		sig_reply_len = snprintf(sig_reply, sizeof(sig_reply), "T%2.2x%s%s",
 				signal_var, stop_reason, current_thread);
@@ -955,9 +987,9 @@ static int gdb_target_callback_event_handler(struct target *target,
 		enum target_event event, void *priv)
 {
 	struct connection *connection = priv;
-	struct gdb_service *gdb_service = connection->service->priv;
+	struct target *gdb_target = get_available_target_from_connection(connection);
 
-	if (gdb_service->target != target)
+	if (gdb_target != target)
 		return ERROR_OK;
 
 	switch (event) {
@@ -1012,8 +1044,8 @@ static int gdb_new_connection(struct connection *connection)
 	 * GDB session could leave dangling breakpoints if e.g. communication
 	 * timed out.
 	 */
-	breakpoint_clear_target(target);
-	watchpoint_clear_target(target);
+	breakpoint_remove_all(target);
+	watchpoint_remove_all(target);
 
 	/* Since version 3.95 (gdb-19990504), with the exclusion of 6.5~6.8, GDB
 	 * sends an ACK at connection with the following comment in its source code:
@@ -1382,8 +1414,13 @@ static int gdb_get_register_packet(struct connection *connection,
 	LOG_DEBUG("-");
 #endif
 
-	if ((target->rtos) && (rtos_get_gdb_reg(connection, reg_num) == ERROR_OK))
-		return ERROR_OK;
+	if (target->rtos) {
+		retval = rtos_get_gdb_reg(connection, reg_num);
+		if (retval == ERROR_OK)
+			return ERROR_OK;
+		if (retval != ERROR_NOT_IMPLEMENTED)
+			return gdb_error(connection, retval);
+	}
 
 	retval = target_get_gdb_reg_list_noread(target, &reg_list, &reg_list_size,
 			REG_CLASS_ALL);
@@ -1498,7 +1535,7 @@ static int gdb_error(struct connection *connection, int retval)
 static int gdb_read_memory_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	char *separator;
 	uint64_t addr = 0;
 	uint32_t len = 0;
@@ -1528,7 +1565,7 @@ static int gdb_read_memory_packet(struct connection *connection,
 
 	buffer = malloc(len);
 
-	LOG_DEBUG("addr: 0x%16.16" PRIx64 ", len: 0x%8.8" PRIx32 "", addr, len);
+	LOG_DEBUG("addr: 0x%16.16" PRIx64 ", len: 0x%8.8" PRIx32, addr, len);
 
 	retval = ERROR_NOT_IMPLEMENTED;
 	if (target->rtos)
@@ -1573,7 +1610,7 @@ static int gdb_read_memory_packet(struct connection *connection,
 static int gdb_write_memory_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	char *separator;
 	uint64_t addr = 0;
 	uint32_t len = 0;
@@ -1600,7 +1637,7 @@ static int gdb_write_memory_packet(struct connection *connection,
 
 	buffer = malloc(len);
 
-	LOG_DEBUG("addr: 0x%" PRIx64 ", len: 0x%8.8" PRIx32 "", addr, len);
+	LOG_DEBUG("addr: 0x%" PRIx64 ", len: 0x%8.8" PRIx32, addr, len);
 
 	if (unhexify(buffer, separator, len) != len)
 		LOG_ERROR("unable to decode memory packet");
@@ -1624,7 +1661,7 @@ static int gdb_write_memory_packet(struct connection *connection,
 static int gdb_write_memory_binary_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	char *separator;
 	uint64_t addr = 0;
 	uint32_t len = 0;
@@ -1676,7 +1713,7 @@ static int gdb_write_memory_binary_packet(struct connection *connection,
 	}
 
 	if (len) {
-		LOG_DEBUG("addr: 0x%" PRIx64 ", len: 0x%8.8" PRIx32 "", addr, len);
+		LOG_DEBUG("addr: 0x%" PRIx64 ", len: 0x%8.8" PRIx32, addr, len);
 
 		retval = ERROR_NOT_IMPLEMENTED;
 		if (target->rtos)
@@ -1703,7 +1740,7 @@ static int gdb_write_memory_binary_packet(struct connection *connection,
 static int gdb_step_continue_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	bool current = false;
 	uint64_t address = 0x0;
 	int retval = ERROR_OK;
@@ -1748,7 +1785,7 @@ static int gdb_step_continue_packet(struct connection *connection,
 static int gdb_breakpoint_watchpoint_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	int type;
 	enum breakpoint_type bp_type = BKPT_SOFT /* dummy init to avoid warning */;
 	enum watchpoint_rw wp_type = WPT_READ /* dummy init to avoid warning */;
@@ -1797,7 +1834,15 @@ static int gdb_breakpoint_watchpoint_packet(struct connection *connection,
 		case 0:
 		case 1:
 			if (packet[0] == 'Z') {
-				retval = breakpoint_add(target, address, size, bp_type);
+				struct target *bp_target = target;
+				if (target->rtos && bp_type == BKPT_SOFT) {
+					bp_target = rtos_swbp_target(target, address, size, bp_type);
+					if (!bp_target) {
+						retval = ERROR_FAIL;
+						break;
+					}
+				}
+				retval = breakpoint_add(bp_target, address, size, bp_type);
 			} else {
 				assert(packet[0] == 'z');
 				retval = breakpoint_remove(target, address);
@@ -1949,7 +1994,7 @@ static int gdb_memory_map(struct connection *connection,
 	 * have to regenerate it a couple of times.
 	 */
 
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	struct flash_bank *p;
 	char *xml = NULL;
 	int size = 0;
@@ -2892,7 +2937,7 @@ static int gdb_query_packet(struct connection *connection,
 			gdb_connection->output_flag = GDB_OUTPUT_NO;
 
 			if (retval == ERROR_OK) {
-				snprintf(gdb_reply, 10, "C%8.8" PRIx32 "", checksum);
+				snprintf(gdb_reply, 10, "C%8.8" PRIx32, checksum);
 				gdb_put_packet(connection, gdb_reply, 9);
 			} else {
 				retval = gdb_error(connection, retval);
@@ -3027,7 +3072,7 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 	__attribute__((unused)) int packet_size)
 {
 	struct gdb_connection *gdb_connection = connection->priv;
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	const char *parse = packet;
 	int retval;
 
@@ -3093,8 +3138,22 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 		}
 
 		if (target->rtos) {
-			/* FIXME: why is this necessary? rtos state should be up-to-date here already! */
-			rtos_update_threads(target);
+			/* Sometimes this results in picking a different thread than
+			 * gdb just requested to step. Then we fake it, and now there's
+			 * a different thread selected than gdb expects, so register
+			 * accesses go to the wrong one!
+			 * E.g.:
+			 * Hg1$
+			 * P8=72101ce197869329$		# write r8 on thread 1
+			 * g$
+			 * vCont?$
+			 * vCont;s:1;c$				# rtos_update_threads changes to other thread
+			 * g$
+			 * qXfer:threads:read::0,fff$
+			 * P8=cc060607eb89ca7f$		# write r8 on other thread
+			 * g$
+			 */
+			 /* rtos_update_threads(target); */
 
 			target->rtos->gdb_target_for_threadid(connection, thread_id, &ct);
 
@@ -3102,8 +3161,7 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 			 * check if the thread to be stepped is the current rtos thread
 			 * if not, we must fake the step
 			 */
-			if (target->rtos->current_thread != thread_id)
-				fake_step = true;
+			fake_step = rtos_needs_fake_step(target, thread_id);
 		}
 
 		if (parse[0] == ';') {
@@ -3237,8 +3295,8 @@ static void gdb_restart_inferior(struct connection *connection, const char *pack
 	struct gdb_connection *gdb_con = connection->priv;
 	struct target *target = get_target_from_connection(connection);
 
-	breakpoint_clear_target(target);
-	watchpoint_clear_target(target);
+	breakpoint_remove_all(target);
+	watchpoint_remove_all(target);
 	command_run_linef(connection->cmd_ctx, "ocd_gdb_restart %s",
 			target_name(target));
 	/* set connection as attached after reset */
@@ -3249,7 +3307,7 @@ static void gdb_restart_inferior(struct connection *connection, const char *pack
 
 static bool gdb_handle_vrun_packet(struct connection *connection, const char *packet, int packet_size)
 {
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	const char *parse = packet;
 
 	/* Skip "vRun" */
@@ -3295,7 +3353,7 @@ static int gdb_v_packet(struct connection *connection,
 	struct gdb_connection *gdb_connection = connection->priv;
 	int result;
 
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 
 	if (strncmp(packet, "vCont", 5) == 0) {
 		bool handled;
@@ -3478,7 +3536,7 @@ static int gdb_detach(struct connection *connection)
 static int gdb_fileio_response_packet(struct connection *connection,
 		char const *packet, int packet_size)
 {
-	struct target *target = get_target_from_connection(connection);
+	struct target *target = get_available_target_from_connection(connection);
 	char *separator;
 	char *parsing_point;
 	int fileio_retcode = strtoul(packet + 1, &separator, 16);
@@ -3771,10 +3829,11 @@ static int gdb_input_inner(struct connection *connection)
 		}
 
 		if (gdb_con->ctrl_c) {
-			if (target->state == TARGET_RUNNING) {
-				struct target *t = target;
-				if (target->rtos)
-					target->rtos->gdb_target_for_threadid(connection, target->rtos->current_threadid, &t);
+			struct target *available_target = get_available_target_from_connection(connection);
+			if (available_target->state == TARGET_RUNNING) {
+				struct target *t = available_target;
+				if (available_target->rtos)
+					available_target->rtos->gdb_target_for_threadid(connection, target->rtos->current_threadid, &t);
 				retval = target_halt(t);
 				if (retval == ERROR_OK)
 					retval = target_poll(t);
@@ -3782,7 +3841,8 @@ static int gdb_input_inner(struct connection *connection)
 					target_call_event_callbacks(target, TARGET_EVENT_GDB_HALT);
 				gdb_con->ctrl_c = false;
 			} else {
-				LOG_INFO("The target is not running when halt was requested, stopping GDB.");
+				LOG_TARGET_INFO(target, "Not running when halt was requested, stopping GDB. (state=%d)",
+						target->state);
 				target_call_event_callbacks(target, TARGET_EVENT_GDB_HALT);
 			}
 		}

@@ -179,14 +179,14 @@ static int remote_bitbang_quit(void)
 static enum bb_value char_to_int(int c)
 {
 	switch (c) {
-		case '0':
-			return BB_LOW;
-		case '1':
-			return BB_HIGH;
-		default:
-			remote_bitbang_quit();
-			LOG_ERROR("remote_bitbang: invalid read response: %c(%i)", c, c);
-			return BB_ERROR;
+	case '0':
+		return BB_LOW;
+	case '1':
+		return BB_HIGH;
+	default:
+		remote_bitbang_quit();
+		LOG_ERROR("remote_bitbang: invalid read response: %c(%i)", c, c);
+		return BB_ERROR;
 	}
 }
 
@@ -412,8 +412,6 @@ COMMAND_HANDLER(remote_bitbang_handle_remote_bitbang_host_command)
 	return ERROR_COMMAND_SYNTAX_ERROR;
 }
 
-static const char * const remote_bitbang_transports[] = { "jtag", "swd", NULL };
-
 COMMAND_HANDLER(remote_bitbang_handle_remote_bitbang_use_remote_sleep_command)
 {
 	if (CMD_ARGC != 1)
@@ -484,7 +482,8 @@ static struct jtag_interface remote_bitbang_interface = {
 
 struct adapter_driver remote_bitbang_adapter_driver = {
 	.name = "remote_bitbang",
-	.transports = remote_bitbang_transports,
+	.transport_ids = TRANSPORT_JTAG | TRANSPORT_SWD,
+	.transport_preferred_id = TRANSPORT_JTAG,
 	.commands = remote_bitbang_command_handlers,
 
 	.init = &remote_bitbang_init,

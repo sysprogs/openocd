@@ -50,8 +50,16 @@
 /*
  * Relevant specifications from ARM include:
  *
- * ARM(tm) Debug Interface v5 Architecture Specification    ARM IHI 0031F
+ * ARM(tm) Debug Interface v5 Architecture Specification    ARM IHI 0031G
+ * https://developer.arm.com/documentation/ihi0031/latest/
+ *
  * ARM(tm) Debug Interface v6 Architecture Specification    ARM IHI 0074C
+ * https://developer.arm.com/documentation/ihi0074/latest/
+ *
+ * Note that diagrams B4-1 to B4-7 in both ADI specifications show
+ * SWCLK signal mostly in wrong polarity. See detailed SWD timing
+ * https://developer.arm.com/documentation/dui0499/b/arm-dstream-target-interface-connections/swd-timing-requirements
+ *
  * CoreSight(tm) v1.0 Architecture Specification            ARM IHI 0029B
  *
  * CoreSight(tm) DAP-Lite TRM, ARM DDI 0316D
@@ -2367,7 +2375,9 @@ static int adiv5_jim_spot_configure(struct jim_getopt_info *goi,
 				return e;
 			dap = dap_instance_by_jim_obj(goi->interp, o_t);
 			if (!dap) {
-				Jim_SetResultString(goi->interp, "DAP name invalid!", -1);
+				const char *dap_name = Jim_GetString(o_t, NULL);
+				Jim_SetResultFormatted(goi->interp, "DAP '%s' not found",
+					dap_name);
 				return JIM_ERR;
 			}
 			if (*dap_p && *dap_p != dap) {

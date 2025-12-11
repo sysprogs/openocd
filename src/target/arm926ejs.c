@@ -14,6 +14,7 @@
 
 #include "arm926ejs.h"
 #include <helper/time_support.h>
+#include <helper/string_choices.h>
 #include "target_type.h"
 #include "register.h"
 #include "arm_opcodes.h"
@@ -220,88 +221,88 @@ static int arm926ejs_examine_debug_reason(struct target *target)
 	debug_reason = buf_get_u32(dbg_stat->value, 6, 4);
 
 	switch (debug_reason) {
-		case 0:
-			LOG_DEBUG("no *NEW* debug entry (?missed one?)");
-			/* ... since last restart or debug reset ... */
-			target->debug_reason = DBG_REASON_DBGRQ;
-			break;
-		case 1:
-			LOG_DEBUG("breakpoint from EICE unit 0");
-			target->debug_reason = DBG_REASON_BREAKPOINT;
-			break;
-		case 2:
-			LOG_DEBUG("breakpoint from EICE unit 1");
-			target->debug_reason = DBG_REASON_BREAKPOINT;
-			break;
-		case 3:
-			LOG_DEBUG("soft breakpoint (BKPT instruction)");
-			target->debug_reason = DBG_REASON_BREAKPOINT;
-			break;
-		case 4:
-			LOG_DEBUG("vector catch breakpoint");
-			target->debug_reason = DBG_REASON_BREAKPOINT;
-			break;
-		case 5:
-			LOG_DEBUG("external breakpoint");
-			target->debug_reason = DBG_REASON_BREAKPOINT;
-			break;
-		case 6:
-			LOG_DEBUG("watchpoint from EICE unit 0");
-			target->debug_reason = DBG_REASON_WATCHPOINT;
-			break;
-		case 7:
-			LOG_DEBUG("watchpoint from EICE unit 1");
-			target->debug_reason = DBG_REASON_WATCHPOINT;
-			break;
-		case 8:
-			LOG_DEBUG("external watchpoint");
-			target->debug_reason = DBG_REASON_WATCHPOINT;
-			break;
-		case 9:
-			LOG_DEBUG("internal debug request");
-			target->debug_reason = DBG_REASON_DBGRQ;
-			break;
-		case 10:
-			LOG_DEBUG("external debug request");
-			target->debug_reason = DBG_REASON_DBGRQ;
-			break;
-		case 11:
-			LOG_DEBUG("debug re-entry from system speed access");
-			/* This is normal when connecting to something that's
-			 * already halted, or in some related code paths, but
-			 * otherwise is surprising (and presumably wrong).
-			 */
-			switch (target->debug_reason) {
-			case DBG_REASON_DBGRQ:
-				break;
-			default:
-				LOG_ERROR("unexpected -- debug re-entry");
-				/* FALLTHROUGH */
-			case DBG_REASON_UNDEFINED:
-				target->debug_reason = DBG_REASON_DBGRQ;
-				break;
-			}
-			break;
-		case 12:
-			/* FIX!!!! here be dragons!!! We need to fail here so
-			 * the target will interpreted as halted but we won't
-			 * try to talk to it right now... a resume + halt seems
-			 * to sync things up again. Please send an email to
-			 * openocd development mailing list if you have hardware
-			 * to donate to look into this problem....
-			 */
-			LOG_WARNING("WARNING: mystery debug reason MOE = 0xc. Try issuing a resume + halt.");
-			target->debug_reason = DBG_REASON_DBGRQ;
+	case 0:
+		LOG_DEBUG("no *NEW* debug entry (?missed one?)");
+		/* ... since last restart or debug reset ... */
+		target->debug_reason = DBG_REASON_DBGRQ;
+		break;
+	case 1:
+		LOG_DEBUG("breakpoint from EICE unit 0");
+		target->debug_reason = DBG_REASON_BREAKPOINT;
+		break;
+	case 2:
+		LOG_DEBUG("breakpoint from EICE unit 1");
+		target->debug_reason = DBG_REASON_BREAKPOINT;
+		break;
+	case 3:
+		LOG_DEBUG("soft breakpoint (BKPT instruction)");
+		target->debug_reason = DBG_REASON_BREAKPOINT;
+		break;
+	case 4:
+		LOG_DEBUG("vector catch breakpoint");
+		target->debug_reason = DBG_REASON_BREAKPOINT;
+		break;
+	case 5:
+		LOG_DEBUG("external breakpoint");
+		target->debug_reason = DBG_REASON_BREAKPOINT;
+		break;
+	case 6:
+		LOG_DEBUG("watchpoint from EICE unit 0");
+		target->debug_reason = DBG_REASON_WATCHPOINT;
+		break;
+	case 7:
+		LOG_DEBUG("watchpoint from EICE unit 1");
+		target->debug_reason = DBG_REASON_WATCHPOINT;
+		break;
+	case 8:
+		LOG_DEBUG("external watchpoint");
+		target->debug_reason = DBG_REASON_WATCHPOINT;
+		break;
+	case 9:
+		LOG_DEBUG("internal debug request");
+		target->debug_reason = DBG_REASON_DBGRQ;
+		break;
+	case 10:
+		LOG_DEBUG("external debug request");
+		target->debug_reason = DBG_REASON_DBGRQ;
+		break;
+	case 11:
+		LOG_DEBUG("debug re-entry from system speed access");
+		/* This is normal when connecting to something that's
+		 * already halted, or in some related code paths, but
+		 * otherwise is surprising (and presumably wrong).
+		 */
+		switch (target->debug_reason) {
+		case DBG_REASON_DBGRQ:
 			break;
 		default:
-			LOG_WARNING("WARNING: unknown debug reason: 0x%x", debug_reason);
-			/* Oh agony! should we interpret this as a halt request or
-			 * that the target stopped on it's own accord?
-			 */
+			LOG_ERROR("unexpected -- debug re-entry");
+			/* FALLTHROUGH */
+		case DBG_REASON_UNDEFINED:
 			target->debug_reason = DBG_REASON_DBGRQ;
-			/* if we fail here, we won't talk to the target and it will
-			 * be reported to be in the halted state */
 			break;
+		}
+		break;
+	case 12:
+		/* FIX!!!! here be dragons!!! We need to fail here so
+		 * the target will interpreted as halted but we won't
+		 * try to talk to it right now... a resume + halt seems
+		 * to sync things up again. Please send an email to
+		 * openocd development mailing list if you have hardware
+		 * to donate to look into this problem....
+		 */
+		LOG_WARNING("WARNING: mystery debug reason MOE = 0xc. Try issuing a resume + halt.");
+		target->debug_reason = DBG_REASON_DBGRQ;
+		break;
+	default:
+		LOG_WARNING("WARNING: unknown debug reason: 0x%x", debug_reason);
+		/* Oh agony! should we interpret this as a halt request or
+		 * that the target stopped on it's own accord?
+		 */
+		target->debug_reason = DBG_REASON_DBGRQ;
+		/* if we fail here, we won't talk to the target and it will
+		 * be reported to be in the halted state */
+		break;
 	}
 
 	return ERROR_OK;
@@ -426,7 +427,7 @@ static int arm926ejs_post_debug_entry(struct target *target)
 	retval = jtag_execute_queue();
 	if (retval != ERROR_OK)
 		return retval;
-	LOG_DEBUG("cp15_control_reg: %8.8" PRIx32 "", arm926ejs->cp15_control_reg);
+	LOG_DEBUG("cp15_control_reg: %8.8" PRIx32, arm926ejs->cp15_control_reg);
 
 	if (arm926ejs->armv4_5_mmu.armv4_5_cache.ctype == -1) {
 		uint32_t cache_type_reg;
@@ -440,9 +441,11 @@ static int arm926ejs_post_debug_entry(struct target *target)
 		armv4_5_identify_cache(cache_type_reg, &arm926ejs->armv4_5_mmu.armv4_5_cache);
 	}
 
-	arm926ejs->armv4_5_mmu.mmu_enabled = (arm926ejs->cp15_control_reg & 0x1U) ? 1 : 0;
-	arm926ejs->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled = (arm926ejs->cp15_control_reg & 0x4U) ? 1 : 0;
-	arm926ejs->armv4_5_mmu.armv4_5_cache.i_cache_enabled = (arm926ejs->cp15_control_reg & 0x1000U) ? 1 : 0;
+	arm926ejs->armv4_5_mmu.mmu_enabled = arm926ejs->cp15_control_reg & 0x1U;
+	arm926ejs->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled =
+		arm926ejs->cp15_control_reg & 0x4U;
+	arm926ejs->armv4_5_mmu.armv4_5_cache.i_cache_enabled =
+		arm926ejs->cp15_control_reg & 0x1000U;
 
 	/* save i/d fault status and address register */
 	retval = arm926ejs->read_cp15(target, 0, 0, 5, 0, &arm926ejs->d_fsr);
@@ -455,7 +458,7 @@ static int arm926ejs_post_debug_entry(struct target *target)
 	if (retval != ERROR_OK)
 		return retval;
 
-	LOG_DEBUG("D FSR: 0x%8.8" PRIx32 ", D FAR: 0x%8.8" PRIx32 ", I FSR: 0x%8.8" PRIx32 "",
+	LOG_DEBUG("D FSR: 0x%8.8" PRIx32 ", D FAR: 0x%8.8" PRIx32 ", I FSR: 0x%8.8" PRIx32,
 		arm926ejs->d_fsr, arm926ejs->d_far, arm926ejs->i_fsr);
 
 	uint32_t cache_dbg_ctrl;
@@ -503,10 +506,6 @@ static int arm926ejs_verify_pointer(struct command_invocation *cmd,
 /** Logs summary of ARM926 state for a halted target. */
 int arm926ejs_arch_state(struct target *target)
 {
-	static const char *state[] = {
-		"disabled", "enabled"
-	};
-
 	struct arm926ejs_common *arm926ejs = target_to_arm926(target);
 
 	if (arm926ejs->common_magic != ARM926EJS_COMMON_MAGIC) {
@@ -516,9 +515,9 @@ int arm926ejs_arch_state(struct target *target)
 
 	arm_arch_state(target);
 	LOG_USER("MMU: %s, D-Cache: %s, I-Cache: %s",
-			 state[arm926ejs->armv4_5_mmu.mmu_enabled],
-			 state[arm926ejs->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled],
-			 state[arm926ejs->armv4_5_mmu.armv4_5_cache.i_cache_enabled]);
+			 str_enabled_disabled(arm926ejs->armv4_5_mmu.mmu_enabled),
+			 str_enabled_disabled(arm926ejs->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled),
+			 str_enabled_disabled(arm926ejs->armv4_5_mmu.armv4_5_cache.i_cache_enabled));
 
 	return ERROR_OK;
 }
@@ -545,7 +544,7 @@ int arm926ejs_soft_reset_halt(struct target *target)
 				return retval;
 		} else
 			break;
-		if (debug_level >= 1) {
+		if (LOG_LEVEL_IS(LOG_LVL_WARNING)) {
 			/* do not eat all CPU, time out after 1 se*/
 			alive_sleep(100);
 		} else
@@ -575,9 +574,9 @@ int arm926ejs_soft_reset_halt(struct target *target)
 	retval = arm926ejs_disable_mmu_caches(target, 1, 1, 1);
 	if (retval != ERROR_OK)
 		return retval;
-	arm926ejs->armv4_5_mmu.mmu_enabled = 0;
-	arm926ejs->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled = 0;
-	arm926ejs->armv4_5_mmu.armv4_5_cache.i_cache_enabled = 0;
+	arm926ejs->armv4_5_mmu.mmu_enabled = false;
+	arm926ejs->armv4_5_mmu.armv4_5_cache.d_u_cache_enabled = false;
+	arm926ejs->armv4_5_mmu.armv4_5_cache.i_cache_enabled = false;
 
 	return target_call_event_callbacks(target, TARGET_EVENT_HALTED);
 }
@@ -689,7 +688,7 @@ int arm926ejs_init_arch_info(struct target *target, struct arm926ejs_common *arm
 	arm926ejs->armv4_5_mmu.disable_mmu_caches = arm926ejs_disable_mmu_caches;
 	arm926ejs->armv4_5_mmu.enable_mmu_caches = arm926ejs_enable_mmu_caches;
 	arm926ejs->armv4_5_mmu.has_tiny_pages = 1;
-	arm926ejs->armv4_5_mmu.mmu_enabled = 0;
+	arm926ejs->armv4_5_mmu.mmu_enabled = false;
 
 	arm7_9->examine_debug_reason = arm926ejs_examine_debug_reason;
 
@@ -702,7 +701,7 @@ int arm926ejs_init_arch_info(struct target *target, struct arm926ejs_common *arm
 	return ERROR_OK;
 }
 
-static int arm926ejs_target_create(struct target *target, Jim_Interp *interp)
+static int arm926ejs_target_create(struct target *target)
 {
 	struct arm926ejs_common *arm926ejs = calloc(1, sizeof(struct arm926ejs_common));
 
@@ -749,7 +748,7 @@ static int arm926ejs_virt2phys(struct target *target, target_addr_t virtual, tar
 	return ERROR_OK;
 }
 
-static int arm926ejs_mmu(struct target *target, int *enabled)
+static int arm926ejs_mmu(struct target *target, bool *enabled)
 {
 	struct arm926ejs_common *arm926ejs = target_to_arm926(target);
 

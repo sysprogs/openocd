@@ -190,6 +190,10 @@ ATTRS{idVendor}=="138e", ATTRS{idProduct}=="9000", MODE="660", GROUP="plugdev", 
 # Debug Board for Neo1973
 ATTRS{idVendor}=="1457", ATTRS{idProduct}=="5118", MODE="660", GROUP="plugdev", TAG+="uaccess"
 
+# Microchip RISC-V Debug
+ATTRS{idVendor}=="1514", ATTRS{idProduct}=="2008", MODE="660", GROUP="plugdev", TAG+="uaccess"
+ATTRS{idVendor}=="1514", ATTRS{idProduct}=="200a", MODE="660", GROUP="plugdev", TAG+="uaccess"
+
 # OSBDM
 ATTRS{idVendor}=="15a2", ATTRS{idProduct}=="0042", MODE="660", GROUP="plugdev", TAG+="uaccess"
 ATTRS{idVendor}=="15a2", ATTRS{idProduct}=="0058", MODE="660", GROUP="plugdev", TAG+="uaccess"
@@ -215,6 +219,11 @@ ATTRS{idVendor}=="16c0", ATTRS{idProduct}=="06ad", MODE="660", GROUP="plugdev", 
 
 # USBprog with OpenOCD firmware
 ATTRS{idVendor}=="1781", ATTRS{idProduct}=="0c63", MODE="660", GROUP="plugdev", TAG+="uaccess"
+
+# WCH CH347T chip in mode 3
+ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55dd", MODE="660", GROUP="plugdev", TAG+="uaccess"
+# WCH CH347F chip
+ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55de", MODE="660", GROUP="plugdev", TAG+="uaccess"
 
 # TI/Luminary Stellaris In-Circuit Debug Interface (ICDI) Board
 ATTRS{idVendor}=="1cbe", ATTRS{idProduct}=="00fd", MODE="660", GROUP="plugdev", TAG+="uaccess"
@@ -248,8 +257,6 @@ ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1002", MODE="660", GROUP="plugdev", 
 # ANGIE USB-JTAG Adapter
 ATTRS{idVendor}=="584e", ATTRS{idProduct}=="414f", MODE="660", GROUP="plugdev", TAG+="uaccess"
 ATTRS{idVendor}=="584e", ATTRS{idProduct}=="424e", MODE="660", GROUP="plugdev", TAG+="uaccess"
-ATTRS{idVendor}=="584e", ATTRS{idProduct}=="4255", MODE="660", GROUP="plugdev", TAG+="uaccess"
-ATTRS{idVendor}=="584e", ATTRS{idProduct}=="4355", MODE="660", GROUP="plugdev", TAG+="uaccess"
 ATTRS{idVendor}=="584e", ATTRS{idProduct}=="4a55", MODE="660", GROUP="plugdev", TAG+="uaccess"
 
 # Marvell Sheevaplug

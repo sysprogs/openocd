@@ -637,13 +637,13 @@ int arm7_9_execute_sys_speed(struct target *target)
 		if ((buf_get_u32(dbg_stat->value, EICE_DBG_STATUS_DBGACK, 1))
 				&& (buf_get_u32(dbg_stat->value, EICE_DBG_STATUS_SYSCOMP, 1)))
 			break;
-		if (debug_level >= 3)
+		if (LOG_LEVEL_IS(LOG_LVL_DEBUG))
 			alive_sleep(100);
 		else
 			keep_alive();
 	}
 	if (timeout) {
-		LOG_ERROR("timeout waiting for SYSCOMP & DBGACK, last DBG_STATUS: %" PRIx32 "",
+		LOG_ERROR("timeout waiting for SYSCOMP & DBGACK, last DBG_STATUS: %" PRIx32,
 			buf_get_u32(dbg_stat->value, 0, dbg_stat->size));
 		return ERROR_TARGET_TIMEOUT;
 	}
@@ -1088,7 +1088,7 @@ int arm7_9_soft_reset_halt(struct target *target)
 		retval = jtag_execute_queue();
 		if (retval != ERROR_OK)
 			return retval;
-		if (debug_level >= 3)
+		if (LOG_LEVEL_IS(LOG_LVL_DEBUG))
 			alive_sleep(100);
 		else
 			keep_alive();
@@ -1332,7 +1332,7 @@ static int arm7_9_debug_entry(struct target *target)
 	for (i = 0; i <= 15; i++) {
 		struct reg *r = arm_reg_current(arm, i);
 
-		LOG_DEBUG("r%i: 0x%8.8" PRIx32 "", i, context[i]);
+		LOG_DEBUG("r%i: 0x%8.8" PRIx32, i, context[i]);
 
 		buf_set_u32(r->value, 0, 32, context[i]);
 		/* r0 and r15 (pc) have to be restored later */
@@ -1340,7 +1340,7 @@ static int arm7_9_debug_entry(struct target *target)
 		r->valid = true;
 	}
 
-	LOG_DEBUG("entered debug state at PC 0x%" PRIx32 "", context[15]);
+	LOG_DEBUG("entered debug state at PC 0x%" PRIx32, context[15]);
 
 	/* exceptions other than USR & SYS have a saved program status register */
 	if (arm->spsr) {
@@ -1594,7 +1594,7 @@ static int arm7_9_restore_context(struct target *target)
 			struct arm_reg *reg_arch_info;
 			reg_arch_info = reg->arch_info;
 			if ((reg->dirty) && (reg_arch_info->mode != ARM_MODE_ANY)) {
-				LOG_DEBUG("writing SPSR of mode %i with value 0x%8.8" PRIx32 "",
+				LOG_DEBUG("writing SPSR of mode %i with value 0x%8.8" PRIx32,
 					i,
 					buf_get_u32(reg->value, 0, 32));
 				arm7_9->write_xpsr(target, buf_get_u32(reg->value, 0, 32), 1);
@@ -1744,7 +1744,7 @@ int arm7_9_resume(struct target *target,
 				uint32_t current_opcode;
 				target_read_u32(target, current_pc, &current_opcode);
 				LOG_ERROR(
-					"Couldn't calculate PC of next instruction, current opcode was 0x%8.8" PRIx32 "",
+					"Couldn't calculate PC of next instruction, current opcode was 0x%8.8" PRIx32,
 					current_opcode);
 				return retval;
 			}
@@ -1789,7 +1789,7 @@ int arm7_9_resume(struct target *target,
 			LOG_DEBUG("new PC after step: 0x%8.8" PRIx32,
 				buf_get_u32(arm->pc->value, 0, 32));
 
-			LOG_DEBUG("set breakpoint at 0x%8.8" TARGET_PRIxADDR "", breakpoint->address);
+			LOG_DEBUG("set breakpoint at 0x%8.8" TARGET_PRIxADDR, breakpoint->address);
 			retval = arm7_9_set_breakpoint(target, breakpoint);
 			if (retval != ERROR_OK)
 				return retval;
@@ -1937,7 +1937,7 @@ int arm7_9_step(struct target *target, bool current, target_addr_t address,
 		uint32_t current_opcode;
 		target_read_u32(target, current_pc, &current_opcode);
 		LOG_ERROR(
-			"Couldn't calculate PC of next instruction, current opcode was 0x%8.8" PRIx32 "",
+			"Couldn't calculate PC of next instruction, current opcode was 0x%8.8" PRIx32,
 			current_opcode);
 		return retval;
 	}
@@ -2116,7 +2116,7 @@ int arm7_9_read_memory(struct target *target,
 	int retval;
 	int last_reg = 0;
 
-	LOG_DEBUG("address: 0x%8.8" TARGET_PRIxADDR ", size: 0x%8.8" PRIx32 ", count: 0x%8.8" PRIx32 "",
+	LOG_DEBUG("address: 0x%8.8" TARGET_PRIxADDR ", size: 0x%8.8" PRIx32 ", count: 0x%8.8" PRIx32,
 		address, size, count);
 
 	if (target->state != TARGET_HALTED) {
@@ -2135,21 +2135,49 @@ int arm7_9_read_memory(struct target *target,
 	reg[0] = address;
 	arm7_9->write_core_regs(target, 0x1, reg);
 
-	int j = 0;
-
 	switch (size) {
-		case 4:
-			while (num_accesses < count) {
-				uint32_t reg_list;
-				thisrun_accesses =
-						((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
-				reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
+	case 4:
+		while (num_accesses < count) {
+			uint32_t reg_list;
+			thisrun_accesses =
+					((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
+			reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
 
-				if (last_reg <= thisrun_accesses)
-					last_reg = thisrun_accesses;
+			if (last_reg <= thisrun_accesses)
+				last_reg = thisrun_accesses;
 
-				arm7_9->load_word_regs(target, reg_list);
+			arm7_9->load_word_regs(target, reg_list);
 
+			/* fast memory reads are only safe when the target is running
+			 * from a sufficiently high clock (32 kHz is usually too slow)
+			 */
+			if (arm7_9->fast_memory_access)
+				retval = arm7_9_execute_fast_sys_speed(target);
+			else
+				retval = arm7_9_execute_sys_speed(target);
+			if (retval != ERROR_OK)
+				return retval;
+
+			arm7_9->read_core_regs_target_buffer(target, reg_list, buffer, 4);
+
+			/* advance buffer, count number of accesses */
+			buffer += thisrun_accesses * 4;
+			num_accesses += thisrun_accesses;
+
+			keep_alive();
+		}
+		break;
+	case 2:
+		while (num_accesses < count) {
+			uint32_t reg_list;
+			thisrun_accesses =
+					((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
+			reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
+
+			for (i = 1; i <= thisrun_accesses; i++) {
+				if (i > last_reg)
+				    last_reg = i;
+				arm7_9->load_hword_reg(target, i);
 				/* fast memory reads are only safe when the target is running
 				 * from a sufficiently high clock (32 kHz is usually too slow)
 				 */
@@ -2160,81 +2188,48 @@ int arm7_9_read_memory(struct target *target,
 				if (retval != ERROR_OK)
 					return retval;
 
-				arm7_9->read_core_regs_target_buffer(target, reg_list, buffer, 4);
-
-				/* advance buffer, count number of accesses */
-				buffer += thisrun_accesses * 4;
-				num_accesses += thisrun_accesses;
-
-				if ((j++%1024) == 0)
-					keep_alive();
 			}
-			break;
-		case 2:
-			while (num_accesses < count) {
-				uint32_t reg_list;
-				thisrun_accesses =
-						((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
-				reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
 
-				for (i = 1; i <= thisrun_accesses; i++) {
-					if (i > last_reg)
-					    last_reg = i;
-					arm7_9->load_hword_reg(target, i);
-					/* fast memory reads are only safe when the target is running
-					 * from a sufficiently high clock (32 kHz is usually too slow)
-					 */
-					if (arm7_9->fast_memory_access)
-						retval = arm7_9_execute_fast_sys_speed(target);
-					else
-						retval = arm7_9_execute_sys_speed(target);
-					if (retval != ERROR_OK)
-						return retval;
+			arm7_9->read_core_regs_target_buffer(target, reg_list, buffer, 2);
 
-				}
+			/* advance buffer, count number of accesses */
+			buffer += thisrun_accesses * 2;
+			num_accesses += thisrun_accesses;
 
-				arm7_9->read_core_regs_target_buffer(target, reg_list, buffer, 2);
+			keep_alive();
+		}
+		break;
+	case 1:
+		while (num_accesses < count) {
+			uint32_t reg_list;
+			thisrun_accesses =
+					((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
+			reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
 
-				/* advance buffer, count number of accesses */
-				buffer += thisrun_accesses * 2;
-				num_accesses += thisrun_accesses;
-
-				if ((j++%1024) == 0)
-					keep_alive();
+			for (i = 1; i <= thisrun_accesses; i++) {
+				if (i > last_reg)
+					last_reg = i;
+				arm7_9->load_byte_reg(target, i);
+				/* fast memory reads are only safe when the target is running
+				 * from a sufficiently high clock (32 kHz is usually too slow)
+				 */
+				if (arm7_9->fast_memory_access)
+					retval = arm7_9_execute_fast_sys_speed(target);
+				else
+					retval = arm7_9_execute_sys_speed(target);
+				if (retval != ERROR_OK)
+					return retval;
 			}
-			break;
-		case 1:
-			while (num_accesses < count) {
-				uint32_t reg_list;
-				thisrun_accesses =
-						((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
-				reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
 
-				for (i = 1; i <= thisrun_accesses; i++) {
-					if (i > last_reg)
-						last_reg = i;
-					arm7_9->load_byte_reg(target, i);
-					/* fast memory reads are only safe when the target is running
-					 * from a sufficiently high clock (32 kHz is usually too slow)
-					 */
-					if (arm7_9->fast_memory_access)
-						retval = arm7_9_execute_fast_sys_speed(target);
-					else
-						retval = arm7_9_execute_sys_speed(target);
-					if (retval != ERROR_OK)
-						return retval;
-				}
+			arm7_9->read_core_regs_target_buffer(target, reg_list, buffer, 1);
 
-				arm7_9->read_core_regs_target_buffer(target, reg_list, buffer, 1);
+			/* advance buffer, count number of accesses */
+			buffer += thisrun_accesses * 1;
+			num_accesses += thisrun_accesses;
 
-				/* advance buffer, count number of accesses */
-				buffer += thisrun_accesses * 1;
-				num_accesses += thisrun_accesses;
-
-				if ((j++%1024) == 0)
-					keep_alive();
-			}
-			break;
+			keep_alive();
+		}
+		break;
 	}
 
 	if (!is_arm_mode(arm->core_mode))
@@ -2313,30 +2308,117 @@ int arm7_9_write_memory(struct target *target,
 	embeddedice_store_reg(dbg_ctrl);
 
 	switch (size) {
-		case 4:
-			while (num_accesses < count) {
-				uint32_t reg_list;
-				thisrun_accesses =
-						((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
-				reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
+	case 4:
+		while (num_accesses < count) {
+			uint32_t reg_list;
+			thisrun_accesses =
+					((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
+			reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
 
-				for (i = 1; i <= thisrun_accesses; i++) {
-					if (i > last_reg)
-						last_reg = i;
-					reg[i] = target_buffer_get_u32(target, buffer);
-					buffer += 4;
-				}
+			for (i = 1; i <= thisrun_accesses; i++) {
+				if (i > last_reg)
+					last_reg = i;
+				reg[i] = target_buffer_get_u32(target, buffer);
+				buffer += 4;
+			}
 
-				arm7_9->write_core_regs(target, reg_list, reg);
+			arm7_9->write_core_regs(target, reg_list, reg);
 
-				arm7_9->store_word_regs(target, reg_list);
+			arm7_9->store_word_regs(target, reg_list);
+
+			/* fast memory writes are only safe when the target is running
+			 * from a sufficiently high clock (32 kHz is usually too slow)
+			 */
+			if (arm7_9->fast_memory_access) {
+				retval = arm7_9_execute_fast_sys_speed(target);
+			} else {
+				retval = arm7_9_execute_sys_speed(target);
+
+				/*
+				 * if memory writes are made when the clock is running slow
+				 * (i.e. 32 kHz) which is necessary in some scripts to reconfigure
+				 * processor operations after a "reset halt" or "reset init",
+				 * need to immediately stroke the keep alive or will end up with
+				 * gdb "keep alive not sent error message" problem.
+				 */
+
+				keep_alive();
+			}
+
+			if (retval != ERROR_OK)
+				return retval;
+
+			num_accesses += thisrun_accesses;
+		}
+		break;
+	case 2:
+		while (num_accesses < count) {
+			uint32_t reg_list;
+			thisrun_accesses =
+					((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
+			reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
+
+			for (i = 1; i <= thisrun_accesses; i++) {
+				if (i > last_reg)
+					last_reg = i;
+				reg[i] = target_buffer_get_u16(target, buffer) & 0xffff;
+				buffer += 2;
+			}
+
+			arm7_9->write_core_regs(target, reg_list, reg);
+
+			for (i = 1; i <= thisrun_accesses; i++) {
+				arm7_9->store_hword_reg(target, i);
 
 				/* fast memory writes are only safe when the target is running
 				 * from a sufficiently high clock (32 kHz is usually too slow)
 				 */
-				if (arm7_9->fast_memory_access)
+				if (arm7_9->fast_memory_access) {
 					retval = arm7_9_execute_fast_sys_speed(target);
-				else {
+				} else {
+					retval = arm7_9_execute_sys_speed(target);
+
+					/*
+					 * if memory writes are made when the clock is running slow
+					 * (i.e. 32 kHz) which is necessary in some scripts to reconfigure
+					 * processor operations after a "reset halt" or "reset init",
+					 * need to immediately stroke the keep alive or will end up with
+					 * gdb "keep alive not sent error message" problem.
+					 */
+
+					keep_alive();
+				}
+
+				if (retval != ERROR_OK)
+					return retval;
+			}
+
+			num_accesses += thisrun_accesses;
+		}
+		break;
+	case 1:
+		while (num_accesses < count) {
+			uint32_t reg_list;
+			thisrun_accesses =
+					((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
+			reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
+
+			for (i = 1; i <= thisrun_accesses; i++) {
+				if (i > last_reg)
+					last_reg = i;
+				reg[i] = *buffer++ & 0xff;
+			}
+
+			arm7_9->write_core_regs(target, reg_list, reg);
+
+			for (i = 1; i <= thisrun_accesses; i++) {
+				arm7_9->store_byte_reg(target, i);
+				/* fast memory writes are only safe when the target is running
+				 * from a sufficiently high clock (32 kHz is usually too slow)
+				 */
+				if (arm7_9->fast_memory_access) {
+					retval = arm7_9_execute_fast_sys_speed(target);
+				} else {
 					retval = arm7_9_execute_sys_speed(target);
 
 					/*
@@ -2353,98 +2435,11 @@ int arm7_9_write_memory(struct target *target,
 				if (retval != ERROR_OK)
 					return retval;
 
-				num_accesses += thisrun_accesses;
 			}
-			break;
-		case 2:
-			while (num_accesses < count) {
-				uint32_t reg_list;
-				thisrun_accesses =
-						((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
-				reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
 
-				for (i = 1; i <= thisrun_accesses; i++) {
-					if (i > last_reg)
-						last_reg = i;
-					reg[i] = target_buffer_get_u16(target, buffer) & 0xffff;
-					buffer += 2;
-				}
-
-				arm7_9->write_core_regs(target, reg_list, reg);
-
-				for (i = 1; i <= thisrun_accesses; i++) {
-					arm7_9->store_hword_reg(target, i);
-
-					/* fast memory writes are only safe when the target is running
-					 * from a sufficiently high clock (32 kHz is usually too slow)
-					 */
-					if (arm7_9->fast_memory_access)
-						retval = arm7_9_execute_fast_sys_speed(target);
-					else {
-						retval = arm7_9_execute_sys_speed(target);
-
-						/*
-						 * if memory writes are made when the clock is running slow
-						 * (i.e. 32 kHz) which is necessary in some scripts to reconfigure
-						 * processor operations after a "reset halt" or "reset init",
-						 * need to immediately stroke the keep alive or will end up with
-						 * gdb "keep alive not sent error message" problem.
-						 */
-
-						keep_alive();
-					}
-
-					if (retval != ERROR_OK)
-						return retval;
-				}
-
-				num_accesses += thisrun_accesses;
-			}
-			break;
-		case 1:
-			while (num_accesses < count) {
-				uint32_t reg_list;
-				thisrun_accesses =
-						((count - num_accesses) >= 14) ? 14 : (count - num_accesses);
-				reg_list = (0xffff >> (15 - thisrun_accesses)) & 0xfffe;
-
-				for (i = 1; i <= thisrun_accesses; i++) {
-					if (i > last_reg)
-						last_reg = i;
-					reg[i] = *buffer++ & 0xff;
-				}
-
-				arm7_9->write_core_regs(target, reg_list, reg);
-
-				for (i = 1; i <= thisrun_accesses; i++) {
-					arm7_9->store_byte_reg(target, i);
-					/* fast memory writes are only safe when the target is running
-					 * from a sufficiently high clock (32 kHz is usually too slow)
-					 */
-					if (arm7_9->fast_memory_access)
-						retval = arm7_9_execute_fast_sys_speed(target);
-					else {
-						retval = arm7_9_execute_sys_speed(target);
-
-						/*
-						 * if memory writes are made when the clock is running slow
-						 * (i.e. 32 kHz) which is necessary in some scripts to reconfigure
-						 * processor operations after a "reset halt" or "reset init",
-						 * need to immediately stroke the keep alive or will end up with
-						 * gdb "keep alive not sent error message" problem.
-						 */
-
-						keep_alive();
-					}
-
-					if (retval != ERROR_OK)
-						return retval;
-
-				}
-
-				num_accesses += thisrun_accesses;
-			}
-			break;
+			num_accesses += thisrun_accesses;
+		}
+		break;
 	}
 
 	/* Re-Set DBGACK */
@@ -2641,7 +2636,7 @@ int arm7_9_bulk_write_memory(struct target *target,
 		uint32_t endaddress = buf_get_u32(reg_params[0].value, 0, 32);
 		if (endaddress != (address + count*4)) {
 			LOG_ERROR(
-				"DCC write failed, expected end address 0x%08" TARGET_PRIxADDR " got 0x%0" PRIx32 "",
+				"DCC write failed, expected end address 0x%08" TARGET_PRIxADDR " got 0x%0" PRIx32,
 				(address + count*4),
 				endaddress);
 			retval = ERROR_FAIL;

@@ -332,43 +332,43 @@ static int amt_jtagaccel_execute_queue(struct jtag_command *cmd_queue)
 
 	while (cmd) {
 		switch (cmd->type) {
-			case JTAG_RESET:
-				LOG_DEBUG_IO("reset trst: %i srst %i",
-						cmd->cmd.reset->trst,
-						cmd->cmd.reset->srst);
-				if (cmd->cmd.reset->trst == 1)
-					tap_set_state(TAP_RESET);
-				amt_jtagaccel_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
-				break;
-			case JTAG_RUNTEST:
-				LOG_DEBUG_IO("runtest %i cycles, end in %i",
-						cmd->cmd.runtest->num_cycles,
-						cmd->cmd.runtest->end_state);
-				amt_jtagaccel_end_state(cmd->cmd.runtest->end_state);
-				amt_jtagaccel_runtest(cmd->cmd.runtest->num_cycles);
-				break;
-			case JTAG_TLR_RESET:
-				LOG_DEBUG_IO("statemove end in %i", cmd->cmd.statemove->end_state);
-				amt_jtagaccel_end_state(cmd->cmd.statemove->end_state);
-				amt_jtagaccel_state_move();
-				break;
-			case JTAG_SCAN:
-				LOG_DEBUG_IO("scan end in %i", cmd->cmd.scan->end_state);
-				amt_jtagaccel_end_state(cmd->cmd.scan->end_state);
-				scan_size = jtag_build_buffer(cmd->cmd.scan, &buffer);
-				type = jtag_scan_type(cmd->cmd.scan);
-				amt_jtagaccel_scan(cmd->cmd.scan->ir_scan, type, buffer, scan_size);
-				if (jtag_read_buffer(buffer, cmd->cmd.scan) != ERROR_OK)
-					retval = ERROR_JTAG_QUEUE_FAILED;
-				free(buffer);
-				break;
-			case JTAG_SLEEP:
-				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
-				jtag_sleep(cmd->cmd.sleep->us);
-				break;
-			default:
-				LOG_ERROR("BUG: unknown JTAG command type encountered");
-				exit(-1);
+		case JTAG_RESET:
+			LOG_DEBUG_IO("reset trst: %i srst %i",
+					cmd->cmd.reset->trst,
+					cmd->cmd.reset->srst);
+			if (cmd->cmd.reset->trst == 1)
+				tap_set_state(TAP_RESET);
+			amt_jtagaccel_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
+			break;
+		case JTAG_RUNTEST:
+			LOG_DEBUG_IO("runtest %i cycles, end in %i",
+					cmd->cmd.runtest->num_cycles,
+					cmd->cmd.runtest->end_state);
+			amt_jtagaccel_end_state(cmd->cmd.runtest->end_state);
+			amt_jtagaccel_runtest(cmd->cmd.runtest->num_cycles);
+			break;
+		case JTAG_TLR_RESET:
+			LOG_DEBUG_IO("statemove end in %i", cmd->cmd.statemove->end_state);
+			amt_jtagaccel_end_state(cmd->cmd.statemove->end_state);
+			amt_jtagaccel_state_move();
+			break;
+		case JTAG_SCAN:
+			LOG_DEBUG_IO("scan end in %i", cmd->cmd.scan->end_state);
+			amt_jtagaccel_end_state(cmd->cmd.scan->end_state);
+			scan_size = jtag_build_buffer(cmd->cmd.scan, &buffer);
+			type = jtag_scan_type(cmd->cmd.scan);
+			amt_jtagaccel_scan(cmd->cmd.scan->ir_scan, type, buffer, scan_size);
+			if (jtag_read_buffer(buffer, cmd->cmd.scan) != ERROR_OK)
+				retval = ERROR_JTAG_QUEUE_FAILED;
+			free(buffer);
+			break;
+		case JTAG_SLEEP:
+			LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
+			jtag_sleep(cmd->cmd.sleep->us);
+			break;
+		default:
+			LOG_ERROR("BUG: unknown JTAG command type encountered");
+			exit(-1);
 		}
 		cmd = cmd->next;
 	}
@@ -418,6 +418,8 @@ static int amt_jtagaccel_init(void)
 	uint8_t status_port;
 #endif
 	uint8_t ar_status;
+
+	LOG_WARNING("This adapter is deprecated and support will be removed in the next release!");
 
 #if PARPORT_USE_PPDEV == 1
 	if (device_handle > 0) {
@@ -579,7 +581,8 @@ static struct jtag_interface amt_jtagaccel_interface = {
 
 struct adapter_driver amt_jtagaccel_adapter_driver = {
 	.name = "amt_jtagaccel",
-	.transports = jtag_only,
+	.transport_ids = TRANSPORT_JTAG,
+	.transport_preferred_id = TRANSPORT_JTAG,
 	.commands = amtjtagaccel_command_handlers,
 
 	.init = amt_jtagaccel_init,

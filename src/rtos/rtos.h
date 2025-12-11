@@ -9,8 +9,8 @@
 #define OPENOCD_RTOS_RTOS_H
 
 #include "server/server.h"
+#include "target/breakpoints.h"
 #include "target/target.h"
-#include <helper/jim-nvp.h>
 
 typedef int64_t threadid_t;
 typedef int64_t symbol_address_t;
@@ -65,8 +65,10 @@ struct rtos_type {
 	/** Return a list of general registers, with their values filled out. */
 	int (*get_thread_reg_list)(struct rtos *rtos, int64_t thread_id,
 			struct rtos_reg **reg_list, int *num_regs);
-	int (*get_thread_reg)(struct rtos *rtos, int64_t thread_id,
-			uint32_t reg_num, struct rtos_reg *reg);
+	/** Return the size and value of the specified reg_num. The value is
+	 * allocated by the callee and freed by the caller. */
+	int (*get_thread_reg_value)(struct rtos *rtos, threadid_t thread_id,
+			uint32_t reg_num, uint32_t *size, uint8_t **value);
 	int (*get_symbol_list_to_lookup)(struct symbol_table_elem *symbol_list[]);
 	int (*clean)(struct target *target);
 	char * (*ps_command)(struct target *target);
@@ -78,6 +80,19 @@ struct rtos_type {
 			uint8_t *buffer);
 	int (*write_buffer)(struct rtos *rtos, target_addr_t address, uint32_t size,
 			const uint8_t *buffer);
+	/**
+	 * Possibly work around an annoying gdb behaviour: when the current thread
+	 * is changed in gdb, it assumes that the target can follow and also make
+	 * the thread current. This is an assumption that cannot hold for a real
+	 * target running a multi-threading OS. If an RTOS can do this, override
+	 * needs_fake_step(). */
+	bool (*needs_fake_step)(struct target *target, int64_t thread_id);
+	/* When a software breakpoint is set, it is set on only one target,
+	 * because we assume memory is shared across them. By default this is the
+	 * first target in the SMP group. Override this function to have
+	 * breakpoint_add() use a different target. */
+	struct target * (*swbp_target)(struct rtos *rtos, target_addr_t address,
+				     uint32_t length, enum breakpoint_type type);
     int (*step_hook)(struct target *target, int current, uint32_t address, int handle_breakpoints);
 };
 
@@ -114,7 +129,8 @@ struct rtos_register_stacking {
 
 #define GDB_THREAD_PACKET_NOT_CONSUMED (-40)
 
-int rtos_create(struct jim_getopt_info *goi, struct target *target);
+int rtos_create(struct command_invocation *cmd, struct target *target,
+		const char *rtos_name);
 void rtos_destroy(struct target *target);
 int rtos_set_reg(struct connection *connection, int reg_num,
 		uint8_t *reg_value);
@@ -136,7 +152,16 @@ int rtos_read_buffer(struct target *target, target_addr_t address,
 		uint32_t size, uint8_t *buffer);
 int rtos_write_buffer(struct target *target, target_addr_t address,
 		uint32_t size, const uint8_t *buffer);
+bool rtos_needs_fake_step(struct target *target, int64_t thread_id);
+struct target *rtos_swbp_target(struct target *target, target_addr_t address,
+				uint32_t length, enum breakpoint_type type);
+/**
+ * Get the RTOS from the target itself, or from one of the targets in
+ * the same SMP node, or NULL when no RTOS is set.
+ */
+struct rtos *rtos_from_target(struct target *target);
 
+// Keep in alphabetic order this list of rtos
 extern const struct rtos_type chibios_rtos;
 extern const struct rtos_type chromium_ec_rtos;
 extern const struct rtos_type ecos_rtos;

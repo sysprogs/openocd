@@ -194,16 +194,12 @@ struct target_type {
 	const struct command_registration *commands;
 
 	/* called when target is created */
-	int (*target_create)(struct target *target, Jim_Interp *interp);
+	int (*target_create)(struct target *target);
 
 	/* called for various config parameters */
 	/* returns JIM_CONTINUE - if option not understood */
 	/* otherwise: JIM_OK, or JIM_ERR, */
 	int (*target_jim_configure)(struct target *target, struct jim_getopt_info *goi);
-
-	/* target commands specifically handled by the target */
-	/* returns JIM_OK, or JIM_ERR, or JIM_CONTINUE - if option not understood */
-	int (*target_jim_commands)(struct target *target, struct jim_getopt_info *goi);
 
 	/**
 	 * This method is used to perform target setup that requires
@@ -268,7 +264,7 @@ struct target_type {
 	int (*write_phys_memory)(struct target *target, target_addr_t phys_address,
 			uint32_t size, uint32_t count, const uint8_t *buffer);
 
-	int (*mmu)(struct target *target, int *enabled);
+	int (*mmu)(struct target *target, bool *enabled);
 
 	/* after reset is complete, the target can check if things are properly set up.
 	 *
@@ -311,6 +307,7 @@ struct target_type {
 	unsigned int (*data_bits)(struct target *target);
 };
 
+// Keep in alphabetic order this list of targets
 extern struct target_type aarch64_target;
 extern struct target_type arcv2_target;
 extern struct target_type arm11_target;

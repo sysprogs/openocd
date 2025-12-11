@@ -16,6 +16,7 @@
 #include "minidriver.h"
 #include "interface.h"
 #include "interfaces.h"
+#include <helper/bits.h>
 #include <transport/transport.h>
 
 /**
@@ -24,7 +25,6 @@
  */
 
 struct adapter_driver *adapter_driver;
-const char * const jtag_only[] = { "jtag", NULL };
 
 enum adapter_clk_mode {
 	CLOCK_MODE_UNSELECTED = 0,
@@ -53,17 +53,19 @@ static const struct gpio_map {
 	enum adapter_gpio_direction direction;
 	bool permit_drive_option;
 	bool permit_init_state_option;
+	bool permit_exit_state_option;
 } gpio_map[ADAPTER_GPIO_IDX_NUM] = {
-	[ADAPTER_GPIO_IDX_TDO] = { "tdo", ADAPTER_GPIO_DIRECTION_INPUT, false, true, },
-	[ADAPTER_GPIO_IDX_TDI] = { "tdi", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, },
-	[ADAPTER_GPIO_IDX_TMS] = { "tms", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, },
-	[ADAPTER_GPIO_IDX_TCK] = { "tck", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, },
-	[ADAPTER_GPIO_IDX_SWDIO] = { "swdio", ADAPTER_GPIO_DIRECTION_BIDIRECTIONAL, true, true, },
-	[ADAPTER_GPIO_IDX_SWDIO_DIR] = { "swdio_dir", ADAPTER_GPIO_DIRECTION_OUTPUT, true, false, },
-	[ADAPTER_GPIO_IDX_SWCLK] = { "swclk", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, },
-	[ADAPTER_GPIO_IDX_TRST] = { "trst", ADAPTER_GPIO_DIRECTION_OUTPUT, false, true, },
-	[ADAPTER_GPIO_IDX_SRST] = { "srst", ADAPTER_GPIO_DIRECTION_OUTPUT, false, true, },
-	[ADAPTER_GPIO_IDX_LED] = { "led", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, },
+	[ADAPTER_GPIO_IDX_TDO] = { "tdo", ADAPTER_GPIO_DIRECTION_INPUT, false, true, true },
+	[ADAPTER_GPIO_IDX_TDI] = { "tdi", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, true },
+	[ADAPTER_GPIO_IDX_TMS] = { "tms", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, true },
+	[ADAPTER_GPIO_IDX_TCK] = { "tck", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, true },
+	[ADAPTER_GPIO_IDX_SWDIO] = { "swdio", ADAPTER_GPIO_DIRECTION_BIDIRECTIONAL, true, true, true },
+	[ADAPTER_GPIO_IDX_SWDIO_DIR] = { "swdio_dir", ADAPTER_GPIO_DIRECTION_OUTPUT, true, false, false },
+	[ADAPTER_GPIO_IDX_SWCLK] = { "swclk", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, true },
+	[ADAPTER_GPIO_IDX_TRST] = { "trst", ADAPTER_GPIO_DIRECTION_OUTPUT, false, true, true },
+	[ADAPTER_GPIO_IDX_SRST] = { "srst", ADAPTER_GPIO_DIRECTION_OUTPUT, false, true, true },
+	[ADAPTER_GPIO_IDX_LED] = { "led", ADAPTER_GPIO_DIRECTION_OUTPUT, true, true, true },
+	[ADAPTER_GPIO_IDX_USER0] = { "user0", ADAPTER_GPIO_DIRECTION_BIDIRECTIONAL, true, true, true },
 };
 
 static int adapter_config_khz(unsigned int khz);
@@ -187,7 +189,6 @@ int adapter_init(struct command_context *cmd_ctx)
 int adapter_quit(void)
 {
 	if (is_adapter_initialized() && adapter_driver->quit) {
-		/* close the JTAG interface */
 		int result = adapter_driver->quit();
 		if (result != ERROR_OK)
 			LOG_ERROR("failed: %d", result);
@@ -270,15 +271,15 @@ int adapter_config_rclk(unsigned int fallback_speed_khz)
 int adapter_get_speed(int *speed)
 {
 	switch (adapter_config.clock_mode) {
-		case CLOCK_MODE_KHZ:
-			adapter_khz_to_speed(adapter_get_speed_khz(), speed);
-			break;
-		case CLOCK_MODE_RCLK:
-			adapter_rclk_to_speed(adapter_config.rclk_fallback_speed_khz, speed);
-			break;
-		default:
-			LOG_ERROR("BUG: unknown adapter clock mode");
-			return ERROR_FAIL;
+	case CLOCK_MODE_KHZ:
+		adapter_khz_to_speed(adapter_get_speed_khz(), speed);
+		break;
+	case CLOCK_MODE_RCLK:
+		adapter_rclk_to_speed(adapter_config.rclk_fallback_speed_khz, speed);
+		break;
+	default:
+		LOG_ERROR("BUG: unknown adapter clock mode");
+		return ERROR_FAIL;
 	}
 	return ERROR_OK;
 }
@@ -380,7 +381,7 @@ done:
 
 COMMAND_HANDLER(handle_adapter_name)
 {
-	/* return the name of the interface */
+	/* return the name of the adapter driver */
 	/* TCL code might need to know the exact type... */
 	/* FUTURE: we allow this as a means to "set" the interface. */
 
@@ -392,51 +393,49 @@ COMMAND_HANDLER(handle_adapter_name)
 	return ERROR_OK;
 }
 
-COMMAND_HANDLER(adapter_transports_command)
+COMMAND_HANDLER(dump_adapter_driver_list)
 {
-	char **transports;
-	int retval;
-
-	retval = CALL_COMMAND_HANDLER(transport_list_parse, &transports);
-	if (retval != ERROR_OK)
-		return retval;
-
-	retval = allow_transports(CMD_CTX, (const char **)transports);
-
-	if (retval != ERROR_OK) {
-		for (unsigned int i = 0; transports[i]; i++)
-			free(transports[i]);
-		free(transports);
+	int max_len = 0;
+	for (unsigned int i = 0; adapter_drivers[i]; i++) {
+		int len = strlen(adapter_drivers[i]->name);
+		if (max_len < len)
+			max_len = len;
 	}
-	return retval;
+
+	for (unsigned int i = 0; adapter_drivers[i]; i++) {
+		const char *name = adapter_drivers[i]->name;
+		unsigned int transport_ids = adapter_drivers[i]->transport_ids;
+
+		command_print_sameline(CMD, "%-*s {", max_len, name);
+		for (unsigned int j = BIT(0); j & TRANSPORT_VALID_MASK; j <<= 1)
+			if (j & transport_ids)
+				command_print_sameline(CMD, " %s", transport_name(j));
+		command_print(CMD, " }");
+	}
+
+	return ERROR_OK;
 }
 
 COMMAND_HANDLER(handle_adapter_list_command)
 {
-	if (strcmp(CMD_NAME, "list") == 0 && CMD_ARGC > 0)
+	if (CMD_ARGC)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
-	command_print(CMD, "The following debug adapters are available:");
-	for (unsigned int i = 0; adapter_drivers[i]; i++) {
-		const char *name = adapter_drivers[i]->name;
-		command_print(CMD, "%u: %s", i + 1, name);
-	}
-
-	return ERROR_OK;
+	return CALL_COMMAND_HANDLER(dump_adapter_driver_list);
 }
 
 COMMAND_HANDLER(handle_adapter_driver_command)
 {
 	int retval;
 
-	/* check whether the interface is already configured */
+	/* check whether the adapter driver is already configured */
 	if (adapter_driver) {
-		LOG_WARNING("Interface already configured, ignoring");
+		LOG_WARNING("Adapter driver already configured, ignoring");
 		return ERROR_OK;
 	}
 
-	/* interface name is a mandatory argument */
-	if (CMD_ARGC != 1 || CMD_ARGV[0][0] == '\0')
+	/* adapter driver name is a mandatory argument */
+	if (CMD_ARGC != 1)
 		return ERROR_COMMAND_SYNTAX_ERROR;
 
 	for (unsigned int i = 0; adapter_drivers[i]; i++) {
@@ -451,15 +450,17 @@ COMMAND_HANDLER(handle_adapter_driver_command)
 
 		adapter_driver = adapter_drivers[i];
 
-		return allow_transports(CMD_CTX, adapter_driver->transports);
+		return allow_transports(CMD_CTX, adapter_driver->transport_ids,
+			adapter_driver->transport_preferred_id);
 	}
 
-	/* no valid interface was found (i.e. the configuration option,
-	 * didn't match one of the compiled-in interfaces
+	/* no valid adapter driver was found (i.e. the configuration option,
+	 * didn't match one of the compiled-in drivers
 	 */
-	LOG_ERROR("The specified debug interface was not found (%s)",
+	LOG_ERROR("The specified adapter driver was not found (%s)",
 				CMD_ARGV[0]);
-	CALL_COMMAND_HANDLER(handle_adapter_list_command);
+	command_print(CMD, "The following adapter drivers are available:");
+	CALL_COMMAND_HANDLER(dump_adapter_driver_list);
 	return ERROR_JTAG_INVALID_INTERFACE;
 }
 
@@ -614,34 +615,34 @@ next:
 
 	/* minimal JTAG has neither SRST nor TRST (so that's the default) */
 	switch (new_cfg & (RESET_HAS_TRST | RESET_HAS_SRST)) {
-		case RESET_HAS_SRST:
-			modes[0] = "srst_only";
-			break;
-		case RESET_HAS_TRST:
-			modes[0] = "trst_only";
-			break;
-		case RESET_TRST_AND_SRST:
-			modes[0] = "trst_and_srst";
-			break;
-		default:
-			modes[0] = "none";
-			break;
+	case RESET_HAS_SRST:
+		modes[0] = "srst_only";
+		break;
+	case RESET_HAS_TRST:
+		modes[0] = "trst_only";
+		break;
+	case RESET_TRST_AND_SRST:
+		modes[0] = "trst_and_srst";
+		break;
+	default:
+		modes[0] = "none";
+		break;
 	}
 
 	/* normally SRST and TRST are decoupled; but bugs happen ... */
 	switch (new_cfg & (RESET_SRST_PULLS_TRST | RESET_TRST_PULLS_SRST)) {
-		case RESET_SRST_PULLS_TRST:
-			modes[1] = "srst_pulls_trst";
-			break;
-		case RESET_TRST_PULLS_SRST:
-			modes[1] = "trst_pulls_srst";
-			break;
-		case RESET_SRST_PULLS_TRST | RESET_TRST_PULLS_SRST:
-			modes[1] = "combined";
-			break;
-		default:
-			modes[1] = "separate";
-			break;
+	case RESET_SRST_PULLS_TRST:
+		modes[1] = "srst_pulls_trst";
+		break;
+	case RESET_TRST_PULLS_SRST:
+		modes[1] = "trst_pulls_srst";
+		break;
+	case RESET_SRST_PULLS_TRST | RESET_TRST_PULLS_SRST:
+		modes[1] = "combined";
+		break;
+	default:
+		modes[1] = "separate";
+		break;
 	}
 
 	/* TRST-less connectors include Altera, Xilinx, and minimal JTAG */
@@ -851,6 +852,7 @@ static COMMAND_HELPER(helper_adapter_gpio_print_config, enum adapter_gpio_config
 	const char *drive = "";
 	const char *pull = "";
 	const char *init_state = "";
+	const char *exit_state = "";
 
 	if (gpio_config->gpio_num == ADAPTER_GPIO_NOT_SET) {
 		command_print(CMD, "adapter gpio %s: not configured", gpio_map[gpio_idx].name);
@@ -909,9 +911,27 @@ static COMMAND_HELPER(helper_adapter_gpio_print_config, enum adapter_gpio_config
 		}
 	}
 
-	command_print(CMD, "adapter gpio %s (%s): num %u, chip %d, active-%s%s%s%s",
+	if (gpio_map[gpio_idx].permit_exit_state_option) {
+		switch (gpio_config->exit_state) {
+		case ADAPTER_GPIO_EXIT_STATE_NO_CHANGE:
+			exit_state = ", exit-state no-change";
+			break;
+		case ADAPTER_GPIO_EXIT_STATE_INACTIVE:
+			exit_state = ", exit-state inactive";
+			break;
+		case ADAPTER_GPIO_EXIT_STATE_ACTIVE:
+			exit_state = ", exit-state active";
+			break;
+		case ADAPTER_GPIO_EXIT_STATE_INPUT:
+			exit_state = ", exit-state input";
+			break;
+		}
+	}
+
+
+	command_print(CMD, "adapter gpio %s (%s): num %u, chip %d, active-%s%s%s%s%s",
 		gpio_map[gpio_idx].name, dir, gpio_config->gpio_num, (int)gpio_config->chip_num, active_state,
-		drive, pull, init_state);
+		drive, pull, init_state, exit_state);
 
 	return ERROR_OK;
 }
@@ -937,8 +957,8 @@ COMMAND_HANDLER(adapter_gpio_config_handler)
 
 	int gpio_idx = get_gpio_index(CMD_ARGV[0]);
 	if (gpio_idx == -1) {
-		LOG_ERROR("adapter has no gpio named %s", CMD_ARGV[0]);
-		return ERROR_COMMAND_SYNTAX_ERROR;
+		command_print(CMD, "adapter has no gpio named %s", CMD_ARGV[0]);
+		return ERROR_COMMAND_ARGUMENT_INVALID;
 	}
 
 	if (CMD_ARGC == 1) {
@@ -1032,9 +1052,34 @@ COMMAND_HANDLER(adapter_gpio_config_handler)
 			}
 		}
 
-		LOG_ERROR("illegal option for adapter %s %s: %s",
+		if (gpio_map[gpio_idx].permit_exit_state_option) {
+			if (strcmp(CMD_ARGV[i], "-exit-no-change") == 0) {
+				++i;
+				gpio_config->exit_state = ADAPTER_GPIO_EXIT_STATE_NO_CHANGE;
+				continue;
+			}
+			if (strcmp(CMD_ARGV[i], "-exit-inactive") == 0) {
+				++i;
+				gpio_config->exit_state = ADAPTER_GPIO_EXIT_STATE_INACTIVE;
+				continue;
+			}
+			if (strcmp(CMD_ARGV[i], "-exit-active") == 0) {
+				++i;
+				gpio_config->exit_state = ADAPTER_GPIO_EXIT_STATE_ACTIVE;
+				continue;
+			}
+
+			if (gpio_map[gpio_idx].direction == ADAPTER_GPIO_DIRECTION_BIDIRECTIONAL &&
+					strcmp(CMD_ARGV[i], "-exit-input") == 0) {
+				++i;
+				gpio_config->exit_state = ADAPTER_GPIO_EXIT_STATE_INPUT;
+				continue;
+			}
+		}
+
+		command_print(CMD, "illegal option for adapter %s %s: %s",
 				CMD_NAME, gpio_map[gpio_idx].name, CMD_ARGV[i]);
-		return ERROR_COMMAND_SYNTAX_ERROR;
+		return ERROR_COMMAND_ARGUMENT_INVALID;
 	}
 
 	/* Force swdio_dir init state to be compatible with swdio init state */
@@ -1138,13 +1183,6 @@ static const struct command_registration adapter_command_handlers[] = {
 		.chain = adapter_srst_command_handlers,
 	},
 	{
-		.name = "transports",
-		.handler = adapter_transports_command,
-		.mode = COMMAND_CONFIG,
-		.help = "Declare transports the adapter supports.",
-		.usage = "transport ...",
-	},
-	{
 		.name = "usb",
 		.mode = COMMAND_ANY,
 		.help = "usb adapter command group",
@@ -1176,7 +1214,8 @@ static const struct command_registration adapter_command_handlers[] = {
 			"[-active-high|-active-low] "
 			"[-push-pull|-open-drain|-open-source] "
 			"[-pull-none|-pull-up|-pull-down]"
-			"[-init-inactive|-init-active|-init-input] ]",
+			"[-init-inactive|-init-active|-init-input] ]"
+			"[-exit-no-change|-exit-inactive|-exit-active|-exit-input] ]",
 	},
 	COMMAND_REGISTRATION_DONE
 };

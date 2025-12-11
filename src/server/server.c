@@ -43,10 +43,10 @@ enum shutdown_reason {
 	SHUTDOWN_WITH_ERROR_CODE,	/* set by shutdown command; quit with non-zero return code */
 	SHUTDOWN_WITH_SIGNAL_CODE	/* set by sig_handler; exec shutdown then exit with signal as return code */
 };
-static enum shutdown_reason shutdown_openocd = CONTINUE_MAIN_LOOP;
 
+static volatile sig_atomic_t shutdown_openocd = CONTINUE_MAIN_LOOP;
 /* store received signal to exit application by killing ourselves */
-static int last_signal;
+static volatile sig_atomic_t last_signal;
 
 /* set the polling period to 100ms */
 static int polling_period = 100;
@@ -161,7 +161,8 @@ static int remove_connection(struct service *service, struct connection *connect
 	/* find connection */
 	while ((c = *p)) {
 		if (c->fd == connection->fd) {
-			service->connection_closed(c);
+			if (service->connection_closed)
+				service->connection_closed(c);
 			if (service->type == CONNECTION_TCP)
 				close_socket(c->fd);
 			else if (service->type == CONNECTION_PIPE) {
@@ -190,8 +191,13 @@ static int remove_connection(struct service *service, struct connection *connect
 
 static void free_service(struct service *c)
 {
+	if (c->type == CONNECTION_PIPE && c->fd != -1)
+		close(c->fd);
+	if (c->service_dtor)
+		c->service_dtor(c);
 	free(c->name);
 	free(c->port);
+	free(c->priv);
 	free(c);
 }
 
@@ -214,6 +220,7 @@ int add_service(const struct service_driver *driver, const char *port,
 	c->input = driver->input_handler;
 	c->connection_closed = driver->connection_closed_handler;
 	c->keep_client_alive = driver->keep_client_alive_handler;
+	c->service_dtor = driver->service_dtor_handler;
 	c->priv = priv;
 	c->next = NULL;
 	long portnumber;
@@ -371,7 +378,6 @@ int remove_service(const char *name, const char *port)
 			if (tmp->type != CONNECTION_STDINOUT)
 				close_socket(tmp->fd);
 
-			free(tmp->priv);
 			free_service(tmp);
 
 			return ERROR_OK;
@@ -390,18 +396,7 @@ static int remove_services(void)
 		struct service *next = c->next;
 
 		remove_connections(c);
-
-		free(c->name);
-
-		if (c->type == CONNECTION_PIPE) {
-			if (c->fd != -1)
-				close(c->fd);
-		}
-		free(c->port);
-		free(c->priv);
-		/* delete service */
-		free(c);
-
+		free_service(c);
 		/* remember the last service for unlinking */
 		c = next;
 	}
@@ -604,6 +599,7 @@ static void sig_handler(int sig)
 	/* store only first signal that hits us */
 	if (shutdown_openocd == CONTINUE_MAIN_LOOP) {
 		shutdown_openocd = SHUTDOWN_WITH_SIGNAL_CODE;
+		assert(sig >= SIG_ATOMIC_MIN && sig <= SIG_ATOMIC_MAX);
 		last_signal = sig;
 		LOG_DEBUG("Terminating on Signal %d", sig);
 	} else

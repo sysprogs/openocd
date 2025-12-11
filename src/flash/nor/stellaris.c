@@ -573,13 +573,13 @@ static void stellaris_read_clock_info(struct flash_bank *bank)
 	unsigned long mainfreq;
 
 	target_read_u32(target, SCB_BASE | RCC, &rcc);
-	LOG_DEBUG("Stellaris RCC %" PRIx32 "", rcc);
+	LOG_DEBUG("Stellaris RCC %" PRIx32, rcc);
 
 	target_read_u32(target, SCB_BASE | RCC2, &rcc2);
-	LOG_DEBUG("Stellaris RCC2 %" PRIx32 "", rcc);
+	LOG_DEBUG("Stellaris RCC2 %" PRIx32, rcc);
 
 	target_read_u32(target, SCB_BASE | PLLCFG, &pllcfg);
-	LOG_DEBUG("Stellaris PLLCFG %" PRIx32 "", pllcfg);
+	LOG_DEBUG("Stellaris PLLCFG %" PRIx32, pllcfg);
 
 	stellaris_info->rcc = rcc;
 	stellaris_info->rcc2 = rcc2;
@@ -608,30 +608,30 @@ static void stellaris_read_clock_info(struct flash_bank *bank)
 	stellaris_info->mck_desc = "";
 
 	switch (oscsrc) {
-		case 0:				/* MOSC */
-			mainfreq = rcc_xtal[xtal];
-			break;
-		case 1:				/* IOSC */
-			mainfreq = stellaris_info->iosc_freq;
-			stellaris_info->mck_desc = stellaris_info->iosc_desc;
-			break;
-		case 2:				/* IOSC/4 */
-			mainfreq = stellaris_info->iosc_freq / 4;
-			stellaris_info->mck_desc = stellaris_info->iosc_desc;
-			break;
-		case 3:				/* lowspeed */
-			/* Sandstorm doesn't have this 30K +/- 30% osc */
-			mainfreq = 30000;
-			stellaris_info->mck_desc = " (±30%)";
-			break;
-		case 8:				/* hibernation osc */
-			/* not all parts support hibernation */
-			mainfreq = 32768;
-			break;
+	case 0:				/* MOSC */
+		mainfreq = rcc_xtal[xtal];
+		break;
+	case 1:				/* IOSC */
+		mainfreq = stellaris_info->iosc_freq;
+		stellaris_info->mck_desc = stellaris_info->iosc_desc;
+		break;
+	case 2:				/* IOSC/4 */
+		mainfreq = stellaris_info->iosc_freq / 4;
+		stellaris_info->mck_desc = stellaris_info->iosc_desc;
+		break;
+	case 3:				/* lowspeed */
+		/* Sandstorm doesn't have this 30K +/- 30% osc */
+		mainfreq = 30000;
+		stellaris_info->mck_desc = " (±30%)";
+		break;
+	case 8:				/* hibernation osc */
+		/* not all parts support hibernation */
+		mainfreq = 32768;
+		break;
 
-		default: /* NOTREACHED */
-			mainfreq = 0;
-			break;
+	default: /* NOTREACHED */
+		mainfreq = 0;
+		break;
 	}
 
 	/* PLL is used if it's not bypassed; its output is 200 MHz
@@ -659,7 +659,7 @@ static int stellaris_read_part_info(struct flash_bank *bank)
 	target_read_u32(target, SCB_BASE | DID1, &did1);
 	target_read_u32(target, SCB_BASE | DC0, &stellaris_info->dc0);
 	target_read_u32(target, SCB_BASE | DC1, &stellaris_info->dc1);
-	LOG_DEBUG("did0 0x%" PRIx32 ", did1 0x%" PRIx32 ", dc0 0x%" PRIx32 ", dc1 0x%" PRIx32 "",
+	LOG_DEBUG("did0 0x%" PRIx32 ", did1 0x%" PRIx32 ", dc0 0x%" PRIx32 ", dc1 0x%" PRIx32,
 		  did0, did1, stellaris_info->dc0, stellaris_info->dc1);
 
 	ver = DID0_VER(did0);
@@ -702,35 +702,35 @@ static int stellaris_read_part_info(struct flash_bank *bank)
 	}
 
 	switch (stellaris_info->target_class) {
-		case 0:				/* Sandstorm */
-			/*
-			 * Current (2009-August) parts seem to be rev C2 and use 12 MHz.
-			 * Parts before rev C0 used 15 MHz; some C0 parts use 15 MHz
-			 * (LM3S618), but some other C0 parts are 12 MHz (LM3S811).
-			 */
-			if (((did0 >> 8) & 0xff) < 2) {
-				stellaris_info->iosc_freq = 15000000;
-				stellaris_info->iosc_desc = " (±50%)";
-			}
-			break;
+	case 0:				/* Sandstorm */
+		/*
+		 * Current (2009-August) parts seem to be rev C2 and use 12 MHz.
+		 * Parts before rev C0 used 15 MHz; some C0 parts use 15 MHz
+		 * (LM3S618), but some other C0 parts are 12 MHz (LM3S811).
+		 */
+		if (((did0 >> 8) & 0xff) < 2) {
+			stellaris_info->iosc_freq = 15000000;
+			stellaris_info->iosc_desc = " (±50%)";
+		}
+		break;
 
-		case 1:			/* Fury */
-			break;
+	case 1:			/* Fury */
+		break;
 
-		case 4:			/* Tempest */
-		case 5:			/* Blizzard */
-		case 6:			/* Firestorm */
-		case 0xa:		/* Snowflake */
-			stellaris_info->iosc_freq = 16000000;	/* +/- 1% */
-			stellaris_info->iosc_desc = " (±1%)";
-			/* FALL THROUGH */
+	case 4:			/* Tempest */
+	case 5:			/* Blizzard */
+	case 6:			/* Firestorm */
+	case 0xa:		/* Snowflake */
+		stellaris_info->iosc_freq = 16000000;	/* +/- 1% */
+		stellaris_info->iosc_desc = " (±1%)";
+		/* FALL THROUGH */
 
-		case 3:			/* DustDevil */
-			stellaris_info->xtal_mask = 0x1f;
-			break;
+	case 3:			/* DustDevil */
+		stellaris_info->xtal_mask = 0x1f;
+		break;
 
-		default:
-			LOG_WARNING("Unknown did0 class");
+	default:
+		LOG_WARNING("Unknown did0 class");
 	}
 
 	for (i = 0; stellaris_parts[i].partno; i++) {
@@ -871,7 +871,7 @@ static int stellaris_erase(struct flash_bank *bank, unsigned int first,
 		/* Check access violations */
 		target_read_u32(target, FLASH_CRIS, &flash_cris);
 		if (flash_cris & (AMASK)) {
-			LOG_WARNING("Error erasing flash page %i,  flash_cris 0x%" PRIx32 "",
+			LOG_WARNING("Error erasing flash page %i,  flash_cris 0x%" PRIx32,
 					banknr, flash_cris);
 			target_write_u32(target, FLASH_CRIS, 0);
 			return ERROR_FLASH_OPERATION_FAILED;
@@ -967,7 +967,7 @@ static int stellaris_protect(struct flash_bank *bank, int set,
 		/* Check access violations */
 		target_read_u32(target, FLASH_CRIS, &flash_cris);
 		if (flash_cris & (AMASK)) {
-			LOG_WARNING("Error setting flash page protection,  flash_cris 0x%" PRIx32 "", flash_cris);
+			LOG_WARNING("Error setting flash page protection,  flash_cris 0x%" PRIx32, flash_cris);
 			target_write_u32(target, FLASH_CRIS, 0);
 			return ERROR_FLASH_OPERATION_FAILED;
 		}
@@ -1035,7 +1035,7 @@ static int stellaris_write_block(struct flash_bank *bank,
 	if (wcount * 4 < buf_min)
 		return ERROR_TARGET_RESOURCE_NOT_AVAILABLE;
 
-	LOG_DEBUG("(bank=%p buffer=%p offset=%08" PRIx32 " wcount=%08" PRIx32 "",
+	LOG_DEBUG("(bank=%p buffer=%p offset=%08" PRIx32 " wcount=%08" PRIx32,
 			bank, buffer, offset, wcount);
 
 	/* flash write code */
@@ -1115,7 +1115,7 @@ static int stellaris_write(struct flash_bank *bank, const uint8_t *buffer,
 		return ERROR_TARGET_NOT_HALTED;
 	}
 
-	LOG_DEBUG("(bank=%p buffer=%p offset=%08" PRIx32 " count=%08" PRIx32 "",
+	LOG_DEBUG("(bank=%p buffer=%p offset=%08" PRIx32 " count=%08" PRIx32,
 			bank, buffer, offset, count);
 
 	if (stellaris_info->did1 == 0)
@@ -1153,7 +1153,7 @@ static int stellaris_write(struct flash_bank *bank, const uint8_t *buffer,
 				/* if an error occurred, we examine the reason, and quit */
 				target_read_u32(target, FLASH_CRIS, &flash_cris);
 
-				LOG_ERROR("flash writing failed with CRIS: 0x%" PRIx32 "", flash_cris);
+				LOG_ERROR("flash writing failed with CRIS: 0x%" PRIx32, flash_cris);
 				return ERROR_FLASH_OPERATION_FAILED;
 			}
 		} else {
@@ -1165,7 +1165,7 @@ static int stellaris_write(struct flash_bank *bank, const uint8_t *buffer,
 
 	while (words_remaining > 0) {
 		if (!(address & 0xff))
-			LOG_DEBUG("0x%" PRIx32 "", address);
+			LOG_DEBUG("0x%" PRIx32, address);
 
 		/* Program one word */
 		target_write_u32(target, FLASH_FMA, address);
@@ -1189,7 +1189,7 @@ static int stellaris_write(struct flash_bank *bank, const uint8_t *buffer,
 		memcpy(last_word, buffer+bytes_written, bytes_remaining);
 
 		if (!(address & 0xff))
-			LOG_DEBUG("0x%" PRIx32 "", address);
+			LOG_DEBUG("0x%" PRIx32, address);
 
 		/* Program one word */
 		target_write_u32(target, FLASH_FMA, address);
@@ -1205,7 +1205,7 @@ static int stellaris_write(struct flash_bank *bank, const uint8_t *buffer,
 	/* Check access violations */
 	target_read_u32(target, FLASH_CRIS, &flash_cris);
 	if (flash_cris & (AMASK)) {
-		LOG_DEBUG("flash_cris 0x%" PRIx32 "", flash_cris);
+		LOG_DEBUG("flash_cris 0x%" PRIx32, flash_cris);
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 	return ERROR_OK;
@@ -1342,7 +1342,7 @@ COMMAND_HANDLER(stellaris_handle_recover_command)
 	 * cycle to recover.
 	 */
 
-	Jim_Eval_Named(CMD_CTX->interp, "catch { hla_command \"debug unlock\" }", NULL, 0);
+	Jim_Eval_Named(CMD_CTX->interp, "catch { hla command \"debug unlock\" }", NULL, 0);
 	if (!strcmp(Jim_GetString(Jim_GetResult(CMD_CTX->interp), NULL), "0")) {
 		retval = ERROR_OK;
 		goto user_action;

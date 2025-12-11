@@ -82,9 +82,9 @@ static int ocl_erase(struct flash_bank *bank, unsigned int first,
 
 	if (dcc_buffer[1] != OCL_CMD_DONE) {
 		if (dcc_buffer[0] == OCL_ERASE_ALL)
-			LOG_ERROR("loader response to OCL_ERASE_ALL 0x%08" PRIx32 "", dcc_buffer[1]);
+			LOG_ERROR("loader response to OCL_ERASE_ALL 0x%08" PRIx32, dcc_buffer[1]);
 		else
-			LOG_ERROR("loader response to OCL_ERASE_BLOCK 0x%08" PRIx32 "", dcc_buffer[1]);
+			LOG_ERROR("loader response to OCL_ERASE_BLOCK 0x%08" PRIx32, dcc_buffer[1]);
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 
@@ -132,21 +132,21 @@ static int ocl_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t of
 		/* copy data to DCC buffer in proper byte order and properly aligned */
 		for (i = 0; i < runlen; i++) {
 			switch (byteofs++) {
-				case 0:
-					*dcc_bufptr &= *(buffer++) | 0xffffff00;
-					break;
-				case 1:
-					*dcc_bufptr &= ((*(buffer++)) << 8) | 0xffff00ff;
-					break;
-				case 2:
-					*dcc_bufptr &= ((*(buffer++)) << 16) | 0xff00ffff;
-					break;
-				case 3:
-					*dcc_bufptr &= ((*(buffer++)) << 24) | 0x00ffffff;
-					chksum ^= *(dcc_bufptr++);
-					*dcc_bufptr = 0xffffffff;
-					byteofs = 0;
-					break;
+			case 0:
+				*dcc_bufptr &= *(buffer++) | 0xffffff00;
+				break;
+			case 1:
+				*dcc_bufptr &= ((*(buffer++)) << 8) | 0xffff00ff;
+				break;
+			case 2:
+				*dcc_bufptr &= ((*(buffer++)) << 16) | 0xff00ffff;
+				break;
+			case 3:
+				*dcc_bufptr &= ((*(buffer++)) << 24) | 0x00ffffff;
+				chksum ^= *(dcc_bufptr++);
+				*dcc_bufptr = 0xffffffff;
+				byteofs = 0;
+				break;
 			}
 		}
 
@@ -178,7 +178,7 @@ static int ocl_write(struct flash_bank *bank, const uint8_t *buffer, uint32_t of
 		}
 
 		if (dcc_buffer[0] != OCL_CMD_DONE) {
-			LOG_ERROR("loader response to OCL_FLASH_BLOCK 0x%08" PRIx32 "", dcc_buffer[0]);
+			LOG_ERROR("loader response to OCL_FLASH_BLOCK 0x%08" PRIx32, dcc_buffer[0]);
 			free(dcc_buffer);
 			return ERROR_FLASH_OPERATION_FAILED;
 		}
@@ -217,7 +217,7 @@ static int ocl_probe(struct flash_bank *bank)
 		return retval;
 
 	if (dcc_buffer[0] != OCL_CMD_DONE) {
-		LOG_ERROR("loader response to OCL_PROBE 0x%08" PRIx32 "", dcc_buffer[0]);
+		LOG_ERROR("loader response to OCL_PROBE 0x%08" PRIx32, dcc_buffer[0]);
 		return ERROR_FLASH_OPERATION_FAILED;
 	}
 

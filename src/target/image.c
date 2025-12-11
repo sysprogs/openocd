@@ -670,7 +670,7 @@ static int image_elf32_read_section(struct image *image,
 	if (offset < field32(elf, segment->p_filesz)) {
 		/* maximal size present in file for the current segment */
 		read_size = MIN(size, field32(elf, segment->p_filesz) - offset);
-		LOG_DEBUG("read elf: size = 0x%zx at 0x%" TARGET_PRIxADDR "", read_size,
+		LOG_DEBUG("read elf: size = 0x%zx at 0x%" TARGET_PRIxADDR, read_size,
 			field32(elf, segment->p_offset) + offset);
 		/* read initialized area of the segment */
 		retval = fileio_seek(elf->fileio, field32(elf, segment->p_offset) + offset);
@@ -713,7 +713,7 @@ static int image_elf64_read_section(struct image *image,
 	if (offset < field64(elf, segment->p_filesz)) {
 		/* maximal size present in file for the current segment */
 		read_size = MIN(size, field64(elf, segment->p_filesz) - offset);
-		LOG_DEBUG("read elf: size = 0x%zx at 0x%" TARGET_PRIxADDR "", read_size,
+		LOG_DEBUG("read elf: size = 0x%zx at 0x%" TARGET_PRIxADDR, read_size,
 			field64(elf, segment->p_offset) + offset);
 		/* read initialized area of the segment */
 		retval = fileio_seek(elf->fileio, field64(elf, segment->p_offset) + offset);
@@ -815,36 +815,35 @@ static int image_mot_buffer_complete_inner(struct image *image,
 				}
 			} else if (record_type >= 1 && record_type <= 3) {
 				switch (record_type) {
-					case 1:
-						/* S1 - 16 bit address data record */
-						sscanf(&lpsz_line[bytes_read], "%4" SCNx32, &address);
-						cal_checksum += (uint8_t)(address >> 8);
-						cal_checksum += (uint8_t)address;
-						bytes_read += 4;
-						count -= 2;
-						break;
+				case 1:
+					/* S1 - 16 bit address data record */
+					sscanf(&lpsz_line[bytes_read], "%4" SCNx32, &address);
+					cal_checksum += (uint8_t)(address >> 8);
+					cal_checksum += (uint8_t)address;
+					bytes_read += 4;
+					count -= 2;
+					break;
 
-					case 2:
-						/* S2 - 24 bit address data record */
-						sscanf(&lpsz_line[bytes_read], "%6" SCNx32, &address);
-						cal_checksum += (uint8_t)(address >> 16);
-						cal_checksum += (uint8_t)(address >> 8);
-						cal_checksum += (uint8_t)address;
-						bytes_read += 6;
-						count -= 3;
-						break;
+				case 2:
+					/* S2 - 24 bit address data record */
+					sscanf(&lpsz_line[bytes_read], "%6" SCNx32, &address);
+					cal_checksum += (uint8_t)(address >> 16);
+					cal_checksum += (uint8_t)(address >> 8);
+					cal_checksum += (uint8_t)address;
+					bytes_read += 6;
+					count -= 3;
+					break;
 
-					case 3:
-						/* S3 - 32 bit address data record */
-						sscanf(&lpsz_line[bytes_read], "%8" SCNx32, &address);
-						cal_checksum += (uint8_t)(address >> 24);
-						cal_checksum += (uint8_t)(address >> 16);
-						cal_checksum += (uint8_t)(address >> 8);
-						cal_checksum += (uint8_t)address;
-						bytes_read += 8;
-						count -= 4;
-						break;
-
+				case 3:
+					/* S3 - 32 bit address data record */
+					sscanf(&lpsz_line[bytes_read], "%8" SCNx32, &address);
+					cal_checksum += (uint8_t)(address >> 24);
+					cal_checksum += (uint8_t)(address >> 16);
+					cal_checksum += (uint8_t)(address >> 8);
+					cal_checksum += (uint8_t)address;
+					bytes_read += 8;
+					count -= 4;
+					break;
 				}
 
 				if (full_address != address) {
@@ -1088,7 +1087,7 @@ int image_read_section(struct image *image,
 	/* don't read past the end of a section */
 	if (offset + size > image->sections[section].size) {
 		LOG_DEBUG(
-			"read past end of section: 0x%8.8" TARGET_PRIxADDR " + 0x%8.8" PRIx32 " > 0x%8.8" PRIx32 "",
+			"read past end of section: 0x%8.8" TARGET_PRIxADDR " + 0x%8.8" PRIx32 " > 0x%8.8" PRIx32,
 			offset,
 			size,
 			image->sections[section].size);

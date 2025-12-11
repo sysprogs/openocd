@@ -427,18 +427,4 @@
 		<UniversalDriverId>com.sysprogs.libusb.mini</UniversalDriverId>
 		<SerialNumberCommand>ftdi_serial</SerialNumberCommand>
 	</ProgrammingInterface>	
-	<ProgrammingInterface>
-		<ID>picoprobe</ID>
-		<Name>Raspberry Pi Picoprobe</Name>
-		<ScriptFile>interface/picoprobe.cfg</ScriptFile>
-		<UsbIdentities>
-		  <UsbIdentity>
-			<VID>2E8A</VID>
-			<PID>0004</PID>
-			<Interface>02</Interface>
-		  </UsbIdentity>
-		</UsbIdentities>
-		<UniversalDriverId>com.sysprogs.libusb.mini</UniversalDriverId>
-		<SerialNumberCommand>pico_serialnum</SerialNumberCommand>
-	</ProgrammingInterface>	
 </ArrayOfProgrammingInterface>

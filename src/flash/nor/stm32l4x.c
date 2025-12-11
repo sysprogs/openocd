@@ -152,6 +152,9 @@
 /* this flag indicates that programming should be done in quad-word
  * the default programming word size is double-word */
 #define F_QUAD_WORD_PROG    BIT(4)
+/* the registers WRPxyR have UNLOCK bit - writing zero locks the write
+ * protection region permanently! */
+#define F_WRP_HAS_LOCK		BIT(5)
 /* end of STM32L4 flags ******************************************************/
 
 
@@ -284,7 +287,7 @@ struct stm32l4_wrp {
 };
 
 /* human readable list of families this drivers supports (sorted alphabetically) */
-static const char *device_families = "STM32C0/G0/G4/L4/L4+/L5/U0/U5/WB/WL";
+static const char *device_families = "STM32C0/G0/G4/L4/L4+/L5/U0/U3/U5/WB/WL";
 
 static const struct stm32l4_rev stm32l47_l48xx_revs[] = {
 	{ 0x1000, "1" }, { 0x1001, "2" }, { 0x1003, "3" }, { 0x1007, "4" }
@@ -303,8 +306,16 @@ static const struct stm32l4_rev stm32c03xx_revs[] = {
 	{ 0x1000, "A" }, { 0x1001, "Z" },
 };
 
+static const struct stm32l4_rev stm32c05xx_revs[] = {
+	{ 0x1000, "A" },
+};
+
 static const struct stm32l4_rev stm32c071xx_revs[] = {
 	{ 0x1001, "Z" },
+};
+
+static const struct stm32l4_rev stm32c09xx_revs[] = {
+	{ 0x1000, "A" },
 };
 
 static const struct stm32l4_rev stm32g05_g06xx_revs[] = {
@@ -339,6 +350,10 @@ static const struct stm32l4_rev stm32u0xx_revs[] = {
 	{ 0x1000, "A" },
 };
 
+static const struct stm32l4_rev stm32u37_u38xx_revs[] = {
+	{ 0x1000, "A" }, { 0x1001, "Z" },
+};
+
 static const struct stm32l4_rev stm32g43_g44xx_revs[] = {
 	{ 0x1000, "A" }, { 0x2000, "B" }, { 0x2001, "Z" },
 };
@@ -370,11 +385,15 @@ static const struct stm32l4_rev stm32u53_u54xx_revs[] = {
 
 static const struct stm32l4_rev stm32u57_u58xx_revs[] = {
 	{ 0x1000, "A" }, { 0x1001, "Z" }, { 0x1003, "Y" }, { 0x2000, "B" },
-	{ 0x2001, "X" }, { 0x3000, "C" }, { 0x3001, "W" },
+	{ 0x2001, "X" }, { 0x3000, "C" }, { 0x3001, "W" }, { 0x3007, "U" },
 };
 
 static const struct stm32l4_rev stm32u59_u5axx_revs[] = {
-	{ 0x3001, "X" },
+	{ 0x3001, "X" }, { 0x3002, "W" },
+};
+
+static const struct stm32l4_rev stm32u5f_u5gxx_revs[] = {
+	{ 0x1000, "A" }, { 0x1001, "Z" },
 };
 
 static const struct stm32l4_rev stm32wba5x_revs[] = {
@@ -447,6 +466,18 @@ static const struct stm32l4_part_info stm32l4_parts[] = {
 	  .otp_size              = 1024,
 	},
 	{
+	  .id                    = DEVID_STM32C05XX,
+	  .revs                  = stm32c05xx_revs,
+	  .num_revs              = ARRAY_SIZE(stm32c05xx_revs),
+	  .device_str            = "STM32C05xx",
+	  .max_flash_size_kb     = 64,
+	  .flags                 = F_NONE,
+	  .flash_regs_base       = 0x40022000,
+	  .fsize_addr            = 0x1FFF75A0,
+	  .otp_base              = 0x1FFF7000,
+	  .otp_size              = 1024,
+	},
+	{
 	  .id                    = DEVID_STM32C071XX,
 	  .revs                  = stm32c071xx_revs,
 	  .num_revs              = ARRAY_SIZE(stm32c071xx_revs),
@@ -459,12 +490,25 @@ static const struct stm32l4_part_info stm32l4_parts[] = {
 	  .otp_size              = 1024,
 	},
 	{
+	  .id                    = DEVID_STM32C09XX,
+	  .revs                  = stm32c09xx_revs,
+	  .num_revs              = ARRAY_SIZE(stm32c09xx_revs),
+	  .device_str            = "STM32C09xx",
+	  .max_flash_size_kb     = 256,
+	  .flags                 = F_NONE,
+	  .flash_regs_base       = 0x40022000,
+	  .fsize_addr            = 0x1FFF75A0,
+	  .otp_base              = 0x1FFF7000,
+	  .otp_size              = 1024,
+	},
+	{
 	  .id                    = DEVID_STM32U53_U54XX,
 	  .revs                  = stm32u53_u54xx_revs,
 	  .num_revs              = ARRAY_SIZE(stm32u53_u54xx_revs),
 	  .device_str            = "STM32U535/U545",
 	  .max_flash_size_kb     = 512,
-	  .flags                 = F_HAS_DUAL_BANK | F_QUAD_WORD_PROG | F_HAS_TZ | F_HAS_L5_FLASH_REGS,
+	  .flags                 = F_HAS_DUAL_BANK | F_QUAD_WORD_PROG | F_HAS_TZ
+								| F_HAS_L5_FLASH_REGS | F_WRP_HAS_LOCK,
 	  .flash_regs_base       = 0x40022000,
 	  .fsize_addr            = 0x0BFA07A0,
 	  .otp_base              = 0x0BFA0000,
@@ -651,12 +695,25 @@ static const struct stm32l4_part_info stm32l4_parts[] = {
 	  .otp_size              = 1024,
 	},
 	{
+	  .id                    = DEVID_STM32U37_U38XX,
+	  .revs                  = stm32u37_u38xx_revs,
+	  .num_revs              = ARRAY_SIZE(stm32u37_u38xx_revs),
+	  .device_str            = "STM32U37/U38xx",
+	  .max_flash_size_kb     = 1024,
+	  .flags                 = F_HAS_DUAL_BANK | F_HAS_TZ | F_HAS_L5_FLASH_REGS | F_WRP_HAS_LOCK,
+	  .flash_regs_base       = 0x40022000,
+	  .fsize_addr            = 0x0BFA07A0,
+	  .otp_base              = 0x0BFA0000,
+	  .otp_size              = 512,
+	},
+	{
 	  .id                    = DEVID_STM32U59_U5AXX,
 	  .revs                  = stm32u59_u5axx_revs,
 	  .num_revs              = ARRAY_SIZE(stm32u59_u5axx_revs),
 	  .device_str            = "STM32U59/U5Axx",
 	  .max_flash_size_kb     = 4096,
-	  .flags                 = F_HAS_DUAL_BANK | F_QUAD_WORD_PROG | F_HAS_TZ | F_HAS_L5_FLASH_REGS,
+	  .flags                 = F_HAS_DUAL_BANK | F_QUAD_WORD_PROG | F_HAS_TZ
+								| F_HAS_L5_FLASH_REGS | F_WRP_HAS_LOCK,
 	  .flash_regs_base       = 0x40022000,
 	  .fsize_addr            = 0x0BFA07A0,
 	  .otp_base              = 0x0BFA0000,
@@ -668,7 +725,21 @@ static const struct stm32l4_part_info stm32l4_parts[] = {
 	  .num_revs              = ARRAY_SIZE(stm32u57_u58xx_revs),
 	  .device_str            = "STM32U57/U58xx",
 	  .max_flash_size_kb     = 2048,
-	  .flags                 = F_HAS_DUAL_BANK | F_QUAD_WORD_PROG | F_HAS_TZ | F_HAS_L5_FLASH_REGS,
+	  .flags                 = F_HAS_DUAL_BANK | F_QUAD_WORD_PROG | F_HAS_TZ
+								| F_HAS_L5_FLASH_REGS | F_WRP_HAS_LOCK,
+	  .flash_regs_base       = 0x40022000,
+	  .fsize_addr            = 0x0BFA07A0,
+	  .otp_base              = 0x0BFA0000,
+	  .otp_size              = 512,
+	},
+	{
+	  .id                    = DEVID_STM32U5F_U5GXX,
+	  .revs                  = stm32u5f_u5gxx_revs,
+	  .num_revs              = ARRAY_SIZE(stm32u5f_u5gxx_revs),
+	  .device_str            = "STM32U5F/U5Gxx",
+	  .max_flash_size_kb     = 4096,
+	  .flags                 = F_HAS_DUAL_BANK | F_QUAD_WORD_PROG | F_HAS_TZ
+								| F_HAS_L5_FLASH_REGS | F_WRP_HAS_LOCK,
 	  .flash_regs_base       = 0x40022000,
 	  .fsize_addr            = 0x0BFA07A0,
 	  .otp_base              = 0x0BFA0000,
@@ -926,7 +997,7 @@ static int stm32l4_wait_status_busy(struct flash_bank *bank, int timeout)
 		retval = stm32l4_read_flash_reg_by_index(bank, STM32_FLASH_SR_INDEX, &status);
 		if (retval != ERROR_OK)
 			return retval;
-		LOG_DEBUG("status: 0x%" PRIx32 "", status);
+		LOG_DEBUG("status: 0x%" PRIx32, status);
 		if ((status & stm32l4_info->sr_bsy_mask) == 0)
 			break;
 		if (timeout-- <= 0) {
@@ -1239,6 +1310,8 @@ static int stm32l4_write_one_wrpxy(struct flash_bank *bank, struct stm32l4_wrp *
 	int wrp_end = wrpxy->last - wrpxy->offset;
 
 	uint32_t wrp_value = (wrp_start & stm32l4_info->wrpxxr_mask) | ((wrp_end & stm32l4_info->wrpxxr_mask) << 16);
+	if (stm32l4_info->part_info->flags & F_WRP_HAS_LOCK)
+		wrp_value |= FLASH_WRPXYR_UNLOCK;
 
 	return stm32l4_write_option(bank, stm32l4_info->flash_regs[wrpxy->reg_idx], wrp_value, 0xffffffff);
 }
@@ -1322,6 +1395,10 @@ static int stm32l4_erase(struct flash_bank *bank, unsigned int first,
 	3. Set the STRT bit in the FLASH_CR register
 	4. Wait for the BSY bit to be cleared
 	 */
+
+	retval = stm32l4_wait_status_busy(bank, FLASH_ERASE_TIMEOUT);
+	if (retval != ERROR_OK)
+		goto err_lock;
 
 	for (unsigned int i = first; i <= last; i++) {
 		uint32_t erase_flags;
@@ -1728,6 +1805,9 @@ static int stm32l4_write(struct flash_bank *bank, const uint8_t *buffer,
 	if (retval != ERROR_OK)
 		goto err_lock;
 
+	retval = stm32l4_wait_status_busy(bank, FLASH_WRITE_TIMEOUT);
+	if (retval != ERROR_OK)
+		goto err_lock;
 
 	/* For TrustZone enabled devices, when TZEN is set and RDP level is 0.5,
 	 * the debug is possible only in non-secure state.
@@ -2005,7 +2085,9 @@ static int stm32l4_probe(struct flash_bank *bank)
 	case DEVID_STM32L43_L44XX:
 	case DEVID_STM32C01XX:
 	case DEVID_STM32C03XX:
+	case DEVID_STM32C05XX:
 	case DEVID_STM32C071XX:
+	case DEVID_STM32C09XX:
 	case DEVID_STM32G05_G06XX:
 	case DEVID_STM32G07_G08XX:
 	case DEVID_STM32U031XX:
@@ -2092,9 +2174,19 @@ static int stm32l4_probe(struct flash_bank *bank)
 			stm32l4_info->bank1_sectors = num_pages / 2;
 		}
 		break;
+	case DEVID_STM32U37_U38XX:
+		page_size_kb = 4;
+		num_pages = flash_size_kb / page_size_kb;
+		stm32l4_info->bank1_sectors = num_pages;
+		if (is_max_flash_size || (stm32l4_info->optr & FLASH_U5_DUALBANK)) {
+			stm32l4_info->dual_bank_mode = true;
+			stm32l4_info->bank1_sectors = num_pages / 2;
+		}
+		break;
 	case DEVID_STM32U53_U54XX:
 	case DEVID_STM32U57_U58XX:
 	case DEVID_STM32U59_U5AXX:
+	case DEVID_STM32U5F_U5GXX:
 		/* according to RM0456 Rev 4, Chapter 7.3.1 and 7.9.13
 		 * U53x/U54x have 512K max flash size:
 		 *   512K variants are always in DUAL BANK mode
@@ -2102,7 +2194,7 @@ static int stm32l4_probe(struct flash_bank *bank)
 		 * U57x/U58x have 2M max flash size:
 		 *   2M variants are always in DUAL BANK mode
 		 *   1M variants can be in DUAL BANK mode if FLASH_OPTR:DUALBANK is set
-		 * U59x/U5Ax have 4M max flash size:
+		 * U59x/U5Ax/U5Fx/U5Gx have 4M max flash size:
 		 *   4M variants are always in DUAL BANK mode
 		 *   2M variants can be in DUAL BANK mode if FLASH_OPTR:DUALBANK is set
 		 * Note: flash banks are always contiguous
@@ -2349,19 +2441,18 @@ COMMAND_HANDLER(stm32l4_handle_option_read_command)
 	if (retval != ERROR_OK)
 		return retval;
 
-	uint32_t reg_offset, reg_addr;
+	uint32_t reg_offset;
 	uint32_t value = 0;
 
 	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[1], reg_offset);
-	reg_addr = stm32l4_get_flash_reg(bank, reg_offset);
 
 	retval = stm32l4_read_flash_reg(bank, reg_offset, &value);
 	if (retval != ERROR_OK)
 		return retval;
 
-	command_print(CMD, "Option Register: <0x%" PRIx32 "> = 0x%" PRIx32 "", reg_addr, value);
+	command_print(CMD, "0x%" PRIx32, value);
 
-	return retval;
+	return ERROR_OK;
 }
 
 COMMAND_HANDLER(stm32l4_handle_option_write_command)

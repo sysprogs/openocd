@@ -16,6 +16,7 @@
 #include <helper/log.h>
 #include "breakpoints.h"
 #include "smp.h"
+#include "helper/util.h"
 
 enum breakpoint_watchpoint {
 	BREAKPOINT,
@@ -56,6 +57,13 @@ static int breakpoint_add_internal(struct target *target,
 				address, breakpoint->unique_id);
 			return ERROR_TARGET_DUPLICATE_BREAKPOINT;
 		}
+		if (type == BKPT_SOFT &&
+				is_memory_regions_overlap(address, length, breakpoint->address, breakpoint->length)) {
+			LOG_TARGET_ERROR(target, "Breakpoint intersects with another one at " TARGET_ADDR_FMT
+				" of length %u (BP %" PRIu32 ")", breakpoint->address,
+				breakpoint->length, breakpoint->unique_id);
+			return ERROR_TARGET_INTERSECT_BREAKPOINT;
+		}
 		breakpoint_p = &breakpoint->next;
 		breakpoint = breakpoint->next;
 	}
@@ -72,22 +80,22 @@ static int breakpoint_add_internal(struct target *target,
 
 	retval = target_add_breakpoint(target, *breakpoint_p);
 	switch (retval) {
-		case ERROR_OK:
-			break;
-		case ERROR_TARGET_RESOURCE_NOT_AVAILABLE:
-			reason = "resource not available";
-			goto fail;
-		case ERROR_TARGET_NOT_HALTED:
-			reason = "target running";
-			goto fail;
-		default:
-			reason = "unknown reason";
+	case ERROR_OK:
+		break;
+	case ERROR_TARGET_RESOURCE_NOT_AVAILABLE:
+		reason = "resource not available";
+		goto fail;
+	case ERROR_TARGET_NOT_HALTED:
+		reason = "target not halted";
+		goto fail;
+	default:
+		reason = "unknown reason";
 fail:
-			LOG_TARGET_ERROR(target, "can't add breakpoint: %s", reason);
-			free((*breakpoint_p)->orig_instr);
-			free(*breakpoint_p);
-			*breakpoint_p = NULL;
-			return retval;
+		LOG_TARGET_ERROR(target, "can't add breakpoint: %s", reason);
+		free((*breakpoint_p)->orig_instr);
+		free(*breakpoint_p);
+		*breakpoint_p = NULL;
+		return retval;
 	}
 
 	LOG_TARGET_DEBUG(target, "added %s breakpoint at " TARGET_ADDR_FMT
@@ -210,16 +218,10 @@ int breakpoint_add(struct target *target,
 	unsigned int length,
 	enum breakpoint_type type)
 {
-	if (target->smp) {
-		struct target_list *head;
-
-		if (type == BKPT_SOFT) {
-			head = list_first_entry(target->smp_targets, struct target_list, lh);
-			return breakpoint_add_internal(head->target, address, length, type);
-		}
-
-		foreach_smp_target(head, target->smp_targets) {
-			struct target *curr = head->target;
+	if (target->smp && type == BKPT_HARD) {
+		struct target_list *list_node;
+		foreach_smp_target(list_node, target->smp_targets) {
+			struct target *curr = list_node->target;
 			int retval = breakpoint_add_internal(curr, address, length, type);
 			if (retval != ERROR_OK)
 				return retval;
@@ -412,6 +414,8 @@ static int watchpoint_free(struct target *target, struct watchpoint *watchpoint_
 
 static int watchpoint_remove_all_internal(struct target *target)
 {
+	LOG_TARGET_DEBUG(target, "Delete all watchpoints");
+
 	struct watchpoint *watchpoint = target->watchpoints;
 	int retval = ERROR_OK;
 
@@ -465,27 +469,6 @@ int watchpoint_remove_all(struct target *target)
 	return breakpoint_watchpoint_remove_all(target, WATCHPOINT);
 }
 
-int breakpoint_clear_target(struct target *target)
-{
-	int retval = ERROR_OK;
-
-	if (target->smp) {
-		struct target_list *head;
-
-		foreach_smp_target(head, target->smp_targets) {
-			struct target *curr = head->target;
-			int status = breakpoint_remove_all_internal(curr);
-
-			if (status != ERROR_OK)
-				retval = status;
-		}
-	} else {
-		retval = breakpoint_remove_all_internal(target);
-	}
-
-	return retval;
-}
-
 struct breakpoint *breakpoint_find(struct target *target, target_addr_t address)
 {
 	struct breakpoint *breakpoint = target->breakpoints;
@@ -536,23 +519,23 @@ static int watchpoint_add_internal(struct target *target, target_addr_t address,
 
 	retval = target_add_watchpoint(target, *watchpoint_p);
 	switch (retval) {
-		case ERROR_OK:
-			break;
-		case ERROR_TARGET_RESOURCE_NOT_AVAILABLE:
-			reason = "resource not available";
-			goto bye;
-		case ERROR_TARGET_NOT_HALTED:
-			reason = "target running";
-			goto bye;
-		default:
-			reason = "unrecognized error";
+	case ERROR_OK:
+		break;
+	case ERROR_TARGET_RESOURCE_NOT_AVAILABLE:
+		reason = "resource not available";
+		goto bye;
+	case ERROR_TARGET_NOT_HALTED:
+		reason = "target not halted";
+		goto bye;
+	default:
+		reason = "unrecognized error";
 bye:
-			LOG_TARGET_ERROR(target, "can't add %s watchpoint at " TARGET_ADDR_FMT ", %s",
-				watchpoint_rw_strings[(*watchpoint_p)->rw],
-				address, reason);
-			free(*watchpoint_p);
-			*watchpoint_p = NULL;
-			return retval;
+		LOG_TARGET_ERROR(target, "can't add %s watchpoint at " TARGET_ADDR_FMT ", %s",
+			watchpoint_rw_strings[(*watchpoint_p)->rw],
+			address, reason);
+		free(*watchpoint_p);
+		*watchpoint_p = NULL;
+		return retval;
 	}
 
 	LOG_TARGET_DEBUG(target, "added %s watchpoint at " TARGET_ADDR_FMT
@@ -641,23 +624,6 @@ int watchpoint_remove(struct target *target, target_addr_t address)
 	return retval;
 }
 
-int watchpoint_clear_target(struct target *target)
-{
-	LOG_TARGET_DEBUG(target, "Delete all watchpoints");
-
-	struct watchpoint *watchpoint = target->watchpoints;
-	int retval = ERROR_OK;
-
-	while (watchpoint) {
-		struct watchpoint *tmp = watchpoint;
-		watchpoint = watchpoint->next;
-		int status = watchpoint_free(target, tmp);
-		if (status != ERROR_OK)
-			retval = status;
-	}
-	return retval;
-}
-
 int watchpoint_hit(struct target *target, enum watchpoint_rw *rw,
 		   target_addr_t *address)
 {
@@ -665,6 +631,20 @@ int watchpoint_hit(struct target *target, enum watchpoint_rw *rw,
 	struct watchpoint *hit_watchpoint;
 
 	retval = target_hit_watchpoint(target, &hit_watchpoint);
+	if (retval == ERROR_NOT_IMPLEMENTED
+			&& target->debug_reason == DBG_REASON_WATCHPOINT) {
+		// Handle the trivial case: only one watchpoint is set
+		unsigned int cnt = 0;
+		struct watchpoint *wp = target->watchpoints;
+		while (wp) {
+			cnt++;
+			wp = wp->next;
+		}
+		if (cnt == 1) {
+			retval = ERROR_OK;
+			hit_watchpoint = target->watchpoints;
+		}
+	}
 	if (retval != ERROR_OK)
 		return ERROR_FAIL;
 
