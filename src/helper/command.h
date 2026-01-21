@@ -80,8 +80,13 @@ struct command_invocation {
 	unsigned int argc;
 	const char **argv;
 	Jim_Obj * const *jimtcl_argv;
-	Jim_Obj *output;
+	char *output;
 };
+
+/**
+ * Assigned to command_invocation::output on allocation error
+ */
+#define CMD_PRINT_OOM ((char *)(-1L))
 
 /**
  * Return true if the command @c cmd is registered by OpenOCD.

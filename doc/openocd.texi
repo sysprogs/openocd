@@ -1771,10 +1771,10 @@ There are more complex examples too, with chips that have
 multiple TAPs. Ones worth looking at include:
 
 @itemize
-@item @file{target/omap3530.cfg} -- with disabled ARM and DSP,
+@item @file{target/ti/omap3530.cfg} -- with disabled ARM and DSP,
 plus a JRC to enable them
 @item @file{target/str912.cfg} -- with flash, CPU, and boundary scan
-@item @file{target/ti_dm355.cfg} -- with ETM, ARM, and JRC (this JRC
+@item @file{target/ti/dm355.cfg} -- with ETM, ARM, and JRC (this JRC
 is not currently used)
 @end itemize
 
@@ -3869,7 +3869,7 @@ device configuration, this function may be blocked out. Typical behavior
 observed in such cases is a firewall exception report on the security
 controller and armv8 processor reporting a system error.
 
-See @file{tcl/interface/ti_k3_am625-swd-native.cfg} for a sample configuration
+See @file{tcl/board/ti/am625-self-hosted.cfg} for a sample configuration
 file.
 
 @deffn {Command} {dmem info}
@@ -6225,6 +6225,22 @@ flash bank $_FLASHNAME cfi 0x00000000 0x02000000 2 4 $_TARGETNAME
 @c "cfi part_id" disabled
 @end deffn
 
+@deffn {Flash Driver} {hpm_xpi}
+All members of the HPMxxxx microcontroller family from HPMicro.
+Additional parameters are required to configure the driver: @option{io_base} is
+the base address of the configuration register interface, @option{opt0} and
+@option{opt1} are the options for the flash.
+
+@example
+flash bank $@{_FLASHNAME@}0 hpm_xpi base_address size_bytes 0 0 $_TARGETNAME \
+          io_base opt0 opt1
+@end example
+
+@deffn {Command} {hpm_xpi mass_erase} bank_id
+Erase all pages in data memory for the bank identified by @option{bank_id}.
+@end deffn
+@end deffn
+
 @anchor{jtagspi}
 @deffn {Flash Driver} {jtagspi}
 @cindex Generic JTAG2SPI driver
@@ -7016,6 +7032,11 @@ All members of the ATSAMV7x, ATSAMS70, and ATSAME70 families from
 Atmel include internal flash and use ARM's Cortex-M7 core.
 This driver uses the same command names/syntax as @xref{at91sam3}.
 
+The same driver provides interface for PIC32CZ CA70 series. This
+Cortex-M7 family from Microchip is both binary and pin to pin compatible
+with Atmel's SAM series. The PIC series is a replacement of the original
+SAM series from Atmel after the company acquisition by Microchip.
+
 @example
 flash bank $_FLASHNAME atsamv 0x00400000 0 0 0 $_TARGETNAME
 @end example
@@ -7114,6 +7135,34 @@ flash erase_sector 0 0 last # It will perform a mass erase
 @end example
 
 Triggering a mass erase is also useful when users want to disable readout protection.
+@end deffn
+
+@deffn {Flash Driver} {bl602}
+Supports RISC-V chips Bouffalo Lab BL602, BL702 and BL702L series.
+Both internal and external flashes are supported. The driver automatically
+recognizes the specific version's flash parameters and autoconfigures itself.
+Due to how the SFlash and XIP in those chips works, it is recommended to probe
+the flash before usage, and reset the chip after work with flash is finished.
+
+This driver does not generate boot header which is required to have working
+firmware. This header must be inside of ELF with proper Load Memory Address
+and other parts of firmware must have proper LMA based on boot header configuration.
+
+The @var{bl602} driver needs following parameters,
+which must appear in the following order:
+
+@itemize
+@item @var{chip_type} ... required, may be
+@option{bl602},
+@option{bl702},
+@option{bl702l}
+@end itemize
+
+Example:
+
+@example
+flash bank $_FLASHNAME bl602 0x23000000 0 0 0 $_TARGETNAME bl602
+@end example
 @end deffn
 
 @deffn {Flash Driver} {cc26xx}
@@ -9517,7 +9566,8 @@ Level 0 is error messages only;
 level 1 adds warnings;
 level 2 adds informational messages;
 level 3 adds debugging messages;
-and level 4 adds verbose low-level debug messages.
+level 4 adds verbose low-level debug messages;
+and level 5 adds USB communication messages.
 The default is level 2, but that can be overridden on
 the command line along with the location of that log
 file (which is normally the server's standard output).

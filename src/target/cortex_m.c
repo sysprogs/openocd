@@ -2064,7 +2064,6 @@ int cortex_m_set_breakpoint(struct target *target, struct breakpoint *breakpoint
 	int retval;
 	unsigned int fp_num = 0;
 	struct cortex_m_common *cortex_m = target_to_cm(target);
-	struct cortex_m_fp_comparator *comparator_list = cortex_m->fp_comparator_list;
 
 	if (breakpoint->is_set) {
 		LOG_TARGET_WARNING(target, "breakpoint (BPID: %" PRIu32 ") already set", breakpoint->unique_id);
@@ -2073,6 +2072,12 @@ int cortex_m_set_breakpoint(struct target *target, struct breakpoint *breakpoint
 
 	if (breakpoint->type == BKPT_HARD) {
 		uint32_t fpcr_value;
+		struct cortex_m_fp_comparator *comparator_list = cortex_m->fp_comparator_list;
+		if (!comparator_list) {
+			LOG_TARGET_ERROR(target, "No comparator list. Not examined?");
+			return ERROR_FAIL;
+		}
+
 		while (comparator_list[fp_num].used && (fp_num < cortex_m->fp_num_code))
 			fp_num++;
 		if (fp_num >= cortex_m->fp_num_code) {
@@ -2161,7 +2166,6 @@ int cortex_m_unset_breakpoint(struct target *target, struct breakpoint *breakpoi
 {
 	int retval;
 	struct cortex_m_common *cortex_m = target_to_cm(target);
-	struct cortex_m_fp_comparator *comparator_list = cortex_m->fp_comparator_list;
 
 	if (!breakpoint->is_set) {
 		LOG_TARGET_WARNING(target, "breakpoint not set");
@@ -2181,6 +2185,13 @@ int cortex_m_unset_breakpoint(struct target *target, struct breakpoint *breakpoi
 			LOG_TARGET_DEBUG(target, "Invalid FP Comparator number in breakpoint");
 			return ERROR_OK;
 		}
+
+		struct cortex_m_fp_comparator *comparator_list = cortex_m->fp_comparator_list;
+		if (!comparator_list) {
+			LOG_TARGET_ERROR(target, "No comparator list. Not examined?");
+			return ERROR_FAIL;
+		}
+
 		comparator_list[fp_num].used = false;
 		comparator_list[fp_num].fpcr_value = 0;
 		target_write_u32(target, comparator_list[fp_num].fpcr_address,
@@ -2459,6 +2470,13 @@ void cortex_m_enable_watchpoints(struct target *target)
 			cortex_m_set_watchpoint(target, watchpoint);
 		watchpoint = watchpoint->next;
 	}
+}
+
+static bool cortex_m_memory_ready(struct target *target)
+{
+	struct armv7m_common *armv7m = target_to_armv7m(target);
+
+	return armv7m->debug_ap;
 }
 
 static int cortex_m_read_memory(struct target *target, target_addr_t address,
@@ -2963,8 +2981,6 @@ int cortex_m_examine(struct target *target)
 	}
 
 	if (!target_was_examined(target)) {
-		target_set_examined(target);
-
 		/* Read from Device Identification Registers */
 		retval = target_read_u32(target, CPUID, &cpuid);
 		if (retval != ERROR_OK)
@@ -3632,6 +3648,7 @@ struct target_type cortexm_target = {
 	.get_gdb_arch = arm_get_gdb_arch,
 	.get_gdb_reg_list = armv7m_get_gdb_reg_list,
 
+	.memory_ready = cortex_m_memory_ready,
 	.read_memory = cortex_m_read_memory,
 	.write_memory = cortex_m_write_memory,
 	.checksum_memory = armv7m_checksum_memory,

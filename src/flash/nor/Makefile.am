@@ -22,6 +22,7 @@ NOR_DRIVERS = \
 	%D%/atsamv.c \
 	%D%/atsame5.c \
 	%D%/avrf.c \
+	%D%/bl602.c \
 	%D%/bluenrg-x.c \
 	%D%/cc3220sf.c \
 	%D%/cc26xx.c \
@@ -83,7 +84,8 @@ NOR_DRIVERS = \
 	%D%/w600.c \
 	%D%/xcf.c \
 	%D%/xmc1xxx.c \
-	%D%/xmc4xxx.c
+	%D%/xmc4xxx.c \
+	%D%/hpm_xpi.c
 
 NORHEADERS = \
 	%D%/artery.h \

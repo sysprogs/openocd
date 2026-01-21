@@ -13,8 +13,8 @@
     <ToolchainID>
       <ID>com.visualgdb.mingw32</ID>
       <Version>
-        <GCC>12.2.0</GCC>
-        <GDB>12.1</GDB>
+        <GCC>15.2.0</GCC>
+        <GDB>16.3</GDB>
         <Revision>1</Revision>
       </Version>
     </ToolchainID>
@@ -70,7 +70,7 @@
         <CMakeTargetSpecificSettings>
           <TargetID>openocd</TargetID>
           <Debug>
-            <Arguments>-f interface/stlink-v2-1.cfg -f target/stm32f4x.cfg -c init -c "flash probe 0" </Arguments>
+            <Arguments>-f interface/stlink-v2-1.cfg -f target/stm32f4x.cfg -c init </Arguments>
             <WorkingDirectory>$(LOCALAPPDATA)\VisualGDB\EmbeddedDebugPackages\com.sysprogs.arm.openocd\share\openocd\scripts</WorkingDirectory>
           </Debug>
           <Deployment>

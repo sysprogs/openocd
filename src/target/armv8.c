@@ -205,7 +205,9 @@ static int armv8_read_ttbcr(struct target *target)
 		retval = dpm->instr_read_data_r0(dpm,
 				ARMV8_MRS(SYSTEM_TCR_EL3, 0),
 				&ttbcr);
-		retval += dpm->instr_read_data_r0_64(dpm,
+		if (retval != ERROR_OK)
+			goto done;
+		retval = dpm->instr_read_data_r0_64(dpm,
 				ARMV8_MRS(SYSTEM_TTBR0_EL3, 0),
 				&armv8->ttbr_base);
 		if (retval != ERROR_OK)
@@ -218,7 +220,9 @@ static int armv8_read_ttbcr(struct target *target)
 		retval = dpm->instr_read_data_r0(dpm,
 				ARMV8_MRS(SYSTEM_TCR_EL2, 0),
 				&ttbcr);
-		retval += dpm->instr_read_data_r0_64(dpm,
+		if (retval != ERROR_OK)
+			goto done;
+		retval = dpm->instr_read_data_r0_64(dpm,
 				ARMV8_MRS(SYSTEM_TTBR0_EL2, 0),
 				&armv8->ttbr_base);
 		if (retval != ERROR_OK)
@@ -234,12 +238,14 @@ static int armv8_read_ttbcr(struct target *target)
 		retval = dpm->instr_read_data_r0_64(dpm,
 				ARMV8_MRS(SYSTEM_TCR_EL1, 0),
 				&ttbcr_64);
+		if (retval != ERROR_OK)
+			goto done;
 		armv8->va_size = 64 - (ttbcr_64 & 0x3F);
 		armv8->pa_size = armv8_pa_size((ttbcr_64 >> 32) & 7);
 		armv8->page_size = (ttbcr_64 >> 14) & 3;
 		armv8->armv8_mmu.ttbr1_used = (((ttbcr_64 >> 16) & 0x3F) != 0) ? 1 : 0;
 		armv8->armv8_mmu.ttbr0_mask  = 0x0000FFFFFFFFFFFFULL;
-		retval += dpm->instr_read_data_r0_64(dpm,
+		retval = dpm->instr_read_data_r0_64(dpm,
 				ARMV8_MRS(SYSTEM_TTBR0_EL1 | (armv8->armv8_mmu.ttbr1_used), 0),
 				&armv8->ttbr_base);
 		if (retval != ERROR_OK)
@@ -1849,7 +1855,12 @@ struct reg_cache *armv8_build_reg_cache(struct target *target)
 		reg_list[i].group = armv8_regs[i].group;
 		reg_list[i].number = i;
 		reg_list[i].exist = true;
-		reg_list[i].caller_save = true;	/* gdb defaults to true */
+
+		/* Registers which should be preserved across GDB inferior function calls.
+		 * Avoid saving ELx banked registers as a standard function should
+		 * not change them and higher EL registers are not accessible
+		 * in lower EL modes. */
+		reg_list[i].caller_save = i < ARMV8_ELR_EL1;
 
 		feature = calloc(1, sizeof(struct reg_feature));
 		if (feature) {

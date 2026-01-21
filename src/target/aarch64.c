@@ -39,7 +39,8 @@ struct aarch64_private_config {
 	struct arm_cti *cti;
 };
 
-static int aarch64_poll(struct target *target);
+static int aarch64_poll_smp(struct target *target, bool smp,
+							bool postpone_event);
 static int aarch64_debug_entry(struct target *target);
 static int aarch64_restore_context(struct target *target, bool bpwp);
 static int aarch64_set_breakpoint(struct target *target,
@@ -476,9 +477,8 @@ static int aarch64_halt_smp(struct target *target, bool exc_target)
 	return retval;
 }
 
-static int update_halt_gdb(struct target *target, enum target_debug_reason debug_reason)
+static int aarch64_update_halt_gdb(struct target *target, enum target_debug_reason debug_reason)
 {
-	struct target *gdb_target = NULL;
 	struct target_list *head;
 	struct target *curr;
     
@@ -492,7 +492,7 @@ static int update_halt_gdb(struct target *target, enum target_debug_reason debug
 		aarch64_halt_smp(target, true);
 	}
 
-	/* poll all targets in the group, but skip the target that serves GDB */
+	/* poll all targets in the group */
 	foreach_smp_target(head, target->smp_targets) {
 		curr = head->target;
 		/* skip calling context */
@@ -503,31 +503,43 @@ static int update_halt_gdb(struct target *target, enum target_debug_reason debug
 		/* skip targets that were already halted */
 		if (curr->state == TARGET_HALTED)
 			continue;
-		/* remember the gdb_service->target */
-		if (curr->gdb_service)
-			gdb_target = curr->gdb_service->target;
-		/* skip it */
-		if (curr == gdb_target)
-			continue;
 
-		/* avoid recursion in aarch64_poll() */
-		curr->smp = 0;
-		aarch64_poll(curr);
-		curr->smp = 1;
+		const bool smp = false;
+		const bool postpone_event = true;
+		aarch64_poll_smp(curr, smp, postpone_event);
 	}
 
-	/* after all targets were updated, poll the gdb serving target */
-	if (gdb_target && gdb_target != target)
-		aarch64_poll(gdb_target);
-
 	return ERROR_OK;
+}
+
+enum postponed_halt_events_op {
+	POSTPONED_HALT_EVENT_CLEAR,
+	POSTPONED_HALT_EVENT_EMIT
+};
+
+static void aarch64_smp_postponed_halt_events(struct list_head *smp_targets,
+											enum postponed_halt_events_op op)
+{
+	struct target_list *head;
+	foreach_smp_target(head, smp_targets) {
+		struct target *t = head->target;
+		if (!t->smp_halt_event_postponed)
+			continue;
+
+		if (op == POSTPONED_HALT_EVENT_EMIT) {
+			LOG_TARGET_DEBUG(t, "sending postponed target event 'halted'");
+			target_call_event_callbacks(t, TARGET_EVENT_HALTED);
+		}
+		t->smp_halt_event_postponed = false;
+	}
 }
 
 /*
  * Aarch64 Run control
  */
 
-static int aarch64_poll(struct target *target)
+static int aarch64_poll_smp(struct target *target, bool smp,
+							bool postpone_event)
 {
 	struct armv8_common *armv8 = target_to_armv8(target);
 	enum target_state prev_target_state;
@@ -562,17 +574,25 @@ static int aarch64_poll(struct target *target)
 			if (retval != ERROR_OK)
 				return retval;
 
-			if (target->smp)
-				update_halt_gdb(target, debug_reason);
+			if (smp)
+				aarch64_update_halt_gdb(target, debug_reason);
 
-			if (arm_semihosting(target, &retval) != 0)
+			if (arm_semihosting(target, &retval) != 0) {
+				if (smp)
+					aarch64_smp_postponed_halt_events(target->smp_targets,
+													POSTPONED_HALT_EVENT_CLEAR);
+
 				return retval;
+			}
 
 			switch (prev_target_state) {
 			case TARGET_RUNNING:
 			case TARGET_UNKNOWN:
 			case TARGET_RESET:
-				target_call_event_callbacks(target, TARGET_EVENT_HALTED);
+				if (postpone_event)
+					target->smp_halt_event_postponed = true;
+				else
+					target_call_event_callbacks(target, TARGET_EVENT_HALTED);
 				break;
 			case TARGET_DEBUG_RUNNING:
 				target_call_event_callbacks(target, TARGET_EVENT_DEBUG_HALTED);
@@ -580,6 +600,10 @@ static int aarch64_poll(struct target *target)
 			default:
 				break;
 			}
+
+			if (smp)
+				aarch64_smp_postponed_halt_events(target->smp_targets,
+												POSTPONED_HALT_EVENT_EMIT);
 		}
 	} else if (prsr & PRSR_RESET) {
 		target->state = TARGET_RESET;
@@ -588,6 +612,12 @@ static int aarch64_poll(struct target *target)
 	}
 
 	return retval;
+}
+
+static int aarch64_poll(struct target *target)
+{
+	const bool postpone_event = false;
+	return aarch64_poll_smp(target, target->smp != 0, postpone_event);
 }
 
 static int aarch64_halt(struct target *target)
@@ -873,7 +903,7 @@ static int aarch64_step_restart_smp(struct target *target)
 		retval = aarch64_do_restart_one(curr, RESTART_LAZY);
 		if (retval != ERROR_OK)
 			break;
-}
+	}
 
 	return retval;
 }
@@ -937,6 +967,8 @@ static int aarch64_resume(struct target *target, bool current,
 				}
 
 				if (curr->state != TARGET_RUNNING) {
+					struct armv8_common *curr_armv8 = target_to_armv8(curr);
+					curr_armv8->last_run_control_op = ARMV8_RUNCONTROL_RESUME;
 					curr->state = TARGET_RUNNING;
 					curr->debug_reason = DBG_REASON_NOTHALTED;
 					target_call_event_callbacks(curr, TARGET_EVENT_RESUMED);
@@ -2709,16 +2741,18 @@ static int aarch64_examine_first(struct target *target)
 
 	retval = mem_ap_read_u32(armv8->debug_ap,
 			armv8->debug_base + CPUV8_DBG_MEMFEATURE0, &tmp0);
-	retval += mem_ap_read_u32(armv8->debug_ap,
-			armv8->debug_base + CPUV8_DBG_MEMFEATURE0 + 4, &tmp1);
+	if (retval == ERROR_OK)
+		retval = mem_ap_read_u32(armv8->debug_ap,
+						armv8->debug_base + CPUV8_DBG_MEMFEATURE0 + 4, &tmp1);
 	if (retval != ERROR_OK) {
 		LOG_DEBUG("Examine %s failed", "Memory Model Type");
 		return retval;
 	}
 	retval = mem_ap_read_u32(armv8->debug_ap,
 			armv8->debug_base + CPUV8_DBG_DBGFEATURE0, &tmp2);
-	retval += mem_ap_read_u32(armv8->debug_ap,
-			armv8->debug_base + CPUV8_DBG_DBGFEATURE0 + 4, &tmp3);
+	if (retval == ERROR_OK)
+		retval = mem_ap_read_u32(armv8->debug_ap,
+						armv8->debug_base + CPUV8_DBG_DBGFEATURE0 + 4, &tmp3);
 	if (retval != ERROR_OK) {
 		LOG_DEBUG("Examine %s failed", "ID_AA64DFR0_EL1");
 		return retval;
