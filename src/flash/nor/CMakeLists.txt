@@ -83,4 +83,6 @@ add_library(ocdflashnor
 	eneispif.c
 	dw-spi.c
 	mspm0.c
-	artery.c)
+	artery.c
+	bl602.c
+	hpm_xpi.c)

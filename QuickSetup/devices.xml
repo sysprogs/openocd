@@ -6,6 +6,7 @@
 		<Name>STM32F0xxx</Name>
 		<MatchRegex>^STM32F0.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32f0</SecondBspID>
 		<ScriptFile>target/stm32f0x.cfg</ScriptFile>
 	</TargetDeviceFamily>
 	<TargetDeviceFamily>
@@ -13,6 +14,7 @@
 		<Name>STM32F1xxx</Name>
 		<MatchRegex>^STM32F1.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32f1</SecondBspID>
 		<ScriptFile>target/stm32f1x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -21,6 +23,7 @@
 		<Name>STM32F2xxx</Name>
 		<MatchRegex>^STM32F2.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32f2</SecondBspID>
 		<ScriptFile>target/stm32f2x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -29,6 +32,7 @@
 		<Name>STM32F3xxx</Name>
 		<MatchRegex>^STM32F3.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32f3</SecondBspID>
 		<ScriptFile>target/stm32f3x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -37,6 +41,7 @@
 		<Name>STM32F4xxx</Name>
 		<MatchRegex>^STM32F4.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32f4</SecondBspID>
 		<ScriptFile>target/stm32f4x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -45,6 +50,7 @@
 		<Name>STM32F7xxx</Name>
 		<MatchRegex>^STM32F7.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32f7</SecondBspID>
 		<ScriptFile>target/stm32f7x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -53,6 +59,7 @@
 		<Name>STM32L0xx (Single FLASH bank)</Name>
 		<MatchRegex>^STM32L0.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32l0</SecondBspID>
 		<ScriptFile>target/stm32l0.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -61,6 +68,7 @@
 		<Name>STM32L0xx (Dual FLASH bank)</Name>
 		<MatchRegex>^STM32L0_NOAUTO.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32l0</SecondBspID>
 		<ScriptFile>target/stm32l0_dual_bank.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -69,6 +77,7 @@
 		<Name>STM32L1xx (Single FLASH bank)</Name>
 		<MatchRegex>^STM32L1.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32l1</SecondBspID>
 		<ScriptFile>target/stm32l1.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -77,6 +86,7 @@
 		<Name>STM32L1xx (Dual FLASH bank)</Name>
 		<MatchRegex>^STM32L1_NOAUTO.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32l1</SecondBspID>
 		<ScriptFile>target/stm32l1x_dual_bank.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -85,6 +95,7 @@
 		<Name>STM32L4xx</Name>
 		<MatchRegex>^STM32L4.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32l4</SecondBspID>
 		<ScriptFile>target/stm32l4x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -93,6 +104,7 @@
 		<Name>STM32L5xx</Name>
 		<MatchRegex>^STM32L5.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32l5</SecondBspID>
 		<ScriptFile>target/stm32l5x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -104,11 +116,21 @@
 		<ScriptFile>target/stm32w108xx.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
+	<!--<TargetDeviceFamily>
+		<ID>STM32H5</ID>
+		<Name>STM32H5xx</Name>
+		<MatchRegex>^STM32H5.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32h5</SecondBspID>
+		<ScriptFile>target/stm32h5x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>-->
 	<TargetDeviceFamily>
 		<ID>STM32H7_DUALBANK</ID>
 		<Name>STM32H7xx (Dual FLASH bank)</Name>
 		<MatchRegex>^STM32H7(.3|42).*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32h7</SecondBspID>
 		<ScriptFile>target/stm32h7x_dual_bank.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -117,6 +139,7 @@
 		<Name>STM32H7xx (Single FLASH bank)</Name>
 		<MatchRegex>^STM32H7.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32h7</SecondBspID>
 		<ScriptFile>target/stm32h7x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -125,6 +148,7 @@
 		<Name>STM32G0xx</Name>
 		<MatchRegex>^STM32G0.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32g0</SecondBspID>
 		<ScriptFile>target/stm32g0x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -133,6 +157,7 @@
 		<Name>STM32G0xx (alternative)</Name>
 		<MatchRegex>^STM32G0.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32g0</SecondBspID>
 		<ScriptFile>target/stm32g0x_alt.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -141,6 +166,7 @@
 		<Name>STM32G4xx</Name>
 		<MatchRegex>^STM32G4.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32g4</SecondBspID>
 		<ScriptFile>target/stm32g4x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -149,6 +175,7 @@
 		<Name>STM32C0xx</Name>
 		<MatchRegex>^STM32C0.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32c0</SecondBspID>
 		<ScriptFile>target/stm32c0x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -157,6 +184,7 @@
 		<Name>STM32G4xx (alternative)</Name>
 		<MatchRegex>^STM32G4.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32g4</SecondBspID>
 		<ScriptFile>target/stm32g4x_alt.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
@@ -177,11 +205,38 @@
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
 	<TargetDeviceFamily>
+		<ID>STM32U0</ID>
+		<Name>STM32U0xx</Name>
+		<MatchRegex>^STM32U0.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32u0</SecondBspID>
+		<ScriptFile>target/stm32u0x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32U3</ID>
+		<Name>STM32U3xx</Name>
+		<MatchRegex>^STM32U3.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32u3</SecondBspID>
+		<ScriptFile>target/stm32u3x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
 		<ID>STM32U5</ID>
 		<Name>STM32U5xx</Name>
 		<MatchRegex>^STM32U5.*</MatchRegex>
 		<BspID>com.sysprogs.arm.stm32</BspID>
+		<SecondBspID>com.sysprogs.arm.stm32u5</SecondBspID>
 		<ScriptFile>target/stm32u5x.cfg</ScriptFile>
+		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
+	</TargetDeviceFamily>
+	<TargetDeviceFamily>
+		<ID>STM32N6</ID>
+		<Name>STM32N6xx</Name>
+		<MatchRegex>^STM32N6.*</MatchRegex>
+		<BspID>com.sysprogs.arm.stm32n6</BspID>
+		<ScriptFile>target/stm32n6x.cfg</ScriptFile>
 		<SpecifiesAdapterSpeed>true</SpecifiesAdapterSpeed>
 	</TargetDeviceFamily>
 	<TargetDeviceFamily>

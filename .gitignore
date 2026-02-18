@@ -124,3 +124,5 @@ GTAGS
 # A compile_commands.json can be generated using bear and will help tools such
 # as clangd to locate header files and use correct $CFLAGS
 compile_commands.json
+.sysprogside
+.visualgdb
