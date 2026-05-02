@@ -16,7 +16,7 @@ AS_IF([test "x$MAKEINFO" = "x"], [
 ])
 AC_SUBST([MAKEINFO])
 
-AM_INIT_AUTOMAKE([-Wall -Wno-portability dist-bzip2 dist-zip subdir-objects])
+AM_INIT_AUTOMAKE([foreign -Wall -Wno-portability dist-bzip2 dist-zip subdir-objects])
 
 AC_CONFIG_HEADERS([config.h])
 
@@ -56,15 +56,9 @@ AC_CHECK_TYPE([Elf64_Ehdr],
 	AC_DEFINE([HAVE_ELF64], [1], [Define to 1 if the system has the type 'Elf64_Ehdr'.]),
 	[], [[#include <elf.h>]])
 
-AC_MSG_CHECKING([for glibc])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <features.h>]], [[int v = __GLIBC__;return 0;]])],
-	[have_glibc=yes], [have_glibc=no])
-AC_MSG_RESULT($have_glibc)
-
 AC_CHECK_HEADERS([fcntl.h])
 AC_CHECK_HEADERS([linux/pci.h])
 AC_CHECK_HEADERS([linux/spi/spidev.h])
-AC_CHECK_HEADERS([malloc.h])
 AC_CHECK_HEADERS([netdb.h])
 AC_CHECK_HEADERS([poll.h])
 AC_CHECK_HEADERS([strings.h])
@@ -102,6 +96,8 @@ AC_CHECK_FUNCS([strnlen])
 AC_CHECK_FUNCS([gettimeofday])
 AC_CHECK_FUNCS([usleep])
 AC_CHECK_FUNCS([realpath])
+AC_CHECK_FUNCS([mallinfo])
+AC_CHECK_FUNCS([mallinfo2])
 
 # guess-rev.sh only exists in the repository, not in the released archives
 AC_MSG_CHECKING([whether to build a release])
@@ -267,18 +263,6 @@ AS_IF([test "x$enable_gcov" = "xyes"], [
   CFLAGS+=" -O0"
 ], [
   AC_DEFINE([USE_GCOV], [0], [0 to leave coverage collection disabled.])
-])
-
-debug_malloc=no
-AC_ARG_ENABLE([malloc_logging],
-  AS_HELP_STRING([--enable-malloc-logging],
-      [Include free space in logging messages (requires malloc.h).]),
-  [debug_malloc=$enableval], [])
-
-AC_MSG_CHECKING([whether to enable malloc free space logging]);
-AC_MSG_RESULT([$debug_malloc])
-AS_IF([test "x$debug_malloc" = "xyes" -a "x$have_glibc" = "xyes"], [
-  AC_DEFINE([_DEBUG_FREE_SPACE_],[1], [Include malloc free space in logging])
 ])
 
 m4_define([AC_ARG_ADAPTERS], [
@@ -765,6 +749,7 @@ AC_DEFINE([_GNU_SOURCE],[1],[Use GNU C library extensions (e.g. stdndup).])
 GCC_WARNINGS="-Wall -Wstrict-prototypes -Wformat-security -Wshadow"
 AS_IF([test "x${gcc_wextra}" = "xyes"], [
   GCC_WARNINGS="${GCC_WARNINGS} -Wextra -Wno-unused-parameter"
+  GCC_WARNINGS="${GCC_WARNINGS} -Wno-gnu-folding-constant"
   GCC_WARNINGS="${GCC_WARNINGS} -Wbad-function-cast"
   GCC_WARNINGS="${GCC_WARNINGS} -Wcast-align"
   GCC_WARNINGS="${GCC_WARNINGS} -Wredundant-decls"

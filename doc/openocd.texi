@@ -239,7 +239,7 @@ needing a Git client:
 
 @uref{http://repo.or.cz/w/openocd.git}
 
-The @file{README} file contains the instructions for building the project
+The @file{README.md} file contains the instructions for building the project
 from the repository or a snapshot.
 
 Developers that want to contribute patches to the OpenOCD system are
@@ -6160,7 +6160,7 @@ Some drivers also activate driver-specific commands.
 This is a special driver that maps a previously defined bank to another
 address. All bank settings will be copied from the master physical bank.
 
-The @var{virtual} driver defines one mandatory parameters,
+The @var{virtual} driver defines one mandatory parameter,
 
 @itemize
 @item @var{master_bank} The bank that this virtual address refers to.
@@ -6175,6 +6175,28 @@ flash bank vbank0 virtual 0xbfc00000 0 0 0 \
            $_TARGETNAME $_FLASHNAME
 flash bank vbank1 virtual 0x9fc00000 0 0 0 \
            $_TARGETNAME $_FLASHNAME
+@end example
+@end deffn
+
+@deffn {Flash Driver} ro_alias
+Similar as @var{virtual} driver but suppresses write
+and erase. Use to build a complete memory map for gdb.
+Bank size will be copied from the master physical bank.
+
+The @var{virtual} driver defines one mandatory parameter,
+
+@itemize
+@item @var{master_bank} The bank that this virtual address refers to.
+@end itemize
+@end deffn
+
+@deffn {Flash Driver} read_only
+A stub driver without write and erase.
+Use to define a ROM region for the gdb memory map.
+
+@example
+flash bank $_CHIPNAME.sysrom read_only 0x1ff00000 0xedc0 0 0 \
+           $_TARGETNAME
 @end example
 @end deffn
 
@@ -8509,7 +8531,7 @@ The @var{num} parameter is a value shown by @command{flash banks}.
 @end deffn
 
 @deffn {Flash Driver} {stm32l4x}
-All members of the STM32 C0, G0, G4, L4, L4+, L5, U0, U5, WB and WL
+All members of the STM32 C0, G0, G4, L4, L4+, L5, U0, U5, WB, WBA and WL
 microcontroller families from STMicroelectronics include internal flash
 and use ARM Cortex-M0+, M4 and M33 cores.
 The driver automatically recognizes a number of these chips using
@@ -9567,7 +9589,8 @@ level 1 adds warnings;
 level 2 adds informational messages;
 level 3 adds debugging messages;
 level 4 adds verbose low-level debug messages;
-and level 5 adds USB communication messages.
+and level 5 adds USB communication messages
+and amount of free heap space if mallinfo is available.
 The default is level 2, but that can be overridden on
 the command line along with the location of that log
 file (which is normally the server's standard output).

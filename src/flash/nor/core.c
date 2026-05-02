@@ -44,6 +44,11 @@ int flash_driver_protect(struct flash_bank *bank, int set, unsigned int first,
 	int retval;
 	unsigned int num_blocks;
 
+	if (!bank->driver->protect) {
+		LOG_ERROR("Flash protection is not supported");
+		return ERROR_FLASH_OPER_UNSUPPORTED;
+	}
+
 	if (bank->num_prot_blocks)
 		num_blocks = bank->num_prot_blocks;
 	else
@@ -58,11 +63,6 @@ int flash_driver_protect(struct flash_bank *bank, int set, unsigned int first,
 
 	/* force "set" to 0/1 */
 	set = !!set;
-
-	if (!bank->driver->protect) {
-		LOG_ERROR("Flash protection is not supported.");
-		return ERROR_FLASH_OPER_UNSUPPORTED;
-	}
 
 	/* DANGER!
 	 *
@@ -223,15 +223,8 @@ void flash_free_all_banks(void)
 		else
 			LOG_WARNING("Flash driver of %s does not support free_driver_priv()", bank->name);
 
-		/* For 'virtual' flash driver bank->sectors and bank->prot_blocks pointers are copied from
-		 * master flash_bank structure. They point to memory locations allocated by master flash driver
-		 * so master driver is responsible for releasing them.
-		 * Avoid UB caused by double-free memory corruption if flash bank is 'virtual'. */
-
-		if (strcmp(bank->driver->name, "virtual") != 0) {
-			free(bank->sectors);
-			free(bank->prot_blocks);
-		}
+		free(bank->sectors);
+		free(bank->prot_blocks);
 
 		free(bank->name);
 		free(bank);
@@ -400,17 +393,18 @@ int default_flash_blank_check(struct flash_bank *bank)
 
 	bool fast_check = true;
 	for (unsigned int i = 0; i < bank->num_sectors; ) {
+		unsigned int checked;
 		retval = target_blank_check_memory(target,
 				block_array + i, bank->num_sectors - i,
-				bank->erased_value);
-		if (retval < 1) {
+				bank->erased_value, &checked);
+		if (retval != ERROR_OK) {
 			/* Run slow fallback if the first run gives no result
 			 * otherwise use possibly incomplete results */
 			if (i == 0)
 				fast_check = false;
 			break;
 		}
-		i += retval; /* add number of blocks done this round */
+		i += checked; /* add number of blocks done this round */
 	}
 
 	if (fast_check) {

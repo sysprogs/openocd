@@ -85,4 +85,5 @@ add_library(ocdflashnor
 	mspm0.c
 	artery.c
 	bl602.c
-	hpm_xpi.c)
+	hpm_xpi.c
+	read_only.c)

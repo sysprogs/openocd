@@ -1,4 +1,4 @@
-# Welcome to OpenOCD!
+# Welcome to OpenOCD
 
 OpenOCD provides on-chip programming and debugging support with a
 layered architecture of JTAG interface and TAP support including:
@@ -24,138 +24,76 @@ This README file contains an overview of the following topics:
 - the installation and build process,
 - packaging tips.
 
-
-# Quickstart for the impatient
+## Quickstart for the impatient
 
 If you have a popular board then just start OpenOCD with its config,
 e.g.:
 
-    openocd -f board/stm32f4discovery.cfg
+```sh
+openocd -f board/stm32f4discovery.cfg
+```
 
 If you are connecting a particular adapter with some specific target,
 you need to source both the jtag interface and the target configs,
 e.g.:
 
-```
+```sh
 openocd -f interface/ftdi/jtagkey2.cfg -c "transport select jtag" \
         -f target/ti/calypso.cfg
 ```
 
-```
+```sh
 openocd -f interface/stlink.cfg -c "transport select swd" \
         -f target/stm32l0.cfg
 ```
 
 After OpenOCD startup, connect GDB with
 
-    (gdb) target extended-remote localhost:3333
+```gdb
+(gdb) target extended-remote localhost:3333
+```
 
+## Installing OpenOCD
 
-# OpenOCD Documentation
+The easiest way to install OpenOCD is through your operating system's package
+manager.
 
-In addition to the in-tree documentation, the latest manuals may be
-viewed online at the following URLs:
+- Debian / Ubuntu
 
-  OpenOCD User's Guide:
-    http://openocd.org/doc/html/index.html
+  ```sh
+  sudo apt install openocd
+  ```
 
-  OpenOCD Developer's Manual:
-    http://openocd.org/doc/doxygen/html/index.html
+- Fedora
 
-These reflect the latest development versions, so the following section
-introduces how to build the complete documentation from the package.
+  ```sh
+  sudo dnf install openocd
+  ```
 
-For more information, refer to these documents or contact the developers
-by subscribing to the OpenOCD developer mailing list:
+- macOS (via Homebrew)
 
-	openocd-devel@lists.sourceforge.net
+  ```sh
+  brew install open-ocd
+  ```
 
-## Building the OpenOCD Documentation
+- Windows (via MSYS2)
 
-By default the OpenOCD build process prepares documentation in the
-"Info format" and installs it the standard way, so that `info openocd`
-can access it.
+  ```sh
+  pacman -S mingw-w64-x86_64-openocd
+  ```
 
-Additionally, the OpenOCD User's Guide can be produced in the
-following different formats:
+These packages are often more stable than the bleeding-edge Git mainline, where
+active development happens.
+"Packagers" create binary releases of OpenOCD after the developers publish new
+source code releases.
+Older OpenOCD versions are not suitable for diagnosing issues in the current
+release.
+Users should stay in touch with their distribution maintainers or interface
+vendors to ensure that appropriate updates are provided regularly.
 
-If `PDFVIEWER` is set, this creates and views the PDF User Guide.
-
-    make pdf && ${PDFVIEWER} doc/openocd.pdf
-
-If `HTMLVIEWER` is set, this creates and views the HTML User Guide.
-
-    make html && ${HTMLVIEWER} doc/openocd.html/index.html
-
-The OpenOCD Developer Manual contains information about the internal
-architecture and other details about the code:
-
-Note: make sure doxygen is installed, type doxygen --version
-
-    make doxygen && ${HTMLVIEWER} doxygen/index.html
-
-
-# Supported hardware
-
-## JTAG adapters
-
-AM335x, ARM-JTAG-EW, ARM-USB-OCD, ARM-USB-TINY, AT91RM9200, axm0432, BCM2835,
-Bus Blaster, Buspirate, Cadence DPI, Cadence vdebug, Chameleon, CMSIS-DAP,
-Cortino, Cypress KitProg, DENX, Digilent JTAG-SMT2, DLC 5, DLP-USB1232H,
-embedded projects, Espressif USB JTAG Programmer,
-eStick, FlashLINK, FlossJTAG, Flyswatter, Flyswatter2,
-FTDI FT232R, Gateworks, Hoegl, ICDI, ICEBear, J-Link, JTAG VPI, JTAGkey,
-JTAGkey2, JTAG-lock-pick, KT-Link, Linux GPIOD, Lisa/L, LPC1768-Stick,
-Mellanox rshim, MiniModule, NGX, Nuvoton Nu-Link, Nu-Link2, NXHX, NXP IMX GPIO,
-OOCDLink, Opendous, OpenJTAG, Openmoko, OpenRD, OSBDM, Presto, Redbee,
-Remote Bitbang, RLink, SheevaPlug devkit, Stellaris evkits,
-ST-LINK (SWO tracing supported), STM32-PerformanceStick, STR9-comStick,
-sysfsgpio, Tigard, TI XDS110, TUMPA, Turtelizer, ULINK, USB-A9260, USB-Blaster,
-USB-JTAG, USBprog, VPACLink, VSLLink, Wiggler, XDS100v2, Xilinx XVC/PCIe,
-Xverve.
-
-## Debug targets
-
-ARM: AArch64, ARM11, ARM7, ARM9, Cortex-A/R (v7-A/R), Cortex-M (ARMv{6/7/8}-M),
-FA526, Feroceon/Dragonite, XScale.
-ARCv2, AVR32, DSP563xx, DSP5680xx, EnSilica eSi-RISC, EJTAG (MIPS32, MIPS64),
-ESP32, ESP32-S2, ESP32-S3, Intel Quark, LS102x-SAP, RISC-V, ST STM8,
-Xtensa.
-
-## Flash drivers
-
-ADUC702x, AT91SAM, AT91SAM9 (NAND), ATH79, ATmega128RFA1, Atmel SAM, AVR, CFI,
-DSP5680xx, EFM32, EM357, eSi-RISC, eSi-TSMC, EZR32HG, FM3, FM4, Freedom E SPI,
-GD32, i.MX31, Kinetis, LPC8xx/LPC1xxx/LPC2xxx/LPC541xx, LPC2900, LPC3180, LPC32xx,
-LPCSPIFI, Marvell QSPI, MAX32, Milandr, MXC, NIIET, nRF51, nRF52 , NuMicro,
-NUC910, Nuvoton NPCX, onsemi RSL10, Orion/Kirkwood, PIC32mx, PSoC4/5LP/6,
-Raspberry RP2040, Renesas RPC HF and SH QSPI,
-S3C24xx, S3C6400, SiM3x, SiFive Freedom E, Stellaris, ST BlueNRG, STM32,
-STM32 QUAD/OCTO-SPI for Flash/FRAM/EEPROM, STMSMI, STR7x, STR9x, SWM050,
-TI CC13xx, TI CC26xx, TI CC32xx, TI MSP432, Winner Micro w600, Xilinx XCF,
-XMC1xxx, XMC4xxx.
-
-
-# Installing OpenOCD
-
-## A Note to OpenOCD Users
-
-If you would rather be working "with" OpenOCD rather than "on" it, your
-operating system or JTAG interface supplier may provide binaries for
-you in a convenient-enough package.
-
-Such packages may be more stable than git mainline, where
-bleeding-edge development takes place. These "Packagers" produce
-binary releases of OpenOCD after the developers produces new "release"
-versions of the source code. Previous versions of OpenOCD cannot be
-used to diagnose problems with the current release, so users are
-encouraged to keep in contact with their distribution package
-maintainers or interface vendors to ensure suitable upgrades appear
-regularly.
-
-Users of these binary versions of OpenOCD must contact their Packager to
-ask for support or newer versions of the binaries; the OpenOCD
-developers do not support packages directly.
+If you use one of these binary packages, you must contact the Packager for
+support or for newer binary versions.
+The OpenOCD developers do not provide direct support for packaged binaries.
 
 ## A Note to OpenOCD Packagers
 
@@ -183,8 +121,92 @@ suggestions:
   particular hardware;
 - Use "ftdi" interface adapter driver for the FTDI-based devices.
 
+## OpenOCD Documentation
 
-# Building OpenOCD
+In addition to the in-tree documentation, the latest manuals may be
+viewed online at the following URLs:
+
+- OpenOCD User's Guide: <http://openocd.org/doc/html/index.html>
+
+- OpenOCD Developer's Manual: <http://openocd.org/doc/doxygen/html/index.html>
+
+These reflect the latest development versions, so the following section
+introduces how to build the complete documentation from the package.
+
+For more information, refer to these documents or contact the developers
+by subscribing to the OpenOCD developer mailing list: openocd-devel@lists.sourceforge.net
+
+### Building the OpenOCD Documentation
+
+By default the OpenOCD build process prepares documentation in the
+"Info format" and installs it the standard way, so that `info openocd`
+can access it.
+
+Additionally, the OpenOCD User's Guide can be produced in the
+following different formats:
+
+If `PDFVIEWER` is set, this creates and views the PDF User Guide.
+
+```sh
+make pdf && ${PDFVIEWER} doc/openocd.pdf
+```
+
+If `HTMLVIEWER` is set, this creates and views the HTML User Guide.
+
+```sh
+make html && ${HTMLVIEWER} doc/openocd.html/index.html
+```
+
+The OpenOCD Developer Manual contains information about the internal
+architecture and other details about the code:
+
+Note: make sure doxygen is installed, type doxygen --version
+
+```sh
+make doxygen && ${HTMLVIEWER} doxygen/index.html
+```
+
+## Supported hardware
+
+### JTAG adapters
+
+AM335x, ARM-JTAG-EW, ARM-USB-OCD, ARM-USB-TINY, AT91RM9200, axm0432, BCM2835,
+Bus Blaster, Buspirate, Cadence DPI, Cadence vdebug, Chameleon, CMSIS-DAP,
+Cortino, Cypress KitProg, DENX, Digilent JTAG-SMT2, DLC 5, DLP-USB1232H,
+embedded projects, Espressif USB JTAG Programmer,
+eStick, FlashLINK, FlossJTAG, Flyswatter, Flyswatter2,
+FTDI FT232R, Gateworks, Hoegl, ICDI, ICEBear, J-Link, JTAG VPI, JTAGkey,
+JTAGkey2, JTAG-lock-pick, KT-Link, Linux GPIOD, Lisa/L, LPC1768-Stick,
+Mellanox rshim, MiniModule, NGX, Nuvoton Nu-Link, Nu-Link2, NXHX, NXP IMX GPIO,
+OOCDLink, Opendous, OpenJTAG, Openmoko, OpenRD, OSBDM, Presto, Redbee,
+Remote Bitbang, RLink, SheevaPlug devkit, Stellaris evkits,
+ST-LINK (SWO tracing supported), STM32-PerformanceStick, STR9-comStick,
+sysfsgpio, Tigard, TI XDS110, TUMPA, Turtelizer, ULINK, USB-A9260, USB-Blaster,
+USB-JTAG, USBprog, VPACLink, VSLLink, Wiggler, XDS100v2, Xilinx XVC/PCIe,
+Xverve.
+
+### Debug targets
+
+ARM: AArch64, ARM11, ARM7, ARM9, Cortex-A/R (v7-A/R), Cortex-M (ARMv{6/7/8}-M),
+FA526, Feroceon/Dragonite, XScale.
+ARCv2, AVR32, DSP563xx, DSP5680xx, EnSilica eSi-RISC, EJTAG (MIPS32, MIPS64),
+ESP32, ESP32-S2, ESP32-S3, Intel Quark, LS102x-SAP, RISC-V, ST STM8,
+Xtensa.
+
+### Flash drivers
+
+ADUC702x, AT91SAM, AT91SAM9 (NAND), ATH79, ATmega128RFA1, Atmel SAM, AVR, CFI,
+DSP5680xx, EFM32, EM357, eSi-RISC, eSi-TSMC, EZR32HG, FM3, FM4, Freedom E SPI,
+GD32, i.MX31, Kinetis, LPC8xx/LPC1xxx/LPC2xxx/LPC541xx, LPC2900, LPC3180, LPC32xx,
+LPCSPIFI, Marvell QSPI, MAX32, Milandr, MXC, NIIET, nRF51, nRF52 , NuMicro,
+NUC910, Nuvoton NPCX, onsemi RSL10, Orion/Kirkwood, PIC32mx, PSoC4/5LP/6,
+Raspberry RP2040, Renesas RPC HF and SH QSPI,
+S3C24xx, S3C6400, SiM3x, SiFive Freedom E, Stellaris, ST BlueNRG, STM32,
+STM32 QUAD/OCTO-SPI for Flash/FRAM/EEPROM, STMSMI, STR7x, STR9x, SWM050,
+TI CC13xx, TI CC26xx, TI CC32xx, TI MSP432, Winner Micro w600, Xilinx XCF,
+XMC1xxx, XMC4xxx.
+
+## Building OpenOCD
 
 The INSTALL file contains generic instructions for running `configure`
 and compiling the OpenOCD source code. That file is provided by
@@ -194,12 +216,12 @@ the GNU autotools, then you should read those instructions first.
 Note: if the INSTALL file is not present, it means you are using the
 source code from a development branch, not from an OpenOCD release.
 In this case, follow the instructions 'Compiling OpenOCD' below and
-the file will be created by the first command './bootstrap'.
+the file will be created by the first command `./bootstrap`.
 
 The remainder of this document tries to provide some instructions for
 those looking for a quick-install.
 
-## OpenOCD Dependencies
+### OpenOCD Dependencies
 
 GCC or Clang is currently required to build OpenOCD. The developers
 have begun to enforce strict code warnings (-Wall, -Werror, -Wextra,
@@ -216,7 +238,7 @@ You'll also need:
 - pkg-config >= 0.23 or pkgconf
 - libjim >= 0.79
 
-Additionally, for building from git:
+Additionally, for building from Git:
 
 - autoconf >= 2.69
 - automake >= 1.14
@@ -224,9 +246,8 @@ Additionally, for building from git:
 
 Optional USB-based adapter drivers need libusb-1.0.
 
-Optional USB-Blaster, ASIX Presto and OpenJTAG interface adapter
-drivers need:
-  - libftdi: http://www.intra2net.com/en/developer/libftdi/index.php
+Optional USB-Blaster, ASIX Presto and OpenJTAG interface adapter drivers need
+[libftdi](http://www.intra2net.com/en/developer/libftdi/index.php) library.
 
 Optional CMSIS-DAP adapter driver needs HIDAPI library.
 
@@ -241,6 +262,83 @@ Optional development script checkpatch needs:
 - perl
 - python
 - python-ply
+
+### Compiling OpenOCD
+
+To build OpenOCD, use the following sequence of commands:
+
+```sh
+./bootstrap
+./configure [options]
+make
+sudo make install
+```
+
+The `bootstrap` command is only necessary when building from the Git repository.
+The `configure` step generates the Makefiles required to build OpenOCD, usually
+with one or more options provided to it.
+The first 'make' step will build OpenOCD and place the final executable in './src/'.
+The final (optional) step, `make install`, places all of the files in the
+required location.
+
+To see the list of all the supported options, run `./configure --help`
+
+### Cross-compiling Options
+
+Cross-compiling is supported the standard autotools way, you just need
+to specify the cross-compiling target triplet in the --host option,
+e.g. for cross-building for Windows 32-bit with MinGW on Debian:
+
+```sh
+./configure --host=i686-w64-mingw32 [options]
+```
+
+To make pkg-config work nicely for cross-compiling, you might need an additional
+wrapper script as described at <https://autotools.io/pkgconfig/cross-compiling.html>.
+
+This is needed to tell pkg-config where to look for the target
+libraries that OpenOCD depends on. Alternatively, you can specify
+`*_CFLAGS` and `*_LIBS` environment variables directly, see `./configure
+--help` for the details.
+
+For a more or less complete script that does all this for you, see `contrib/cross-build.sh`.
+
+### Parallel Port Dongles
+
+If you want to access the parallel port using the PPDEV interface you
+have to specify both `--enable-parport` and `--enable-parport-ppdev`, since
+the later option is an option to the parport driver.
+
+The same is true for the `--enable-parport-giveio` option, you have to
+use both the `--enable-parport` and the `--enable-parport-giveio` option
+if you want to use giveio instead of ioperm parallel port access
+method.
+
+### Obtaining OpenOCD From Git
+
+You can download the current Git version with a Git client of your
+choice from the main repository: `git://git.code.sf.net/p/openocd/code`
+
+You may prefer to use a mirror:
+
+- <http://repo.or.cz/r/openocd.git>
+- git://repo.or.cz/openocd.git
+
+Using the Git command line client, you might use the following command
+to set up a local copy of the current repository (make sure there is no
+directory called "openocd" in the current directory):
+
+```sh
+git clone git://git.code.sf.net/p/openocd/code openocd
+```
+
+Then you can update that at your convenience using `git pull`.
+
+There is also a gitweb interface, which you can use either to browse the
+repository or to download arbitrary snapshots using HTTP: <http://repo.or.cz/w/openocd.git>.
+
+Snapshots are compressed tarballs of the source tree, about 1.3 MBytes
+each at this writing.
 
 ## Permissions delegation
 
@@ -258,82 +356,3 @@ For parallel port adapters on GNU/Linux and FreeBSD please change your
 For parport adapters on Windows you need to run install_giveio.bat
 (it's also possible to use "ioperm" with Cygwin instead) to give
 ordinary users permissions for accessing the "LPT" registers directly.
-
-## Compiling OpenOCD
-
-To build OpenOCD, use the following sequence of commands:
-
-    ./bootstrap
-    ./configure [options]
-    make
-    sudo make install
-
-The `bootstrap` command is only necessary when building from the Git repository. The `configure` step generates the Makefiles required to build
-OpenOCD, usually with one or more options provided to it. The first
-'make' step will build OpenOCD and place the final executable in
-'./src/'. The final (optional) step, `make install`, places all of
-the files in the required location.
-
-To see the list of all the supported options, run `./configure --help`
-
-## Cross-compiling Options
-
-Cross-compiling is supported the standard autotools way, you just need
-to specify the cross-compiling target triplet in the --host option,
-e.g. for cross-building for Windows 32-bit with MinGW on Debian:
-
-    ./configure --host=i686-w64-mingw32 [options]
-
-To make pkg-config work nicely for cross-compiling, you might need an
-additional wrapper script as described at
-
-    https://autotools.io/pkgconfig/cross-compiling.html
-
-This is needed to tell pkg-config where to look for the target
-libraries that OpenOCD depends on. Alternatively, you can specify
-`*_CFLAGS` and `*_LIBS` environment variables directly, see `./configure
---help` for the details.
-
-For a more or less complete script that does all this for you, see
-
-    contrib/cross-build.sh
-
-## Parallel Port Dongles
-
-If you want to access the parallel port using the PPDEV interface you
-have to specify both `--enable-parport` and `--enable-parport-ppdev`, since
-the later option is an option to the parport driver.
-
-The same is true for the `--enable-parport-giveio` option, you have to
-use both the `--enable-parport` and the `--enable-parport-giveio` option
-if you want to use giveio instead of ioperm parallel port access
-method.
-
-
-# Obtaining OpenOCD From GIT
-
-You can download the current GIT version with a GIT client of your
-choice from the main repository:
-
-    git://git.code.sf.net/p/openocd/code
-
-You may prefer to use a mirror:
-
-    http://repo.or.cz/r/openocd.git
-    git://repo.or.cz/openocd.git
-
-Using the GIT command line client, you might use the following command
-to set up a local copy of the current repository (make sure there is no
-directory called "openocd" in the current directory):
-
-    git clone git://git.code.sf.net/p/openocd/code openocd
-
-Then you can update that at your convenience using `git pull`.
-
-There is also a gitweb interface, which you can use either to browse
-the repository or to download arbitrary snapshots using HTTP:
-
-    http://repo.or.cz/w/openocd.git
-
-Snapshots are compressed tarballs of the source tree, about 1.3 MBytes
-each at this writing.

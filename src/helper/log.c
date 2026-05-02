@@ -24,24 +24,8 @@
 
 #include <stdarg.h>
 
-#ifdef _DEBUG_FREE_SPACE_
-#ifdef HAVE_MALLOC_H
+#if defined(HAVE_MALLINFO) || defined(HAVE_MALLINFO2)
 #include <malloc.h>
-#else
-#error "malloc.h is required to use --enable-malloc-logging"
-#endif
-
-#ifdef __GLIBC__
-#if __GLIBC_PREREQ(2, 33)
-#define FORDBLKS_FORMAT " %zu"
-#else
-/* glibc older than 2.33 (2021-02-01) use mallinfo(). Overwrite it */
-#define mallinfo2 mallinfo
-#define FORDBLKS_FORMAT " %d"
-#endif
-#else
-#error "GNU glibc is required to use --enable-malloc-logging"
-#endif
 #endif
 
 int debug_level = LOG_LVL_INFO;
@@ -63,7 +47,7 @@ static const char * const log_strings[7] = {
 	"Debug: ",  /* corresponds to LOG_LVL_DEBUG_USB */
 };
 
-static int count;
+static unsigned int count;
 
 /* forward the log to the listeners */
 static void log_forward(const char *file, unsigned int line, const char *function, const char *string)
@@ -117,18 +101,35 @@ static void log_puts(enum log_levels level,
 	if (LOG_LEVEL_IS(LOG_LVL_DEBUG)) {
 		/* print with count and time information */
 		int64_t t = timeval_ms() - start;
-#ifdef _DEBUG_FREE_SPACE_
-		struct mallinfo2 info = mallinfo2();
+
+#if defined(HAVE_MALLINFO) || defined(HAVE_MALLINFO2)
+		const int should_use_mallinfo = LOG_LEVEL_IS(LOG_LVL_DEBUG_MALLOC);
+
+		if (should_use_mallinfo) {
+#ifdef HAVE_MALLINFO2
+			struct mallinfo2 info = mallinfo2();
+#else
+			struct mallinfo info = mallinfo();
 #endif
-		fprintf(log_output, "%s%d %" PRId64 " %s:%d %s()"
-#ifdef _DEBUG_FREE_SPACE_
-			FORDBLKS_FORMAT
+
+			fprintf(log_output, "%s%u %" PRId64 " %s:%d %s()"
+#ifdef HAVE_MALLINFO2
+					" %zu"
+#else
+					" %d"
 #endif
-			": %s", log_strings[level + 1], count, t, file, line, function,
-#ifdef _DEBUG_FREE_SPACE_
-			info.fordblks,
+					": %s", log_strings[level + 1], count, t, file, line, function,
+					info.fordblks,
+					string);
+		}
+#else
+		const int should_use_mallinfo = 0;
 #endif
-			string);
+		if (!should_use_mallinfo) {
+			fprintf(log_output, "%s%u %" PRId64 " %s:%d %s()"
+					": %s", log_strings[level + 1], count, t, file, line, function,
+					string);
+		}
 	} else {
 		/* if we are using gdb through pipes then we do not want any output
 		 * to the pipe otherwise we get repeated strings */
@@ -153,9 +154,10 @@ void log_printf(enum log_levels level,
 	char *string;
 	va_list ap;
 
-	count++;
 	if (level > debug_level)
 		return;
+
+	count++;
 
 	va_start(ap, format);
 
@@ -173,10 +175,10 @@ void log_vprintf_lf(enum log_levels level, const char *file, unsigned int line,
 {
 	char *tmp;
 
-	count++;
-
 	if (level > debug_level)
 		return;
+
+	count++;
 
 	tmp = alloc_vprintf(format, args);
 
@@ -214,7 +216,7 @@ COMMAND_HANDLER(handle_debug_level_command)
 		int new_level;
 		COMMAND_PARSE_NUMBER(int, CMD_ARGV[0], new_level);
 		if (new_level > LOG_LVL_DEBUG_USB || new_level < LOG_LVL_SILENT) {
-			command_print(CMD, "level must be between %d and %d", LOG_LVL_SILENT, LOG_LVL_DEBUG_IO);
+			command_print(CMD, "level must be between %d and %d", LOG_LVL_SILENT, LOG_LVL_DEBUG_USB);
 			return ERROR_COMMAND_ARGUMENT_INVALID;
 		}
 		debug_level = new_level;
