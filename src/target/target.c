@@ -490,7 +490,7 @@ int target_poll(struct target *target)
 	/* We can't poll until after examine */
 	if (!target_was_examined(target)) {
 		/* Fail silently lest we pollute the log */
-		return ERROR_FAIL;
+		return ERROR_TARGET_NOT_EXAMINED;
 	}
 
 	retval = target->type->poll(target);
@@ -516,10 +516,10 @@ int target_poll(struct target *target)
 int target_halt(struct target *target)
 {
 	int retval;
-	/* We can't poll until after examine */
+
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
-		return ERROR_FAIL;
+		LOG_TARGET_ERROR(target, "not examined");
+		return ERROR_TARGET_NOT_EXAMINED;
 	}
 
 	retval = target->type->halt(target);
@@ -567,10 +567,9 @@ int target_resume(struct target *target, bool current, target_addr_t address,
 {
 	int retval;
 
-	/* We can't poll until after examine */
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
-		return ERROR_FAIL;
+		LOG_TARGET_ERROR(target, "not examined");
+		return ERROR_TARGET_NOT_EXAMINED;
 	}
 
 	target_call_event_callbacks(target, TARGET_EVENT_RESUME_START);
@@ -658,16 +657,19 @@ static int no_mmu(struct target *target, bool *enabled)
 
 /**
  * Reset the @c examined flag for the given target.
- * Pure paranoia -- targets are zeroed on allocation.
  */
 static inline void target_reset_examined(struct target *target)
 {
 	target->examined = false;
 }
 
+static inline void target_reset_active_polled(struct target *target)
+{
+	target->active_polled = false;
+}
+
 static int default_examine(struct target *target)
 {
-	target_set_examined(target);
 	return ERROR_OK;
 }
 
@@ -751,8 +753,8 @@ const char *target_type_name(const struct target *target)
 static int target_soft_reset_halt(struct target *target)
 {
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
-		return ERROR_FAIL;
+		LOG_TARGET_ERROR(target, "not examined");
+		return ERROR_TARGET_NOT_EXAMINED;
 	}
 	if (!target->type->soft_reset_halt) {
 		LOG_ERROR("Target %s does not support soft_reset_halt",
@@ -789,7 +791,8 @@ int target_run_algorithm(struct target *target,
 	int retval = ERROR_FAIL;
 
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
+		LOG_TARGET_ERROR(target, "not examined");
+		retval = ERROR_TARGET_NOT_EXAMINED;
 		goto done;
 	}
 	if (!target->type->run_algorithm) {
@@ -830,7 +833,8 @@ int target_start_algorithm(struct target *target,
 	int retval = ERROR_FAIL;
 
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
+		LOG_TARGET_ERROR(target, "not examined");
+		retval = ERROR_TARGET_NOT_EXAMINED;
 		goto done;
 	}
 	if (!target->type->start_algorithm) {
@@ -1397,7 +1401,8 @@ int target_get_gdb_reg_list(struct target *target,
 	int result = ERROR_FAIL;
 
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
+		LOG_TARGET_ERROR(target, "not examined");
+		result = ERROR_TARGET_NOT_EXAMINED;
 		goto done;
 	}
 
@@ -1436,6 +1441,11 @@ int target_step(struct target *target,
 		bool current, target_addr_t address, bool handle_breakpoints)
 {
 	int retval;
+
+	if (!target_was_examined(target)) {
+		LOG_TARGET_ERROR(target, "not examined");
+		return ERROR_TARGET_NOT_EXAMINED;
+	}
 
     if (target->rtos && target->rtos->type->step_hook && target->rtos->type->step_hook(target, current, address, handle_breakpoints) == ERROR_OK)
         return ERROR_OK;
@@ -1505,6 +1515,7 @@ static int target_init_one(struct command_context *cmd_ctx,
 		struct target *target)
 {
 	target_reset_examined(target);
+	target_reset_active_polled(target);
 
 	struct target_type *type = target->type;
 	if (!type->examine)
@@ -2495,8 +2506,8 @@ int target_checksum_memory(struct target *target, target_addr_t address, uint32_
 {
 	int retval;
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
-		return ERROR_FAIL;
+		LOG_TARGET_ERROR(target, "not examined");
+		return ERROR_TARGET_NOT_EXAMINED;
 	}
 
 	if (target->type->checksum_memory) {
@@ -2527,8 +2538,8 @@ int target_blank_check_memory(struct target *target,
 	uint8_t erased_value, unsigned int *checked)
 {
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
-		return ERROR_FAIL;
+		LOG_TARGET_ERROR(target, "not examined");
+		return ERROR_TARGET_NOT_EXAMINED;
 	}
 
 	if (!target->type->blank_check_memory)
@@ -2932,7 +2943,7 @@ static int handle_target(void *priv)
 			is_jtag_poll_safe() && target;
 			target = target->next) {
 
-		if (!target_was_examined(target))
+		if (!target_active_polled(target))
 			continue;
 
 		if (!target->tap->enabled)
@@ -2965,10 +2976,7 @@ static int handle_target(void *priv)
 				LOG_TARGET_ERROR(target, "Polling failed, trying to reexamine");
 				target_reset_examined(target);
 				retval = target_examine_one(target);
-				/* Target examination could have failed due to unstable connection,
-				 * but we set the examined flag anyway to repoll it later */
 				if (retval != ERROR_OK) {
-					target_set_examined(target);
 					LOG_TARGET_ERROR(target, "Examination failed, GDB will be halted. Polling again in %dms",
 						 target->backoff.times * polling_interval);
 					return retval;
@@ -2989,7 +2997,7 @@ COMMAND_HANDLER(handle_reg_command)
 
 	struct target *target = get_current_target(CMD_CTX);
 	if (!target_was_examined(target)) {
-		LOG_ERROR("Target not examined yet");
+		command_print(CMD, "Error: [%s] not examined", target_name(target));
 		return ERROR_TARGET_NOT_EXAMINED;
 	}
 	struct reg *reg = NULL;
@@ -4793,6 +4801,10 @@ COMMAND_HANDLER(handle_target_get_reg)
 	const int length = Jim_ListLength(CMD_CTX->interp, next_argv);
 
 	const struct target *target = get_current_target(CMD_CTX);
+	if (target->state != TARGET_HALTED) {
+		command_print(CMD, "Error: [%s] not halted", target_name(target));
+		return ERROR_TARGET_NOT_HALTED;
+	}
 
 	for (int i = 0; i < length; i++) {
 		Jim_Obj *elem = Jim_ListGetIndex(CMD_CTX->interp, next_argv, i);
@@ -4853,6 +4865,11 @@ COMMAND_HANDLER(handle_set_reg_command)
 
 	const struct target *target = get_current_target(CMD_CTX);
 	assert(target);
+	if (target->state != TARGET_HALTED) {
+		command_print(CMD, "Error: [%s] not halted", target_name(target));
+		return ERROR_TARGET_NOT_HALTED;
+	}
+
 
 	for (unsigned int i = 0; i < length; i += 2) {
 		const char *reg_name = Jim_String(dict[i]);
@@ -5457,8 +5474,10 @@ COMMAND_HANDLER(handle_target_reset)
 	/* do the assert */
 	if (n->value == NVP_ASSERT) {
 		int retval = target->type->assert_reset(target);
-		if (target->defer_examine)
+		if (target->defer_examine) {
 			target_reset_examined(target);
+			target_reset_active_polled(target);
+		}
 		return retval;
 	}
 

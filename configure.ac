@@ -186,6 +186,9 @@ m4_define([SERIAL_PORT_ADAPTERS],
 m4_define([PARALLEL_PORT_ADAPTER],
 	[[[parport], [PC Parallel Port], [PARPORT]]])
 
+m4_define([NETWORK_ADAPTERS],
+	[[[xvc], [Xilinx XVC TCP], [XVC]]])
+
 m4_define([LINUXSPIDEV_ADAPTER],
 	[[[linuxspidev], [Linux spidev driver], [LINUXSPIDEV]]])
 m4_define([VDEBUG_ADAPTER],
@@ -297,7 +300,8 @@ AC_ARG_ADAPTERS([
   RSHIM_ADAPTER,
   XVC_ADAPTERS,
   LIBJAYLINK_ADAPTERS,
-  CMSIS_DAP_TCP_ADAPTER
+  CMSIS_DAP_TCP_ADAPTER,
+  NETWORK_ADAPTERS
   ],[auto])
 
 AC_ARG_ADAPTERS([
@@ -528,10 +532,6 @@ AS_IF([test "x$enable_capstone" != xno], [
 	])
 ])
 
-AS_IF([test "x$enable_capstone" == xno], [
-	AC_DEFINE([HAVE_CAPSTONE], [0], [0 if you don't have Capstone disassembly framework.])
-])
-
 for hidapi_lib in hidapi hidapi-hidraw hidapi-libusb; do
 	PKG_CHECK_MODULES([HIDAPI],[$hidapi_lib],[
 		use_hidapi=yes
@@ -621,6 +621,11 @@ PROCESS_ADAPTERS([AMTJTAGACCEL_ADAPTER], [true], [unused])
 PROCESS_ADAPTERS([HOST_ARM_BITBANG_ADAPTERS], ["x$ac_cv_header_sys_mman_h" = "xyes"], [header sys/mman.h])
 PROCESS_ADAPTERS([HOST_ARM_OR_AARCH64_BITBANG_ADAPTERS], ["x$ac_cv_header_sys_mman_h" = "xyes"], [header sys/mman.h])
 PROCESS_ADAPTERS([DUMMY_ADAPTER], [true], [unused])
+PROCESS_ADAPTERS([NETWORK_ADAPTERS], [true], [unused])
+
+AS_IF([test "x$enable_xvc" != "xno"], [
+  build_bitbang=yes
+])
 
 AS_IF([test "x$enable_linuxgpiod" != "xno"], [
   build_bitbang=yes
@@ -815,6 +820,7 @@ m4_foreach([adapter_driver], [USB1_ADAPTERS,
 	LIBJAYLINK_ADAPTERS, XVC_ADAPTERS,
 	SERIAL_PORT_ADAPTERS,
 	PARALLEL_PORT_ADAPTER,
+	NETWORK_ADAPTERS,
 	LINUXSPIDEV_ADAPTER,
 	VDEBUG_ADAPTER,
 	JTAG_DPI_ADAPTER,

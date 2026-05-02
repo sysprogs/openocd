@@ -216,6 +216,9 @@ endif
 if CH347
 DRIVERFILES += %D%/ch347.c
 endif
+if XVC
+DRIVERFILES += %D%/xvc.c
+endif
 
 DRIVERHEADERS = \
 	%D%/bitbang.h \

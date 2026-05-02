@@ -519,6 +519,7 @@ static int telnet_exec_line(struct connection *connection)
 	t_con->prompt_visible = true;
 
 	if (retval == ERROR_COMMAND_CLOSE_CONNECTION)
+		/* "shutdown" or "exit" executed. */
 		return ERROR_SERVER_REMOTE_CLOSED;
 
 	/* the prompt is always placed at the line beginning */
@@ -601,7 +602,8 @@ static void telnet_auto_complete(struct connection *connection)
 
 	/* user command position in the line, ignore leading spaces */
 	size_t usr_cmd_pos = seq_start;
-	while ((usr_cmd_pos < t_con->line_cursor) && isspace(t_con->line[usr_cmd_pos]))
+	while ((usr_cmd_pos < t_con->line_cursor) &&
+			isspace((unsigned char)t_con->line[usr_cmd_pos]))
 		usr_cmd_pos++;
 
 	/* check user command length */
@@ -615,9 +617,10 @@ static void telnet_auto_complete(struct connection *connection)
 	 * because info commands does not tolerate multiple spaces */
 	size_t optimized_spaces = 0;
 	char query[usr_cmd_len + 1];
+
 	for (size_t i = 0; i < usr_cmd_len; i++) {
-		if ((i < usr_cmd_len - 1) && isspace(t_con->line[usr_cmd_pos + i])
-				&& isspace(t_con->line[usr_cmd_pos + i + 1])) {
+		if ((i < usr_cmd_len - 1) && isspace((unsigned char)t_con->line[usr_cmd_pos + i])
+				&& isspace((unsigned char)t_con->line[usr_cmd_pos + i + 1])) {
 			optimized_spaces++;
 			continue;
 		}
@@ -967,14 +970,14 @@ int telnet_init(char *banner)
 	return ERROR_OK;
 }
 
+bool telnet_is_from_telnet_session(struct command_context *cmd_ctx)
+{
+	return cmd_ctx->output_handler == telnet_output;
+}
+
 COMMAND_HANDLER(handle_telnet_port_command)
 {
 	return CALL_COMMAND_HANDLER(server_pipe_command, &telnet_port);
-}
-
-COMMAND_HANDLER(handle_exit_command)
-{
-	return ERROR_COMMAND_CLOSE_CONNECTION;
 }
 
 static const struct command_registration telnet_subcommand_handlers[] = {
@@ -991,13 +994,6 @@ static const struct command_registration telnet_subcommand_handlers[] = {
 };
 
 static const struct command_registration telnet_command_handlers[] = {
-	{
-		.name = "exit",
-		.handler = handle_exit_command,
-		.mode = COMMAND_ANY,
-		.usage = "",
-		.help = "exit telnet session",
-	},
 	{
 		.name = "telnet",
 		.chain = telnet_subcommand_handlers,

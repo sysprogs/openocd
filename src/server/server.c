@@ -613,7 +613,6 @@ static void sig_handler(int sig)
 	/* store only first signal that hits us */
 	if (shutdown_openocd == CONTINUE_MAIN_LOOP) {
 		shutdown_openocd = SHUTDOWN_WITH_SIGNAL_CODE;
-		assert(sig >= SIG_ATOMIC_MIN && sig <= SIG_ATOMIC_MAX);
 		last_signal = sig;
 		LOG_DEBUG("Terminating on Signal %d", sig);
 	} else
@@ -783,6 +782,23 @@ COMMAND_HANDLER(handle_shutdown_command)
 	return ERROR_COMMAND_CLOSE_CONNECTION;
 }
 
+COMMAND_HANDLER(handle_exit_command)
+{
+	if (!tcl_is_from_tcl_session(CMD_CTX)
+			&& !telnet_is_from_telnet_session(CMD_CTX)) {
+		LOG_WARNING("DEPRECATED: 'exit' should only be used in telnet or Tcl "
+			"sessions to close the session");
+		LOG_WARNING("Did you mean 'shutdown'?");
+		return command_run_line(CMD_CTX, "shutdown");
+	}
+
+	if (CMD_ARGC != 0)
+		return ERROR_COMMAND_SYNTAX_ERROR;
+
+	/* Disconnect telnet / Tcl session */
+	return ERROR_COMMAND_CLOSE_CONNECTION;
+}
+
 COMMAND_HANDLER(handle_poll_period_command)
 {
 	if (CMD_ARGC == 0)
@@ -818,6 +834,13 @@ static const struct command_registration server_command_handlers[] = {
 		.mode = COMMAND_ANY,
 		.usage = "",
 		.help = "shut the server down",
+	},
+	{
+		.name = "exit",
+		.handler = &handle_exit_command,
+		.mode = COMMAND_ANY,
+		.usage = "",
+		.help = "exit (disconnect) telnet or Tcl session",
 	},
 	{
 		.name = "poll_period",

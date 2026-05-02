@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<WorkspaceSnapshot xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <RootFolder>
+    <Items>
+      <Item xsi:type="ProjectReference">
+        <Type>com.visualgdb</Type>
+        <RelativePath>openocd.vgdbcmake</RelativePath>
+        <CacheSubdirectory>openocd</CacheSubdirectory>
+      </Item>
+    </Items>
+  </RootFolder>
+</WorkspaceSnapshot>
